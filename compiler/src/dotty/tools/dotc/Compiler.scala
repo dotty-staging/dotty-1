@@ -94,6 +94,7 @@ class Compiler {
          new ParamForwarding,        // Add forwarders for aliases of superclass parameters
          new TupleOptimizations,     // Optimize generic operations on tuples
          new ArrayConstructors) ::   // Intercept creation of (non-generic) arrays and intrinsify.
+    List(new eff.StoreAnnotations) ::
     List(new Erasure) ::             // Rewrite types to JVM model, erasing all type parameters, abstract types and refinements.
     List(new ElimErasedValueType,    // Expand erased value types to their underlying implmementation types
          new VCElideAllocations,     // Peep-hole optimization to eliminate unnecessary value class allocations
@@ -115,6 +116,8 @@ class Compiler {
                                      // Note: in this mini-phase block scopes are incorrect. No phases that rely on scopes should be here
          new ElimStaticThis,         // Replace `this` references to static objects by global identifiers
          new CountOuterAccesses) ::  // Identify outer accessors that can be dropped
+    List(new init.SetDefTree) ::
+    List(new eff.EscapeAnalysis) ::
     List(new DropOuterAccessors,     // Drop unused outer accessors
          new Flatten,                // Lift all inner classes to package scope
          new RenameLifted,           // Renames lifted classes to local numbering scheme
