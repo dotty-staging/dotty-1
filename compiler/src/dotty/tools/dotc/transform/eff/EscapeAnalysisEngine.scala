@@ -23,14 +23,19 @@ import StdNames.nme
 import reporting.trace
 
 import util.SimpleIdentitySet
+import scala.collection.mutable.ArrayBuilder
 
 /** A trick to make the implicitness of ctx invisible in `EscapeAnalysisEngine`.
   */
 class EscapeAnalysisEngineBase(implicit ctx: Context) {
   val `scala.Long.unbox` = ctx.requiredModule("scala.Long").requiredMethod("unbox")
   val `scala.Int.int2long` = defn.IntClass.companionModule.requiredMethod("int2long")
+
+  /** Special symbol used to represent `this` in the store */
+  val thisStoreKey = ctx.newSymbol(NoSymbol, "<!this!>".toTermName, Flags.EmptyFlags, NoType)
 }
 
+// TODO this engine should probably only be initialised /once/
 class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ctx) {
   import EscapeAnalysisEngine.{given _, _}
 
@@ -70,40 +75,105 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       debug.println(i"#tree = {{{\n${tree}\n}}}")
       debug.println("}}}")
 
-      // case tree @ Apply(fun: New, args) if fun.symbol.isConstructor && !fun.symbol.defTree.isEmpty =>
-
       uncluttered match {
-        // case tree @ New(_) =>
-        //   // NOTE `New` tree signifies a `new` node w/o any parameters
-        //   Map(AllocPoint(tree) -> LabelSet.empty)
 
-        // // member selection
-        // case tree @ Apply(fun @ HasSym(fsym), args) if fsym.isGetter =>
-        //   debug.println(i"symbol is a getter")
-        //   val Select(qual, name) = fun
-        //   for {
-        //     (key, labelSet) <- loop(qual)
-        //     if (labelSet.weak.contains(name))
-        //   } yield key -> labelSet.copy( weak = labelSet.weak - name )
+        case tree @ Select(This(_), name) =>
+          // assuming that we have a member
+          debug.println(i"#member-symbol-select {name=${name}#${name.##}}")
+
+          store.get(thisStoreKey) match {
+            case None =>
+              debug.println(i"!!! Tried to look up $name from the store, but `this` is absent")
+              Map.empty // TODO AnyValue?
+            case Some(av) =>
+              debug.println(i"#av {{{\n${av.toString}\n${av.map{ case (k, v) => k -> v.weak.toList.map(l => l -> l.##) }}\n}}}")
+              av.filter { case (_, value) => value.weak.contains(name) }
+          }
+
+        case tree @ Ident(name) if tree.symbol.owner.isClass =>
+          // assuming that we have a member
+          debug.println("#member-symbol-ident")
+          store.get(thisStoreKey) match {
+            case None =>
+              debug.println(i"!!! Tried to look up $name from the store, but `this` is absent")
+              Map.empty // TODO AnyValue?
+            case Some(av) =>
+              av.filter { case (_, value) => value.weak.contains(name) }
+          }
+
+        case tree @ Ident(_) =>
+          debug.println(i"#ident-data {{{")
+          debug.println(i"#tree.name {{{\n${tree.name}\n}}}")
+          debug.println(i"#tree.qualifier {{{\n${tree.qualifier}\n}}}")
+          debug.println("}}}")
+
+          store.getOrElse(tree.symbol,
+            tree.symbol.defTree match {
+              case EmptyTree => sys.error(i"missing def tree for {${tree.symbol}} shouldn't happen, missing -Yretain-trees")
+              case dt: ValDef =>
+                debug.println(i"going into def tree of $tree")
+                loop(dt.rhs)
+            }
+          )
 
         case tree @ Apply(fun @ Select(new_, ident), args) if ident == nme.CONSTRUCTOR =>
           val fsym = fun.symbol
-          // TODO we need to see primary constructor to know the local variables
-          // NOTE 
           assert(fsym.isPrimaryConstructor)
           val constructorDef = fsym.defTree.asInstanceOf[DefDef]
           val constructorVparams :: Nil = constructorDef.vparamss
+
+          val constructorArgPairs =
+            constructorVparams.lazyZip(args).map {
+              case (p, arg) => p -> loop(arg)
+            }.toList
+
+          def constructorAssignmentsIter: Iterator[(AllocPoint , LabelSet)] = {
+            val newStore = {
+              var res = store
+              for {
+                (p, av) <- constructorArgPairs
+              } do {
+                res = res.updated(p.symbol, av)
+              }
+              res
+            }
+
+            debug.println("#constructor-iteration {{{")
+            debug.println(i"#constructorDef.rhs (${constructorDef.rhs.productPrefix}) {{{\n${constructorDef.rhs}\n}}}")
+            val collected = ArrayBuilder.make[Iterator[(AllocPoint , LabelSet)]]
+            def iterate(tree: Tree): Unit =
+              tree match {
+                case Block(stmts, expr) =>
+                  stmts.foreach(iterate)
+                  iterate(expr)
+                case Assign(Select(This(_), name), rhs) =>
+                  collected += loop(rhs, newStore).iterator.map {
+                    case (k, v) => k -> (v + name)
+                  }
+                  debug.println(i"#bingo: $name#${name.##}")
+                case Assign(lhs, rhs) =>
+                  debug.println(i"#assign:")
+                  debug.println(i"##lhs (${lhs.productPrefix}) {{{\n${lhs}\n}}}")
+                  debug.println(i"##rhs (${rhs.productPrefix}) {{{\n${rhs}\n}}}")
+                case tree =>
+                  debug.println(i"#seeing: {${tree.productPrefix}} {{{\n${tree}\n}}}")
+              }
+            iterate(constructorDef.rhs)
+            debug.println("}}}")
+
+            collected.result.iterator.flatten
+          }
+
           assert(args.hasSameLengthAs(constructorVparams))
           AV.merge(
-            Iterator(AllocPoint(new_) -> LabelSet.empty) ++ {
-              for {
-                (param, arg) <- constructorVparams.iterator zip args.iterator
-                (key, labelSet) <- loop(arg).iterator
-              } yield key -> LabelSet(
-                weak = labelSet.weak + param.name,
-                strong = labelSet.strong + param.name
-              )
-            }
+            Iterator(AllocPoint(new_) -> LabelSet.empty)
+              ++ constructorAssignmentsIter
+              ++ {
+                for {
+                  (param, av) <- constructorArgPairs
+                  (key, labelSet) <- av
+                } yield key -> (labelSet + param.name)
+              }
           )
 
         case tree @ Apply(sel @ Select(objTree, ident), args) =>
@@ -124,7 +194,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
                     val params = methDef.vparamss.head.drop(env.length)
                     for
-                      (vp, arg) <- params lazyZip args // TODO assuming that closures have exactly one parameter list
+                      (vp, arg) <- params lazyZip args // TODO assuming that closures/constructors have exactly one parameter list
                     do
                       res = res.updated(vp.symbol, loop(arg))
 
@@ -138,16 +208,28 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
                   loop(closureBody, newStore)
 
-                case New(_) =>
-                  val methDefTree = sel.symbol.defTree
-                  debug.println(i"#method-def-tree {${ident.toString}} {{{\n${methDefTree}\n}}}")
+                case New(cls) =>
+                  val methDef = sel.symbol.defTree.asInstanceOf[DefDef]
+                  val cstrDef = cls.symbol.primaryConstructor.defTree.asInstanceOf[DefDef]
+                  debug.println(i"#method-def-tree {${ident.toString}} {{{")
+                  debug.println(i"#cstrDef {{{\n${cstrDef}\n}}}")
+                  debug.println(i"#methDef {{{\n${methDef}\n}}}")
+                  debug.println("}}}")
 
-                  // TODO retrieve method body
-                  // TODO retrieve method signature if body is unavailable
-                  AV.merge(
-                    abstractObj.iterator // TODO improve precision based on knowing that we call a method on `ap`
-                      ++ args.iterator.map(loop(_)).flatten
-                  )
+                  val newStore: Store =
+                    var res: Store = store
+
+                    val methParams = methDef.vparamss.head
+                    for
+                      (vp, arg) <- methParams lazyZip args // TODO assuming that closures/constructors have exactly one parameter list
+                    do
+                      res = res.updated(vp.symbol, loop(arg))
+
+                    res = res.updated(thisStoreKey, abstractObj)
+
+                    res
+
+                  loop(methDef.rhs, newStore)
 
                 case sym: Symbol =>
                   // What does it /mean/ when we have a symbol in the map?
@@ -161,7 +243,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   if ident == nme.apply
                     && defn.isFunctionType(info)//.reporting(i"isFunctionType(info) = $result", debug)
                   then {
-                    // TODO assuming that closures have exactly one parameter list
+                    // TODO assuming that closures/constructors have exactly one parameter list
                     val AppliedType(_, params) = info // assuming that a "function type" is always an applied type
                     val iters =
                       for
@@ -218,7 +300,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   debug.println(i"#defTree =\n$underlyingDefDef")
                   debug.println(i"#env = [${env.length}] $env%, %")
                   debug.println("}}}")
-                  // TODO assuming that closures have exactly one parameter list
+                  // TODO assuming that closures/constructors have exactly one parameter list
                   // TODO inefficient length call
                   val closureParams = underlyingDefDef.vparamss.head.drop(env.length)
                   val closureEnvParams = underlyingDefDef.vparamss.head.take(env.length)
@@ -255,22 +337,12 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           val newStore: Store =
             var res: Store = store
             for
-              (vp, arg) <- symTree.vparamss.head lazyZip args // TODO assuming that the closure has exactly one param list
+              (vp, arg) <- symTree.vparamss.head lazyZip args // TODO assuming that closures/constructors have exactly one parameter list
             do
               res = res.updated(vp.symbol, loop(arg))
             res
 
           loop(symTree.rhs, newStore)
-
-        case tree @ Ident(_) =>
-          store.getOrElse(tree.symbol,
-            tree.symbol.defTree match {
-              case EmptyTree => sys.error(i"missing def tree for {${tree.symbol}} shouldn't happen, missing -Yretain-trees")
-              case dt: ValDef =>
-                debug.println(i"going into def tree of $tree")
-                loop(dt.rhs)
-            }
-          )
 
         case tree @ Closure(env, meth, _) =>
           val closureDefTree = meth.symbol.defTree.asInstanceOf[DefDef]
@@ -363,6 +435,8 @@ object EscapeAnalysisEngine {
     weak: Set[Label],
     strong: Set[Label]
   ) {
+    def +(label: Label) = LabelSet(weak = this.weak + label, strong = this.strong + label)
+
     def isEmpty: Boolean = weak.isEmpty && strong.isEmpty
 
     def display: String =

@@ -4,25 +4,11 @@ package transform
 package eff
 
 import core._
-// import Decorators._
-// import Symbols._
-// import Types._
 
 import ast.tpd._
-// import core.Contexts
 import core.Contexts.Context
-// import config.Printers.debug
-
-// import printing.{Showable, Printer}
-// import printing.Texts.Text
 
 import transform.MegaPhase.MiniPhase
-
-// import StdNames.nme
-
-// import reporting.trace
-
-// import util.SimpleIdentitySet
 
 class EscapeAnalysis extends MiniPhase {
   import EscapeAnalysis.{given _, _}
