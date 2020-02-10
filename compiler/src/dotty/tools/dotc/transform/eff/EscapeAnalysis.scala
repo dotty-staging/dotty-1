@@ -20,7 +20,7 @@ class EscapeAnalysis extends MiniPhase {
     val fsym = fun.symbol
     if fsym.exists && fsym.hasAnnotation(ctx.definitions.LocalParamsAnnot) then
       val engine = new EscapeAnalysisEngine(ctx)
-      engine.analyse(tree, store = Map.empty)
+      engine.analyseToplevel(tree)
     tree
   }
 

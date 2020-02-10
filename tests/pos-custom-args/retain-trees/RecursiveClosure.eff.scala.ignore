@@ -1,0 +1,18 @@
+object LoopingClosure {
+  import scala.annotation.internal.local
+
+  class SFile
+
+  def withFile[T](thunk: (SFile @local) => T): T = thunk(new SFile)
+
+  withFile { f =>
+    lazy val len: (List[Any] => Int) = { (list: List[Any]) =>
+      list match {
+        case _ :: t => 1 + len(t)
+        case Nil => 0
+      }
+    }
+
+    len(List(1, 2, 3))
+  }
+}
