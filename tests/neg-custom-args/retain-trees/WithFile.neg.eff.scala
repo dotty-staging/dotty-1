@@ -37,4 +37,10 @@ object WithFileTest {
     new Container(f) // error
   }
 
+  class Container2[T](val value: T)
+
+  withFile("") { f =>
+    new Container2(f).value // error
+  }
+
 }

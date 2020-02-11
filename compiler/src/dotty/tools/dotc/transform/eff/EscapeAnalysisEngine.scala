@@ -12,6 +12,7 @@ import ast.tpd
 import tpd._
 import core.Contexts
 import core.Contexts.Context
+import core.NameOps.TermNameDecorator
 import config.Printers.debug
 
 import printing.{Showable, Printer}
@@ -25,6 +26,8 @@ import reporting.trace
 
 import util.SimpleIdentitySet
 import scala.collection.mutable.{ArrayBuilder, ListBuffer}
+
+import java.{lang => jl}
 
 /** A trick to make the implicitness of ctx invisible in `EscapeAnalysisEngine`. */
 class EscapeAnalysisEngineBase(implicit ctx: Context) {
@@ -45,28 +48,79 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       case _ => s"{{{\n${ it }\n}}}"
 
   def showHeap(it: Any)(implicit ctx: Context): String = {
-    it match
-    case r: (Heap @unchecked) => s"{{{\n${Heap.display(r)}\n}}}"
-    case _ => s"{{{\n${ it }\n}}}"
+    it match {
+      case r: MutRes => r match {
+        case MutRes.NoReturn(h) =>
+          s"{{{\n#NoReturn\n#heap {{{\n${Heap.display(h)}\n}}}\n}}}"
+        case MutRes.Return(h, av, t) =>
+          val res = new StringBuilder
+          res append "{{{\n"
+          res append "#Return(total = $t)\n"
+          res append "#heap {{{\n${Heap.display(h)}\n}}}\n"
+          res append "#av {{{\n${AV.display(av)}\n}}}\n"
+          res append "}}}"
+          res.toString
+      }
+      case _ => s"{{{\n${ it }\n}}}"
+    }
   }
 
   def accumulate(
     tree: Tree,
-    store: Store = Map.empty,
-    cache: Cache = Map.empty,
-    heap: Heap = Heap.Empty
-  )(implicit ctx: Context): Heap = {
+    store: Store,
+    cache: Cache,
+    heap: Heap,
+    terminal: Boolean
+  )(implicit ctx: Context): MutRes = {
     def loop(
       tree: Tree,
       _store: Store = store,
       _cache: Cache = cache,
-      _heap: Heap = heap
-    )(implicit ctx: Context) = accumulate(tree, _store, _cache, _heap)
+      _heap: Heap = heap,
+      _terminal: Boolean = false
+    )(implicit ctx: Context) = accumulate(tree, _store, _cache, _heap, _terminal)
 
-    def _analyse(tree: Tree)(implicit ctx: Context) = analyse(tree, store, cache, heap)
+    def integrate(res: MutRes, tree: Tree, _terminal: Boolean = false) = {
+      res match {
+        case MutRes.NoReturn(heap) =>
+          loop(tree, _heap = heap, _terminal = _terminal)
+        case MutRes.Return(heap, res1, total) =>
+          if (total) res else {
+            loop(tree, _heap = heap, _terminal = _terminal) match {
+              case MutRes.NoReturn(heap) =>
+                MutRes.Return(heap, res1, total)
+              case MutRes.Return(heap, res2, total) =>
+                MutRes.Return(
+                  heap,
+                  AV.merge(res1.iterator ++ res2.iterator),
+                  total
+                )
+            }
+          }
+      }
+    }
+
+    /** Merge mut-results from two _branching_ codepaths. */
+    def merge(resA: MutRes, resB: MutRes): MutRes =
+      (resA, resB) match {
+        case (MutRes.NoReturn(heap1), MutRes.NoReturn(heap2)) =>
+          MutRes.NoReturn(heap1 merge heap2)
+        case (MutRes.Return(heap1, av, total), MutRes.NoReturn(heap2)) =>
+          MutRes.Return(heap1 merge heap2, av, total)
+        case (MutRes.NoReturn(heap1), MutRes.Return(heap2, av, total)) =>
+          MutRes.Return(heap1 merge heap2, av, total)
+        case (MutRes.Return(heap1, av1, total1), MutRes.Return(heap2, av2, total2)) =>
+          MutRes.Return(
+            heap1 merge heap2,
+            av1 merge av2,
+            total1 && total2
+          )
+      }
+
+    def _analyse(tree: Tree, _heap: Heap = heap)(implicit ctx: Context) = analyse(tree, store, cache, _heap)
 
     val uncluttered = unclutter(tree, dropBlocks = false)
-    trace(i"accumulate(${tersely(uncluttered)}; ${store.keys.map(_.name).toList}%, %)", debug, showHeap) {
+    trace(i"accumulate(${tersely(uncluttered)}; terminal=$terminal; ${store.keys.map(_.name).toList}%, %)", debug, showHeap) {
 
       debug.println("{{{")
       debug.println(i"#uncluttered = {{{\n${uncluttered}\n}}}")
@@ -75,9 +129,15 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       debug.println("}}}")
 
       uncluttered match {
-        case Block(stmts, expr) =>
-          val heap1 = stmts.foldLeft(heap) { (heap, stmt) => accumulate(stmt, store, cache, heap) }
-          accumulate(expr, store, cache, heap1)
+        /// constructor
+        case tree @ Apply(Select(_, ident), _) if ident == nme.CONSTRUCTOR =>
+          // ! SSA-assumption
+
+          // just delegate to analyse
+          if (!terminal)
+            MutRes.NoReturn(heap)
+          else
+            MutRes.Return(heap, _analyse(tree), total = true)
 
         case Assign(lhs, rhs) =>
           debug.println(i"#!acc-assign {{{")
@@ -85,49 +145,33 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           debug.println(i"#rhs {${rhs.productPrefix}} {{{\n${rhs}\n}}}")
           debug.println("}}}")
 
-          heap
+          assert(!terminal)
+          MutRes.NoReturn(heap)
 
         // TODO array mutations have their own magick symbol-less methods
 
         case Apply(sel @ Select(obj, _), args) if sel.symbol.isSetter && sel.symbol.is(Flags.Mutable) =>
-          val sym = sel.symbol.underlyingSymbol
-          debug.println(i"#!acc-apply-setter {{{")
-          debug.println(i"#sel {${sel.productPrefix}} {{{\n${sel}\n}}}")
-          debug.println(i"#sel.symbol.flags ${sel.symbol.flags.flagsString}")
-          for (arg, i) <- args.iterator.zipWithIndex
-          do debug.println(i"#args[$i] ${arg}")
-          debug.println(i"#sym ${sym}")
-          debug.println(i"#sel.symbol.accessedFieldOrGetter ${sel.symbol.accessedFieldOrGetter}")
-          debug.println(i"#sel.symbol.name ${sel.symbol.name}")
-          import dotty.tools.dotc.core.NameOps.TermNameDecorator
           val fieldName = sel.symbol.name.asTermName.getterName
-          debug.println(i"#sel.symbol.name.asTermName.getterName ${fieldName}")
-          debug.println(i"#fieldName.## ${fieldName.##}")
           val d = sel.symbol.owner.info.decl(fieldName)
-          debug.println(i"#sel.symbol.owner.info.decl(fieldName) ${d}")
-          debug.println(i"#d.getClass ${d.getClass}")
-          debug.println(i"#d.symbol.flags.flagsString ${d.symbol.flags.flagsString}")
-          debug.println(i"#d.symbol.## ${d.symbol.##}")
-          debug.println(i"#d.## ${d.##}")
-          debug.println(i"#d.info ${d.info}")
-          debug.println(i"#d.info.isParameterless ${d.info.isParameterless}")
-          val field = d.suchThat(!_.is(Flags.Method)).symbol
-          val getter = d.suchThat(_.info.isParameterless).symbol
-          debug.println(i"#field ${field}")
-          debug.println(i"#getter ${getter}")
-          debug.println("}}}")
 
           val arg :: Nil = args // expecting only one arg for a setter
           val abstractArg = _analyse(arg)
 
-          (for {
-            (ap, ls) <- _analyse(obj).iterator // TODO evaluating obj /can/ produce side-effects
-            if ls.isEmpty // TODO only the strongs must be empty, find an error case
-          } yield ap).foldLeft(heap) { (heap, ap) => heap.updatedWith(ap, d.symbol, abstractArg) {
-            av => AV.merge(av.iterator ++ abstractArg)
-          }}
+          val res =
+            (for {
+              (ap, ls) <- _analyse(obj).iterator // TODO evaluating obj /can/ produce side-effects
+              if ls.isEmpty // TODO only the strongs must be empty, find an error case
+            } yield ap).foldLeft(heap) { (heap, ap) =>
+              heap.updatedWith(ap, d.symbol, abstractArg) { av =>
+                av merge abstractArg
+              }
 
-        case Apply(meth, args) =>
+            }
+
+          assert(!terminal)
+          MutRes.NoReturn(res)
+
+        case tree @ Apply(meth, args) =>
           debug.println(i"#!acc-apply {{{")
           debug.println(i"#meth {${meth.productPrefix}} {{{\n${meth}\n}}}")
           debug.println(i"#meth.toString ${meth.toString}")
@@ -136,9 +180,71 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           do debug.println(i"#args[$i] ${arg}")
           debug.println("}}}")
 
-          heap
+          if (!terminal)
+            MutRes.NoReturn(heap)
+          else
+            MutRes.Return(heap, _analyse(tree, heap), total = true)
 
-        case _ => heap
+        case If(cond, thenp, elsep) =>
+          val res1 = loop(cond)
+          val done = res1 match {
+            case _: MutRes.NoReturn => false
+            case MutRes.Return(_, _, total) => total
+          }
+
+          // TODO test the code for exiting from if-conditions
+          if (done) res1 else {
+            val heap1 = res1.heap
+            merge(
+              loop(thenp, _heap = heap, _terminal = terminal),
+              loop(elsep, _heap = heap, _terminal = terminal)
+            )
+          }
+
+        case Return(expr, from) =>
+          debug.println(i"#!return {{{")
+          debug.println(i"#expr {${expr.productPrefix}} {{{\n${expr}\n}}}")
+          debug.println(i"#from {${from.productPrefix}} {{{\n${from}\n}}}")
+          debug.println("}}}")
+
+          // TODO: analyse the expr for terrible nested returns
+          MutRes.Return(heap, _analyse(expr, _heap = heap), total = true)
+
+        case Labeled(bind, tree) =>
+          debug.println(i"#!labeled {{{")
+          debug.println(i"#bind {${bind.productPrefix}} {{{\n${bind}\n}}}")
+          debug.println("}}}")
+
+          loop(tree, _terminal = terminal)
+
+        case Block(stmts, expr) =>
+          var res: MutRes = null
+          val iter = stmts.iterator
+          var done: Boolean = false
+          while (!done && iter.hasNext) {
+            res =
+              if (res == null)
+                loop(iter.next)
+              else
+                integrate(res, iter.next)
+            done = res.isInstanceOf[MutRes.Return]
+          }
+
+          if (!done) {
+            res =
+              if (res == null)
+                loop(expr, _terminal = terminal)
+              else
+                integrate(res, expr, _terminal = terminal)
+          }
+
+          res
+
+        case tree =>
+          if (!terminal)
+            MutRes.NoReturn(heap)
+          else
+            MutRes.Return(heap, _analyse(tree), total = true)
       }
     }
   }
@@ -171,30 +277,33 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
       uncluttered match {
 
-        case tpd.Literal(_) => Map(AP.Constant -> LabelSet.empty)
+        case tpd.Literal(_) =>
+          AV(Map(AP.Constant -> LabelSet.empty))
 
         case tree @ Apply(sel @ Select(obj, _), Nil) if sel.symbol.isGetter && sel.symbol.is(Flags.Mutable) =>
           val sym = sel.symbol.underlyingSymbol
           debug.println(i"#sel.symbol.## ${sel.symbol.##}")
           debug.println(i"#sel.symbol.name.## ${sel.symbol.name.##}")
           debug.println(i"#!sym.flags.flagsString ${sym.flags.flagsString}")
-          AV.merge {
-            (for {
-              (ap, ls) <- loop(obj).iterator
-              if ls.isEmpty // TODO only the strongs must be empty, find a test case
-            } yield {
-              heap.getOrElse(ap, sym, {
-                debug.println(i"#!!! Mutable symbol absent from heap! AP: ${ap.display} ; sym: ${sym}")
-                AV.empty
-              })
-            }).flatten
+
+          var res = AV.Empty
+          for {
+            (ap, ls) <- loop(obj).iterator
+            if ls.isEmpty // TODO only the strongs must be empty, find a test case
+          } do {
+            res = res.merge(heap.getOrElse(ap, sym, {
+              debug.println(i"#!!! Mutable symbol absent from heap! AP: ${ap.display} ; sym: ${sym}")
+              AV.Empty
+            }))
           }
+
+          res
 
         case This(_) =>
           store.get(thisStoreKey) match {
             case None =>
               debug.println(i"#!!! @This tree, `this` absent from store!")
-              Map.empty // TODO AnyValue?
+              AV.Empty // TODO AnyValue?
             case Some(av) => av
           }
 
@@ -205,7 +314,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           store.get(thisStoreKey) match {
             case None =>
               debug.println(i"#!!! Tried to look up $name from the store, but `this` is absent")
-              Map.empty // TODO AnyValue?
+              AV.Empty // TODO AnyValue?
             case Some(av) =>
               av.filter { case (_, value) => value.weak.contains(name) }
           }
@@ -216,7 +325,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           store.get(thisStoreKey) match {
             case None =>
               debug.println(i"!!! Tried to look up $name from the store, but `this` is absent")
-              Map.empty // TODO AnyValue?
+              AV.Empty // TODO AnyValue?
             case Some(av) =>
               av.filter { case (_, value) => value.weak.contains(name) }
           }
@@ -297,149 +406,163 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               ++ {
                 for {
                   (param, av) <- constructorArgPairs
-                  (key, labelSet) <- av
+                  (key, labelSet) <- av.iterator
                 } yield key -> (labelSet + param.name)
               }
           )
 
         /// method call
-        case tree @ Apply(sel @ Select(objTree, ident), args) =>
-          val abstractObj = loop(objTree, store)
-          val iters =
-            for
-              (ap, emptyLabels) <- abstractObj.iterator
-              if emptyLabels.isEmpty // TODO only the /strong/ set should be empty, find an error case for this
-              // TODO if types overlap (why types need to overlap? does it make more sense to check if ident exists on ap?)
-            yield
-              (ap: @unchecked) match {
-                case AP.Tree(cls @ Closure(env, meth, _)) =>
-                  val methDef = meth.symbol.defTree.asInstanceOf[DefDef]
-                  val closureBody = methDef.rhs
+        case tree @ Apply(sel @ Select(objTree, ident), args)
+            if !objTree.symbol.is(Flags.Module) =>
+          debug.println(i">method-call")
 
-                  val (newStore: Store, abstractArgs: List[AV]) =
-                    var res: Store = store
+          def analyseMethodCall(ap: AP, abstractObj: AV): AV =
+            (ap: @unchecked) match {
+              case AP.Tree(cls @ Closure(env, meth, _)) =>
+                // TODO: test the case when the method cannot be statically determined
+                val methDef = meth.symbol.defTree.asInstanceOf[DefDef]
+                val closureBody = methDef.rhs
 
-                    val abstractArgsBld = ListBuffer.empty[AV]
-                    val params = methDef.vparamss.head.drop(env.length)
-                    for
-                      (vp, arg) <- params lazyZip args // TODO assuming that closures/constructors have exactly one parameter list
-                    do
-                      val abstractArg = loop(arg)
-                      abstractArgsBld += abstractArg
-                      res = res.updated(vp.symbol, abstractArg)
+                val (newStore: Store, abstractArgs: List[AV]) = {
+                  var res: Store = store
 
-                    val envSyms = methDef.vparamss.head.take(env.length).map(_.symbol)
-                    for
-                      (ap, ls) <- abstractObj.iterator
-                      sym <- envSyms.find(s => ls.weak.contains(s.name))
-                    do
-                      res = res.updated(sym, Map(ap -> ls))
-
-                    (res, abstractArgsBld.result)
-
-                  cache.get((ap, abstractArgs)) match {
-                    case Some(av: AV) => av
-                    case Some("err") =>
-                      debug.println(i"#! Ran out of abstract stack when analysing a closure: {{{")
-                      debug.println(i"#cls {{{\n${cls}\n}}}")
-                      // for {
-                      //   (aarg, i) <- abstractArgs.iterator.zipWithIndex
-                      // } do {
-                      //   debug.println(i"#aarg[$i] {{{\n${aarg}\n}}}")
-                      // }
-                      debug.println("}}}")
-                      Map.empty
-                    case None =>
-                      loop(closureBody, newStore, cache.updated((ap, abstractArgs), "err"))
+                  val abstractArgsBld = ListBuffer.empty[AV]
+                  val params = methDef.vparamss.head.drop(env.length)
+                  for {
+                    (vp, arg) <- params lazyZip args // TODO assuming that closures/constructors have exactly one parameter list
+                  } do {
+                    val abstractArg = loop(arg)
+                    abstractArgsBld += abstractArg
+                    res = res.updated(vp.symbol, abstractArg)
                   }
 
-                case AP.Tree(New(cls)) =>
-                  val methDef = sel.symbol.defTree.asInstanceOf[DefDef]
-                  val cstrDef = cls.symbol.primaryConstructor.defTree.asInstanceOf[DefDef]
-                  debug.println(i"#method-def-tree {${ident.toString}} {{{")
-                  debug.println(i"#cstrDef {{{\n${cstrDef}\n}}}")
-                  debug.println(i"#methDef {{{\n${methDef}\n}}}")
-                  debug.println("}}}")
-
-                  val (newStore: Store, abstractArgs: List[AV]) = {
-                    var res: Store = store
-
-                    val abstractArgsBld = ListBuffer.empty[AV]
-                    val methParams = methDef.vparamss.head
-                    for
-                      (vp, arg) <- methParams lazyZip args // TODO assuming that closures/constructors have exactly one parameter list
-                    do {
-                      val abstractArg = loop(arg)
-                      abstractArgsBld += abstractArg
-                      res = res.updated(vp.symbol, abstractArg)
-                    }
-
-                    res = res.updated(thisStoreKey, abstractObj)
-                    (res, abstractArgsBld.result)
+                  val envSyms = methDef.vparamss.head.take(env.length).map(_.symbol)
+                  for {
+                    (ap, ls) <- abstractObj.iterator
+                    sym <- envSyms.find(s => ls.weak.contains(s.name))
+                  } do {
+                    res = res.updated(sym, AV(ap -> ls))
                   }
 
-                  cache.get((ap, abstractArgs)) match {
-                    case Some(av: AV) =>
-                      av
-                    case Some("err") =>
-                      debug.println(i"#! Ran out of abstract stack when analysing a method: (${sel.symbol.name}) {{{")
-                      debug.println(i"#methDef.rhs {{{\n${methDef.rhs}\n}}}")
-                      // for {
-                      //   (aarg, i) <- abstractArgs.iterator.zipWithIndex
-                      // } do {
-                      //   debug.println(i"#aarg[$i] {{{\n${aarg}\n}}}")
-                      // }
-                      debug.println("}}}")
-                      Map.empty // TODO: this should be /all/ possible values
-                    case None =>
-                      loop(methDef.rhs, newStore, cache.updated((ap, abstractArgs), "err"))
+                  (res, abstractArgsBld.result)
+                }
+
+                cache.get((ap, abstractArgs)) match {
+                  case Some(av: AV) => av
+                  case Some("err") =>
+                    debug.println(i"#! Ran out of abstract stack when analysing a closure: {{{")
+                    debug.println(i"#cls {{{\n${cls}\n}}}")
+                    // for {
+                    //   (aarg, i) <- abstractArgs.iterator.zipWithIndex
+                    // } do {
+                    //   debug.println(i"#aarg[$i] {{{\n${aarg}\n}}}")
+                    // }
+                    debug.println("}}}")
+                    AV.Empty
+                  case None =>
+                    loop(closureBody, newStore, cache.updated((ap, abstractArgs), "err"))
+                }
+
+              case AP.Tree(New(cls)) =>
+                val methDef = sel.symbol.defTree.asInstanceOf[DefDef]
+                val cstrDef = cls.symbol.primaryConstructor.defTree.asInstanceOf[DefDef]
+                debug.println(i"#method-def-tree {${ident.toString}} {{{")
+                debug.println(i"#cstrDef {{{\n${cstrDef}\n}}}")
+                debug.println(i"#methDef {{{\n${methDef}\n}}}")
+                debug.println("}}}")
+
+                val (newStore: Store, abstractArgs: List[AV]) = {
+                  var res: Store = store
+
+                  val abstractArgsBld = ListBuffer.empty[AV]
+                  val methParams = methDef.vparamss.head
+                  for
+                    (vp, arg) <- methParams lazyZip args // TODO assuming that closures/constructors have exactly one parameter list
+                  do {
+                    val abstractArg = loop(arg)
+                    abstractArgsBld += abstractArg
+                    res = res.updated(vp.symbol, abstractArg)
                   }
 
-                case AP.Sym(sym) =>
-                  // What does it /mean/ when we have a symbol in the map?
-                  // It means we are dealing with a local variable.
-                  // Therefore, we should first check if we can get a signature of the method being selected
-                  // or otherwise we assume the worst
-                  // should probably deal with the easy case first, where we're calling .apply on lambda we have signature of
-                  val info = ctx.atPhase(ctx.postTyperPhase) {
-                    sym.denot.info
-                  }
-                  if ident == nme.apply
-                    && defn.isFunctionType(info)//.reporting(i"isFunctionType(info) = $result", debug)
-                  then {
+                  res = res.updated(thisStoreKey, abstractObj)
+                  (res, abstractArgsBld.result)
+                }
+
+                cache.get((ap, abstractArgs)) match {
+                  case Some(av: AV) =>
+                    av
+                  case Some("err") =>
+                    debug.println(i"#! Ran out of abstract stack when analysing a method: (${sel.symbol.name}) {{{")
+                    debug.println(i"#methDef.rhs {{{\n${methDef.rhs}\n}}}")
+                    // for {
+                    //   (aarg, i) <- abstractArgs.iterator.zipWithIndex
+                    // } do {
+                    //   debug.println(i"#aarg[$i] {{{\n${aarg}\n}}}")
+                    // }
+                    debug.println("}}}")
+                    AV.Empty // TODO: this should be /all/ possible values
+                  case None =>
+                    loop(methDef.rhs, newStore, cache.updated((ap, abstractArgs), "err"))
+                }
+
+              case AP.Sym(sym) =>
+                // What does it /mean/ when we have a symbol in the map?
+                // It means we are dealing with a local variable.
+                // Therefore, we should first check if we can get a signature of the method being selected
+                // or otherwise we assume the worst
+                // should probably deal with the easy case first, where we're calling .apply on lambda we have signature of
+                val info = ctx.atPhase(ctx.postTyperPhase) { sym.denot.info }
+                if (ident == nme.apply && defn.isFunctionType(info)) {
                     // TODO assuming that closures/constructors have exactly one parameter list
                     val AppliedType(_, params) = info // assuming that a "function type" is always an applied type
-                    val iters =
-                      for
-                        (param, arg) <- params lazyZip args // discards the result type parameter
-                        if !param.hasAnnotation(defn.LocalAnnot)
-                      yield
-                        loop(arg)
-                    AV.merge(
-                      // TODO a function *can* in some cases return itself, how to deal with that?
-                      // Iterator(ap -> LabelSet.empty) ++
-                        iters.iterator.flatten
-                    )
+                    var res = AV.Empty
+                    for {
+                      (param, arg) <- params lazyZip args // discards the result type parameter
+                      if !param.hasAnnotation(defn.LocalAnnot)
+                    } do {
+                      res = res merge loop(arg)
+                    }
+
+                    res
                   } else {
+                    debug.println(i"#!sym-method-call")
                     // TODO retrieve signatures for arbitrary methods
-                    AV.merge(
-                      Iterator(ap -> LabelSet.empty) ++
-                      args.iterator.map(loop(_)).flatten
-                    )
+                    args.foldLeft(AV(ap -> LabelSet.empty)) {
+                      (av, arg) => av merge loop(arg)
+                    }
                   }
 
-                case AP.Constant =>
-                  AV.merge(
-                    args.iterator.map(loop(_)).flatten
-                      ++ Iterator(AP.Constant -> LabelSet.empty)
-                  )
-              }
+              case AP.Constant =>
+                args.foldLeft(AV(AP.Constant -> LabelSet.empty)) {
+                  (av, arg) => av merge loop(arg)
+                }
+                // AV.merge(
+                //   args.iterator.map(loop(_)).flatten
+                //     ++ Iterator(AP.Constant -> LabelSet.empty)
+                // )
+            }
 
-          AV.merge(iters.flatMap(_.iterator))
+          val abstractObj = loop(objTree, store)
+          var res = AV.Empty
+          for {
+            (ap, emptyLabels) <- abstractObj.iterator
+            if emptyLabels.isEmpty // TODO only the /strong/ set should be empty, find an error case for this
+            // TODO if types overlap (why types need to overlap? does it make more sense to check if ident exists on ap?)
+          } do {
+            res = res merge analyseMethodCall(ap, abstractObj)
+          }
 
-        case tree @ Apply(fun: Ident, args) if fun.symbol.exists =>
+          res
+
+        case tree @ Apply(fun, args) if !fun.symbol.defTree.isEmpty =>
+
           val fsym = fun.symbol
           val symTree = fsym.defTree.asInstanceOf[DefDef] // StoreAnnotations phase only adds this annot to DefDefs
+
+          debug.println(i"#function-call {{{")
+          debug.println(i"#symTree {${symTree.productPrefix}} {{{\n${symTree}\n}}}")
+          debug.println("}}}")
+
           val rparams = symTree.vparamss.head.map { p =>
             p.symbol.getAnnotation(ctx.definitions.LocalParamsAnnot) match {
               case Some(annot) =>
@@ -475,18 +598,19 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   val closureParams = underlyingDefDef.vparamss.head.drop(env.length)
                   val closureEnvParams = underlyingDefDef.vparamss.head.take(env.length)
 
-                  val (closureLocalParams: LocalParams, newStore: Store) =
+                  val (closureLocalParams: LocalParams, newStore: Store) = {
                     var res1: LocalParams = SimpleIdentitySet.empty
                     var res2: Store = store
                     closureParams.iterator.zipWithIndex.foreach { case (p, idx) =>
                       if lpIndices.contains(idx) then res1 += p.symbol
-                      res2 = res2.updated(p.symbol, Map(AP(p.symbol) -> LabelSet.empty))
+                      res2 = res2.updated(p.symbol, AV(AP(p.symbol) -> LabelSet.empty))
                     }
-                    for (p, t) <- closureEnvParams lazyZip env
-                    do
+                    for (p, t) <- closureEnvParams lazyZip env do {
                       debug.println(i"#env-param ${p.name} → {{{\n${t}\n}}}")
                       res2 = res2.updated(p.symbol, loop(t))
+                    }
                     (res1, res2)
+                  }
 
                   val finalExpr = finalExprOf(underlyingDefDef.rhs)
 
@@ -494,7 +618,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
                   val analysed: AV = loop(finalExpr, newStore)
 
-                  val escapees = analysed.keysIterator.filter(ap => closureLocalParams.contains(ap.maybeSym)).toSeq
+                  val escapees =
+                    analysed.self.keysIterator.filter(ap => closureLocalParams.contains(ap.maybeSym)).toSeq
                   if (escapees.size > 0) {
                     ctx.error(i"(c) escaping locals: ${escapees}%, %", finalExpr.sourcePos)
                   } else {
@@ -512,6 +637,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               res = res.updated(vp.symbol, loop(arg))
             res
 
+          // TODO !!! NEED TO RUN EFFECT ANALYSIS HERE!
           loop(symTree.rhs, newStore)
 
         case tree @ Closure(env, meth, _) =>
@@ -541,7 +667,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case tree =>
           debug.println(i"#!!! UNRECOGNIZED TREE: empty abstract value for ${tree.getClass.getSimpleName}:{{{\n${ tree }\n${ tree.toString }\n}}}")
-          AV.empty
+          AV.Empty
       }
     }
 
@@ -554,7 +680,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
         vp <- vparams
       do
         if vp.symbol.hasAnnotation(ctx.definitions.LocalAnnot) then res1 += vp.symbol
-        res2 = res2.updated(vp.symbol, Map(AP(vp.symbol) -> LabelSet.empty))
+        res2 = res2.updated(vp.symbol, AV(AP(vp.symbol) -> LabelSet.empty))
 
       (res1, res2)
     }
@@ -567,12 +693,26 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     // import given Flags.FlagOps
     if (localParams.size > 0) {
       debug.println(i"${tree.name}: detected local params")
-      val heap = accumulate(tree.rhs, localStore.toMap, Map.empty, Heap.Empty)
-      val analysed = analyse(finalExpr, localStore.toMap, Map.empty, heap)
-      val resolved = AV.resolve(analysed, heap)
-      val escapees = resolved.keysIterator.filter(ap => localParams.contains(ap.maybeSym)).toSeq
+      val mutRes = accumulate(tree.rhs, localStore.toMap, Map.empty, Heap.Empty, terminal = true)
+      val (heap, av) = mutRes match {
+        case MutRes.NoReturn(heap) =>
+          debug.println("#mut-res-no-return")
+          // val analysed = analyse(finalExpr, localStore.toMap, Map.empty, heap)
+          (heap, AV.Empty)
+        case MutRes.Return(heap, res, total) =>
+          debug.println("#mut-res-return")
+          assert(total)
+          (heap, res)
+      }
+
+      val resolved = AV.resolve(av, heap)
+      val escapees =
+        resolved.self.keysIterator.filter(ap => localParams.contains(ap.maybeSym)).toSeq
       if (escapees.size > 0) {
-        ctx.error(i"(m) escaping locals: ${escapees}%, %", finalExpr.sourcePos)
+        escapees.foreach { s => (s: @unchecked) match {
+          case AP.Sym(sym) =>
+            ctx.error(i"(m) local escapes ($sym)", sym.sourcePos)
+        }}
       } else {
         debug.println("No locals escape")
       }
@@ -581,11 +721,12 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     tree
   }
 
-  private def finalExprOf(tree: Tree): Tree = {
+  private def finalExprOf(tree: Tree, skipLabeled: Boolean = false): Tree = {
     var finalExpr: Tree = tree
     def unblocked: Tree =
       finalExpr match {
         case Block(_, expr) => expr
+        case Labeled(_, expr) if skipLabeled => expr
         case _ => null
       }
 
@@ -683,8 +824,39 @@ object EscapeAnalysisEngine {
     def apply(tree: tpd.Tree) = AP.Tree(tree)
   }
 
-  type AV = Map[AP, LabelSet]
+  class AV(val self: Map[AP, LabelSet]) extends AnyVal {
+    def iterator = self.iterator
+
+    def filter(f: ((AP, LabelSet)) => Boolean): AV =
+      AV(this.self.filter(f))
+
+    def merge(other: AV): AV =
+      if (other.self.size < this.self.size)
+        merge(other.iterator)
+      else
+        other.merge(this.iterator)
+
+    def merge(other: Iterator[(AP, LabelSet)]): AV = {
+      var res = this.self
+      for {
+        (ap, ls1) <- other
+      } do {
+        res = res.updatedWith(ap) {
+          case None => Some(ls1)
+          case Some(ls2) =>
+            Some(LabelSet.merge(ls1, ls2))
+        }
+      }
+      AV(res)
+    }
+  }
+
   object AV {
+    val Empty = AV(Map.empty)
+
+    def apply(kv: (AP, LabelSet)): AV = AV(Map(kv))
+    def apply(map: Map[AP, LabelSet]): AV = new AV(map)
+
     def resolve(av: AV, heap: Heap): AV = {
       merge(
         av.iterator
@@ -700,13 +872,11 @@ object EscapeAnalysisEngine {
       )
     }
 
-    def empty: AV = Map.empty
-
     def merge(labels: Iterator[(AP, LabelSet)]): AV = {
       val resIter = for {
         (a, g) <- labels.toArray.groupBy(_._1).iterator
       } yield a -> (g.map(_._2).reduce(LabelSet.merge))
-      resIter.toMap
+      AV(resIter.toMap)
     }
 
     def display(av: AV, indent: Int = 0)(implicit ctx: Context): String = {
@@ -717,7 +887,7 @@ object EscapeAnalysisEngine {
         if nl_? then res append "\n"
         nl_? = true
 
-      for (k, v) <- av
+      for (k, v) <- av.iterator
       do
         nl()
         res append spaces
@@ -729,6 +899,15 @@ object EscapeAnalysisEngine {
   }
 
   type Cache = Map[(AP, List[AV]), AV | "err"]
+
+  trait HasHeap {
+    def heap: Heap
+  }
+
+  enum MutRes extends HasHeap{
+    case NoReturn(heap: Heap);
+    case Return(heap: Heap, result: AV, total: Boolean);
+  }
 
   class Heap (val self: Map[AP, Map[Symbol, AV]]) extends AnyVal {
     def get(ap: AP, sym: Symbol): Option[AV] =
@@ -742,6 +921,25 @@ object EscapeAnalysisEngine {
         case None => elsep
         case Some(inner) => inner.getOrElse(sym, elsep)
       }
+
+    def merge(other: Heap): Heap = {
+      var res: Map[AP, Map[Symbol, AV]] = other.self
+      for { (ap, inner1) <- this.self } do {
+        res = res.updatedWith(ap) {
+          case None => Some(inner1)
+          case Some(inner2) =>
+            var innerRes = inner2
+            for { (sym, av1) <- inner1 } do {
+              innerRes = innerRes.updatedWith(sym) {
+                case None => Some(av1)
+                case Some(av2) => Some(AV.merge(av1.iterator ++ av2.iterator))
+              }
+            }
+            Some(innerRes)
+        }
+      }
+      Heap(res)
+    }
 
     def updatedWith(ap: AP, sym: Symbol, default: AV)(thunk: AV => AV): Heap =
       Heap(self.updatedWith(ap) {
