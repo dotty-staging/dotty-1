@@ -23,12 +23,6 @@ import xsbti.api.DefinitionType
 
 import scala.collection.mutable
 
-// def startMethod(name: String): Unit // or maybe a MethodBuilder?
-// def startTypeParam(name: String): Unit
-// def startParam(name: String)
-// def startType()
-// def endMethod(): Unit
-
 /** This phase sends a representation of the API of classes to sbt via callbacks.
  *
  *  This is used by sbt for incremental recompilation.
@@ -65,8 +59,12 @@ class ExtractAPI extends Phase {
   override def run(implicit ctx: Context): Unit = {
     val unit = ctx.compilationUnit
     val sourceFile = unit.source.file
-    if (ctx.sbtCallback != null)
+    if (ctx.apiCallback != null) {
+      ctx.apiCallback.startSource(sourceFile.jpath)
+    }
+    if (ctx.sbtCallback != null) {
       ctx.sbtCallback.startSource(sourceFile.file)
+    }
 
     val apiTraverser = new ExtractAPICollector
     val classes = apiTraverser.apiSource(unit.tpdTree)

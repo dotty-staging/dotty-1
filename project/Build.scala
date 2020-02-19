@@ -541,8 +541,9 @@ object Build {
         )
       },
 
-      javaOptions += (
-        s"-Ddotty.tools.dotc.semanticdb.test=${(ThisBuild / baseDirectory).value/"tests"/"semanticdb"}"
+      javaOptions in Test ++= Seq(
+        s"-Ddotty.tools.dotc.semanticdb.test=${(ThisBuild / baseDirectory).value/"tests"/"semanticdb"}",
+        s"-Ddotty.tools.dotc.sbt.test=${(ThisBuild / baseDirectory).value/"tests"/"sbt"}"
       ),
 
       testCompilation := Def.inputTaskDyn {
