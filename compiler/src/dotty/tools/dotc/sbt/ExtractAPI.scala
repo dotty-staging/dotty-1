@@ -23,6 +23,12 @@ import xsbti.api.DefinitionType
 
 import scala.collection.mutable
 
+// def startMethod(name: String): Unit // or maybe a MethodBuilder?
+// def startTypeParam(name: String): Unit
+// def startParam(name: String)
+// def startType()
+// def endMethod(): Unit
+
 /** This phase sends a representation of the API of classes to sbt via callbacks.
  *
  *  This is used by sbt for incremental recompilation.
@@ -43,7 +49,7 @@ class ExtractAPI extends Phase {
 
   override def isRunnable(implicit ctx: Context): Boolean = {
     def forceRun = ctx.settings.YdumpSbtInc.value || ctx.settings.YforceSbtPhases.value
-    super.isRunnable && (ctx.sbtCallback != null || forceRun)
+    super.isRunnable && (ctx.sbtCallback != null || ctx.apiCallback != null || forceRun)
   }
 
   // Check no needed. Does not transform trees

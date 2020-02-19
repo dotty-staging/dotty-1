@@ -2,7 +2,7 @@ package dotty.tools
 package dotc
 package core
 
-import interfaces.CompilerCallback
+import interfaces.{CompilerCallback, APICallback}
 import Decorators._
 import Periods._
 import Names._
@@ -47,7 +47,8 @@ object Contexts {
   private val (runLoc,              store6) = store5.newLocation[Run]()
   private val (profilerLoc,         store7) = store6.newLocation[Profiler]()
   private val (notNullInfosLoc,     store8) = store7.newLocation[List[NotNullInfo]]()
-  private val initialStore = store8
+  private val (apiCallbackLoc,      store9) = store8.newLocation[APICallback]()
+  private val initialStore = store9
 
   /** The current context */
   def ctx(using ctx: Context): Context = ctx
@@ -195,6 +196,9 @@ object Contexts {
 
     /** The sbt callback implementation if we are run from sbt, null otherwise */
     def sbtCallback: AnalysisCallback = store(sbtCallbackLoc)
+
+    /** The api callback implementation if we are run from sbt, null otherwise */
+    def apiCallback: APICallback = store(apiCallbackLoc)
 
     /** The current plain printer */
     def printerFn: Context => Printer = store(printerFnLoc)
@@ -565,6 +569,7 @@ object Contexts {
 
     def setCompilerCallback(callback: CompilerCallback): this.type = updateStore(compilerCallbackLoc, callback)
     def setSbtCallback(callback: AnalysisCallback): this.type = updateStore(sbtCallbackLoc, callback)
+    def setAPICallback(callback: APICallback): this.type = updateStore(apiCallbackLoc, callback)
     def setPrinterFn(printer: Context => Printer): this.type = updateStore(printerFnLoc, printer)
     def setSettings(settingsState: SettingsState): this.type = updateStore(settingsStateLoc, settingsState)
     def setRun(run: Run): this.type = updateStore(runLoc, run)
