@@ -83,6 +83,9 @@ class ExtractAPI extends Phase {
       classes.foreach(ctx.sbtCallback.api(sourceFile.file, _))
       mainClasses.foreach(ctx.sbtCallback.mainClass(sourceFile.file, _))
     }
+    if (ctx.apiCallback != null) {
+      ctx.apiCallback.endSource()
+    }
   }
 }
 
@@ -131,6 +134,12 @@ class ExtractAPI extends Phase {
 private class ExtractAPICollector(implicit ctx: Context) extends ThunkHolder {
   import tpd._
   import xsbti.api
+
+  @inline final def apiCallback(op: APICallback => Unit)(implicit ctx: Context): Unit = {
+    if (ctx.apiCallback != null) {
+      op(ctx.apiCallback)
+    }
+  }
 
   /** This cache is necessary for correctness, see the comment about inherited
    *  members in `apiClassStructure`
@@ -209,10 +218,12 @@ private class ExtractAPICollector(implicit ctx: Context) extends ThunkHolder {
         else dt.Module
       } else dt.ClassDef
 
-    val selfType = apiType(sym.givenSelfType)
-
     val name = sym.fullName.stripModuleClassSuffix.toString
       // We strip module class suffix. Zinc relies on a class and its companion having the same name
+
+    apiCallback(_.startClassLike(defType, name))
+
+    val selfType = apiType(sym.givenSelfType)
 
     val tparams = sym.typeParams.map(apiTypeParameter).toArray
 
@@ -238,6 +249,8 @@ private class ExtractAPICollector(implicit ctx: Context) extends ThunkHolder {
        // If sym is an object, all main methods count, otherwise only @static ones count.
       _mainClasses += name
     }
+
+    apiCallback(_.endClassLike())
 
     api.ClassLikeDef.of(name, acc, modifiers, anns, tparams, defType)
   }

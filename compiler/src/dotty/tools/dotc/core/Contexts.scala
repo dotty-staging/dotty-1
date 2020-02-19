@@ -2,7 +2,7 @@ package dotty.tools
 package dotc
 package core
 
-import interfaces.{CompilerCallback, APICallback}
+import interfaces.CompilerCallback
 import Decorators._
 import Periods._
 import Names._
@@ -26,6 +26,7 @@ import scala.io.Codec
 import collection.mutable
 import printing._
 import config.{JavaPlatform, SJSPlatform, Platform, ScalaSettings}
+import sbt.APICallback
 
 import scala.annotation.internal.sharable
 
