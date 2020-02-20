@@ -43,6 +43,7 @@ class Compiler {
     List(new semanticdb.ExtractSemanticDB) :: // Extract info into .semanticdb files
     List(new PostTyper) ::          // Additional checks and cleanups after type checking
     List(new sbt.ExtractAPI) ::     // Sends a representation of the API of classes to sbt via callbacks
+    List(new sbt.ExtractAPICallback) :: // entirely callback based replacement for ExtractAPI
     List(new SetRootTree) ::        // Set the `rootTreeOrProvider` on class symbols
     Nil
 

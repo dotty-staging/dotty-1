@@ -1,4 +1,4 @@
 package example
 
-class HelloWorld:
+final class HelloWorld:
   final val msg = "Hello, World!"
