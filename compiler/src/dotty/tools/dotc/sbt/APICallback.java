@@ -1,14 +1,20 @@
 package dotty.tools.dotc.sbt;
 
 import java.nio.file.Path;
-import xsbti.api.DefinitionType;
 
 public interface APICallback {
+
+  interface DefinitionType {
+    int TRAIT = 0;
+    int CLASS_DEF = 1;
+    int MODULE = 2;
+    int PACKAGE_MODULE = 3;
+  }
 
   default void startSource(Path src) {}
   default void endSource() {}
 
-  default void startClassLikeDef(DefinitionType dt, String name) {}
+  default void startClassLikeDef(int definitionType, String name) {}
   default void endClassLikeDef() {}
 
   default void startVal(String name) {}

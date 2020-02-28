@@ -16,7 +16,7 @@ import dotty.tools.dotc.core.Contexts.{ContextBase, Context, FreshContext}
 
 @Category(Array(classOf[BootstrappedOnlyTests]))
 class APICallbackTests:
-  import xsbti.api.{DefinitionType => dt}
+  import APICallback.{DefinitionType => dt}
   import APICallbackTests._
   import APIEvent._
 
@@ -25,7 +25,7 @@ class APICallbackTests:
   @test def helloWorld: Unit = assertEquals(
     List(
       StartSource(path=rootSrc.resolve("HelloWorld.scala")),
-        StartClassLikeDef(dt.ClassDef, name="example.HelloWorld"),
+        StartClassLikeDef(dt.CLASS_DEF, name="example.HelloWorld"),
           Public,
           Modifiers(isFinal=true),
           StartDef(name="<init>"),
@@ -76,12 +76,11 @@ end APICallbackTests
 
 object APICallbackTests:
   import APIEvent._
-  import xsbti.api
 
   enum APIEvent:
     case StartSource(path: Path)
     case EndSource
-    case StartClassLikeDef(definitionType: api.DefinitionType, name: String)
+    case StartClassLikeDef(definitionType: Int, name: String)
     case EndClassLikeDef
     case StartVal(name: String)
     case EndVal
@@ -126,7 +125,7 @@ object APICallbackTests:
     override def startSource(src: Path): Unit = accept(StartSource(src))
     override def endSource(): Unit = accept(EndSource)
 
-    override def startClassLikeDef(dt: api.DefinitionType, name: String): Unit = accept(StartClassLikeDef(dt, name))
+    override def startClassLikeDef(dt: Int, name: String): Unit = accept(StartClassLikeDef(dt, name))
     override def endClassLikeDef(): Unit = accept(EndClassLikeDef)
 
     override def startVal(name: String): Unit = accept(StartVal(name))

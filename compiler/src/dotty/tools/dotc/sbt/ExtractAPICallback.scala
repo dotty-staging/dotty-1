@@ -227,13 +227,13 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
   }
 
   private def computeClass(sym: ClassSymbol): Unit /*api.ClassLikeDef*/ = {
-    import xsbti.api.{DefinitionType => dt}
+    import APICallback.{DefinitionType => dt}
     val defType =
-      if (sym.is(Trait)) dt.Trait
+      if (sym.is(Trait)) dt.TRAIT
       else if (sym.is(ModuleClass)) {
-        if (sym.is(PackageClass)) dt.PackageModule
-        else dt.Module
-      } else dt.ClassDef
+        if (sym.is(PackageClass)) dt.PACKAGE_MODULE
+        else dt.MODULE
+      } else dt.CLASS_DEF
 
     val name = sym.fullName.stripModuleClassSuffix.toString
       // We strip module class suffix. Zinc relies on a class and its companion having the same name
