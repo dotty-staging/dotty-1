@@ -16,6 +16,7 @@ class EscapeAnalysis extends MiniPhase {
   val phaseName = EscapeAnalysis.name
 
   override def transformApply(tree: Apply)(implicit ctx: Context): Tree = {
+    if (!ctx.settings.YescapeAnalysis.value) return tree
     val Apply(fun, args) = tree
     val fsym = fun.symbol
     if fsym.exists && fsym.hasAnnotation(ctx.definitions.LocalParamsAnnot) then
@@ -30,6 +31,7 @@ class EscapeAnalysis extends MiniPhase {
   }
 
   override def transformDefDef(tree: DefDef)(implicit ctx: Context): Tree = {
+    if (!ctx.settings.YescapeAnalysis.value) return tree
     val engine = new EscapeAnalysisEngine(ctx)
     engine.analyseDefinitionWithLocalParameters(tree)
     tree
