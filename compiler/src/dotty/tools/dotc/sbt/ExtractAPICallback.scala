@@ -142,32 +142,24 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     }
   }
 
-  @inline final def apiCallback(op: => Unit)(implicit ctx: Context): Unit = {
-    if (ctx.apiCallback != null) {
-      op
-    }
-  }
+  private var cacheID: Long = -1L
 
-  @inline final def apiCallbackOr[T](op: => Unit)(orElse: => T)(implicit ctx: Context): Unit = {
-    if (ctx.apiCallback != null) {
-      op
-    }
-    else {
-      orElse
-    }
-  }
+  def newId: Long =
+    cacheID += 1
+    cacheID
+  end newId
 
   /** This cache is necessary for correctness, see the comment about inherited
    *  members in `apiClassStructure`
    */
-  private val classLikeCache = new mutable.HashMap[ClassSymbol, api.ClassLikeDef]
+  private val classLikeCache = new mutable.HashMap[ClassSymbol, Long]
   /** This cache is optional, it avoids recomputing representations */
-  private val typeCache = new mutable.HashMap[Type, api.Type]
+  private val typeCache = new mutable.HashMap[Type, Long]
   /** This cache is necessary to avoid unstable name hashing when `typeCache` is present,
    *  see the comment in the `RefinedType` case in `computeType`
    *  The cache key is (api of RefinedType#parent, api of RefinedType#refinedInfo).
     */
-  private val refinedTypeCache = new mutable.HashMap[(api.Type, api.Definition), api.Structure]
+  private val refinedTypeCache = new mutable.HashMap[(api.Type, api.Definition), Long]
 
   // private val allNonLocalClassesInSrc = new mutable.HashSet[xsbti.api.ClassLike]
   private val _mainClasses = new mutable.HashSet[String]
@@ -212,17 +204,25 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     }
 
     apiClasses(tree)
-    forceThunks()
+    apiCallback(_.forceAllLazy())
 
     // allNonLocalClassesInSrc.toSeq
   }
 
-  def apiClass(sym: ClassSymbol): Unit =
-    computeClass(sym)
-    // classLikeCache.getOrElseUpdate(sym, computeClass(sym))
+  def cacheCallback[T](key: T, map: mutable.Map[T, Long])(compute: T => Unit): Unit =
+    if (map.contains(key)) {
+      apiCallback(_.sharedValue(map(key)))
+    } else {
+      compute(key)
+      val id = newId
+      apiCallback(_.registerSharedWith(id))
+      map.put(key, id)
+    }
+
+  def apiClass(sym: ClassSymbol): Unit = cacheCallback(sym, classLikeCache)(computeClass)
 
   def mainClasses: Set[String] = {
-    forceThunks()
+    apiCallback(_.forceAllLazy())
     _mainClasses.toSet
   }
 
@@ -236,21 +236,21 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       } else dt.CLASS_DEF
 
     val name = sym.fullName.stripModuleClassSuffix.toString
+    val topLevel = sym.isTopLevelClass
       // We strip module class suffix. Zinc relies on a class and its companion having the same name
 
-    apiCallback(_.startClassLikeDef(defType, name))
+    apiCallback(_.startClassLike(defType, name, topLevel))
     apiAccess(sym)
     apiModifiers(sym)
 
-    // val selfType = apiType(sym.givenSelfType)
+    val selfType = strictLazy { apiType(sym.givenSelfType) }
 
     // val tparams = sym.typeParams.map(apiTypeParameter).toArray
 
-    val structure = apiClassStructure(sym)
+    strictLazy { apiClassStructure(sym) }
     // val acc = apiAccess(sym)
     // val modifiers = apiModifiers(sym)
     // val anns = apiAnnotations(sym).toArray
-    // val topLevel = sym.isTopLevelClass
     // val childrenOfSealedClass = sym.children.sorted(classFirstSort).map(c =>
     //   if (c.isClass)
     //     apiType(c.typeRef)
@@ -269,52 +269,87 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     //   _mainClasses += name
     // }
 
-    apiCallback(_.endClassLikeDef())
+    apiCallback(_.endClassLike())
+
+    apiCallback(_.saveNonLocalClass())
+
+    apiCallback(_.startClassLikeDef(defType, name))
+    apiAccess(sym)
+    apiModifiers(sym)
+    apiCallback(_.endClassLikeDef)
 
     // api.ClassLikeDef.of(name, acc, modifiers, anns, tparams, defType)
+  }
+
+  def embedLazy(t: => Unit): Unit = {
+    apiCallback(_.embedLazy(() => t))
+  }
+
+  def strictLazy(t: => Unit): Unit = {
+    apiCallback { cb =>
+      cb.startStrictLazy
+      t
+      cb.endStrictLazy
+    }
   }
 
   def apiClassStructure(csym: ClassSymbol): Unit /*api.Structure*/ = {
     val cinfo = csym.classInfo
 
-    // val bases = {
-    //   val ancestorTypes0 =
-    //     try linearizedAncestorTypes(cinfo)
-    //     catch {
-    //       case ex: TypeError =>
-    //         // See neg/i1750a for an example where a cyclic error can arise.
-    //         // The root cause in this example is an illegal "override" of an inner trait
-    //         ctx.error(ex, csym.sourcePos)
-    //         defn.ObjectType :: Nil
-    //     }
-    //   if (ValueClasses.isDerivedValueClass(csym)) {
-    //     val underlying = ValueClasses.valueClassUnbox(csym).info.finalResultType
-    //     // The underlying type of a value class should be part of the name hash
-    //     // of the value class (see the test `value-class-underlying`), this is accomplished
-    //     // by adding the underlying type to the list of parent types.
-    //     underlying :: ancestorTypes0
-    //   } else
-    //     ancestorTypes0
-    // }
+    val bases = {
+      val ancestorTypes0 =
+        try linearizedAncestorTypes(cinfo)
+        catch {
+          case ex: TypeError =>
+            // See neg/i1750a for an example where a cyclic error can arise.
+            // The root cause in this example is an illegal "override" of an inner trait
+            ctx.error(ex, csym.sourcePos)
+            defn.ObjectType :: Nil
+        }
+      if (ValueClasses.isDerivedValueClass(csym)) {
+        val underlying = ValueClasses.valueClassUnbox(csym).info.finalResultType
+        // The underlying type of a value class should be part of the name hash
+        // of the value class (see the test `value-class-underlying`), this is accomplished
+        // by adding the underlying type to the list of parent types.
+        underlying :: ancestorTypes0
+      } else
+        ancestorTypes0
+    }
 
-    // val apiBases = bases.map(apiType)
+    apiCallback(_.startStructure())
+
+    strictLazy {
+      bases.foreach(apiType)
+      apiCallback(_.endTypeSequence())
+    }
+
+    // apiCallback(_.endParents())
 
     // Synthetic methods that are always present do not affect the API
     // and can therefore be ignored.
     def alwaysPresent(s: Symbol) = csym.is(ModuleClass) && s.isConstructor
     val decls = cinfo.decls.filter(!alwaysPresent(_))
-    val apiDecls = apiDefinitions(decls)
 
-    // val declSet = decls.toSet
-    // // TODO: We shouldn't have to compute inherited members. Instead, `Structure`
-    // // should have a lazy `parentStructures` field.
-    // val inherited = cinfo.baseClasses
-    //   .filter(bc => !bc.is(Scala2x))
-    //   .flatMap(_.classInfo.decls.filter(s => !(s.is(Private) || declSet.contains(s))))
-    // // Inherited members need to be computed lazily because a class might contain
-    // // itself as an inherited member, like in `class A { class B extends A }`,
-    // // this works because of `classLikeCache`
-    // val apiInherited = lzy(apiDefinitions(inherited).toArray)
+    strictLazy {
+      apiDefinitions(decls)
+      apiCallback(_.endClassDefinitionSequence())
+    }
+
+    // apiCallback(_.endDecls())
+
+    val declSet = decls.toSet
+    // TODO: We shouldn't have to compute inherited members. Instead, `Structure`
+    // should have a lazy `parentStructures` field.
+    val inherited = cinfo.baseClasses
+      .filter(bc => !bc.is(Scala2x))
+      .flatMap(_.classInfo.decls.filter(s => !(s.is(Private) || declSet.contains(s))))
+
+    embedLazy {
+      apiDefinitions(inherited)
+      apiCallback(_.endClassDefinitionSequence())
+    }
+
+    apiCallback(_.endStructure())
 
     // api.Structure.of(api.SafeLazy.strict(apiBases.toArray), api.SafeLazy.strict(apiDecls.toArray), apiInherited)
   }
@@ -421,6 +456,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     //     Nil
     // }
     paramLists(sym.info) // val vparamss = paramLists(sym.info)
+    apiCallback(_.endParamLists())
     val retTp = sym.info.finalResultType.widenExpr
 
     // api.Def.of(sym.name.toString, apiAccess(sym), apiModifiers(sym),
@@ -453,10 +489,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       api.SafeLazy.strict(Array()), api.SafeLazy.strict(Array()))
   }
 
-  def apiType(tp: Type)/*: api.Type*/ = {
-    // typeCache.getOrElseUpdate(tp, computeType(tp))
-    computeType(tp)
-  }
+  def apiType(tp: Type): Unit /*: api.Type*/ = cacheCallback(tp, typeCache)(computeType)
 
   private def computeType(tp: Type): Unit/*: api.Type*/ = {
     // TODO: Never dealias. We currently have to dealias because
@@ -465,6 +498,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     val tp2 = if (!tp.isLambdaSub) tp.dealiasKeepAnnots else tp
     tp2 match {
       case NoPrefix | NoType =>
+        apiCallback(_.emptyType())
         // Constants.emptyType
       case tp: NamedType =>
         val sym = tp.symbol
@@ -588,6 +622,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       case _ => {
         ctx.warning(i"sbt-api: Unhandled type ${tp.getClass} : $tp")
         // Constants.emptyType
+        apiCallback(_.emptyType())
       }
     }
   }
@@ -629,26 +664,32 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     else Invariant
   }
 
-  def apiAccess(sym: Symbol): api.Access = {
+  def apiAccess(sym: Symbol): Unit = {
     // Symbols which are private[foo] do not have the flag Private set,
     // but their `privateWithin` exists, see `Parsers#ParserCommon#normalize`.
     if (!sym.isOneOf(Protected | Private) && !sym.privateWithin.exists)
       apiCallback(_.publicAPI())
-      Constants.public
+      // Constants.public
     else if (sym.isAllOf(PrivateLocal))
-      Constants.privateLocal
+      // Constants.privateLocal
+      apiCallback(_.localAPI(false))
     else if (sym.isAllOf(ProtectedLocal))
-      Constants.protectedLocal
+      // Constants.protectedLocal
+      apiCallback(_.localAPI(true))
     else {
       val qualifier =
         if (sym.privateWithin eq NoSymbol)
-          Constants.unqualified
+          // Constants.unqualified
+          null
         else
-          api.IdQualifier.of(sym.privateWithin.fullName.toString)
+          // api.IdQualifier.of(sym.privateWithin.fullName.toString)
+          sym.privateWithin.fullName.toString
       if (sym.is(Protected))
-        api.Protected.of(qualifier)
+        // api.Protected.of(qualifier)
+        apiCallback(_.qualifiedAPI(true, qualifier))
       else
-        api.Private.of(qualifier)
+        // api.Private.of(qualifier)
+        apiCallback(_.qualifiedAPI(false, qualifier))
     }
   }
 

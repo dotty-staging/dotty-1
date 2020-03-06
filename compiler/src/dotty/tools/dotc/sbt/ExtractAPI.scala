@@ -64,8 +64,8 @@ class ExtractAPI extends Phase {
     }
 
     val apiTraverser = new ExtractAPICollector
-    val classes = apiTraverser.apiSource(unit.tpdTree)
-    val mainClasses = apiTraverser.mainClasses
+    val classes      = apiTraverser.apiSource(unit.tpdTree)
+    val mainClasses  = apiTraverser.mainClasses
 
     if (ctx.settings.YdumpSbtInc.value) {
       // Append to existing file that should have been created by ExtractDependencies

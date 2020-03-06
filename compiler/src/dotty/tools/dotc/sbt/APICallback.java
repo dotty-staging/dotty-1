@@ -14,13 +14,43 @@ public interface APICallback {
   default void startSource(Path src) {}
   default void endSource() {}
 
+  default void startClassLike(int definitionType, String name, boolean isTopLevel) {}
+  default void endClassLike() {}
+
   default void startClassLikeDef(int definitionType, String name) {}
   default void endClassLikeDef() {}
+
+  /** register the last seen value as a nonLocalClass and consume it */
+  default void saveNonLocalClass() {}
+
+  /**
+   * Cache the last seen value by id.
+   * @param id a key to store the last seen value.
+   */
+  default void registerSharedWith(long id) {}
+
+  /**
+   * Retrieve a value by id
+   * @param id a key for a shared value
+   */
+  default void sharedValue(long id) {}
+
+  default void startStrictLazy() {}
+  default void endStrictLazy() {}
+  default void embedLazy(Runnable task) {}
+  default void forceAllLazy() {}
+
+  default void startStructure(){}
+  default void endStructure(){}
+
+  default void endTypeSequence() {}
+  default void endClassDefinitionSequence() {}
 
   default void startVal(String name) {}
   default void endVal() {}
 
   default void startDef(String name) {}
+  default void endParamLists() {}
   default void endDef() {}
 
   default void startParamList(boolean isImplicit) {}
@@ -29,7 +59,7 @@ public interface APICallback {
   default void startProjection(String selected) {}
   default void endProjection() {}
 
-  default void startConstant(Object constant) {}
+  default void startConstant(String value) {}
   default void endConstant() {}
 
   default void startSingleton() {}
@@ -38,9 +68,13 @@ public interface APICallback {
   default void startPath() {}
   default void endPath() {}
 
+  default void emptyType() {}
+
   default void id(String name) {}
   default void thisId() {}
   default void publicAPI() {}
+  default void localAPI(boolean isProtected) {}
+  default void qualifiedAPI(boolean isProtected, String optionalQualifier) {}
   default void modifiers(
     boolean isAbstract,
     boolean isOverride,
