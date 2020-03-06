@@ -7,6 +7,7 @@ import core._
 import Decorators._
 import Symbols._
 import Types._
+import Names.Name
 
 import ast.tpd
 import tpd._
@@ -55,18 +56,38 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
   def showHeap(it: Any)(implicit ctx: Context): String = {
     it match {
-      case r: MutRes => r match {
-        case MutRes.NoReturn(h) =>
-          s"{{{\n#NoReturn\n#heap {{{\n${Heap.display(h)}\n}}}\n}}}"
-        case MutRes.Return(h, av, t) =>
-          val res = new StringBuilder
-          res append "{{{\n"
-          res append "#Return(total = $t)\n"
-          res append "#heap {{{\n${Heap.display(h)}\n}}}\n"
-          res append "#av {{{\n${AV.display(av)}\n}}}\n"
-          res append "}}}"
-          res.toString
-      }
+      case MutRes(h, mrv, rs) =>
+        val res = new StringBuilder
+        inline def raw(str: String) = res ++= str
+        inline def ln(str: String) = res ++= "\n" ++= str
+        inline def blk(header: String)(thunk: => Unit) = {
+          ln(header)
+          if header.nonEmpty then raw(" ")
+          raw("{{{")
+          thunk
+          ln("}}}")
+        }
+
+        raw("{{{")
+        blk("#heap") { ln(Heap.display(h)) }
+        mrv match {
+          case MRValue.Skipped =>
+            ln("#value skipped")
+          case MRValue.Abort =>
+            ln("#value abort")
+          case MRValue.Proper(av) =>
+            blk("#value proper") { ln(AV.display(av)) }
+        }
+        blk("#returns") {
+          rs.foreach { case (k, v) =>
+            val line = s"$k → "
+            ln(line)
+            raw(AV.display(v, line.length))
+          }
+        }
+        ln("}}}")
+
+        res.toString
       case _ => s"{{{\n${ it }\n}}}"
     }
   }
@@ -89,42 +110,55 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     // TODO keep only the symbols that don't have a defTree
     lazy val localSymbols = store.keys
 
-    def integrate(res: MutRes, tree: Tree, _terminal: Boolean = false) = {
-      res match {
-        case MutRes.NoReturn(heap) =>
-          loop(tree, _heap = heap, _terminal = _terminal)
-        case MutRes.Return(heap, res1, total) =>
-          if (total) res else {
-            loop(tree, _heap = heap, _terminal = _terminal) match {
-              case MutRes.NoReturn(heap) =>
-                MutRes.Return(heap, res1, total)
-              case MutRes.Return(heap, res2, total) =>
-                MutRes.Return(
-                  heap,
-                  AV.merge(res1.iterator ++ res2.iterator),
-                  total
-                )
-            }
+    type Ret = Map[Name, AV]
+    def mergeReturns(ret1: Ret, ret2: Ret): Ret =
+      if (ret2.size > ret1.size) mergeReturns(ret2, ret1)
+      else {
+        var res = ret1
+        ret2.foreach { case (k, av1) =>
+          res = res.updatedWith(k) {
+            case None => Some(av1)
+            case Some(av2) => Some(av1 merge av2)
           }
+        }
+        res
       }
-    }
 
-    /** Merge mut-results from two _branching_ codepaths. */
-    def merge(resA: MutRes, resB: MutRes): MutRes =
-      (resA, resB) match {
-        case (MutRes.NoReturn(heap1), MutRes.NoReturn(heap2)) =>
-          MutRes.NoReturn(heap1 merge heap2)
-        case (MutRes.Return(heap1, av, total), MutRes.NoReturn(heap2)) =>
-          MutRes.Return(heap1 merge heap2, av, total)
-        case (MutRes.NoReturn(heap1), MutRes.Return(heap2, av, total)) =>
-          MutRes.Return(heap1 merge heap2, av, total)
-        case (MutRes.Return(heap1, av1, total1), MutRes.Return(heap2, av2, total2)) =>
-          MutRes.Return(
-            heap1 merge heap2,
-            av1 merge av2,
-            total1 && total2
+    def mergeMRValues(mrv1: MRValue, mrv2: MRValue): MRValue =
+      (mrv1, mrv2) match {
+        case (MRValue.Abort, _) | (_, MRValue.Abort) => MRValue.Abort
+        case (MRValue.Proper(av1), MRValue.Proper(av2)) => MRValue.Proper(av1 merge av2)
+        case (MRValue.Proper(av), MRValue.Skipped) => MRValue.Proper(av)
+        case (MRValue.Skipped, MRValue.Proper(av)) => MRValue.Proper(av)
+        case (MRValue.Skipped, MRValue.Skipped) => MRValue.Skipped
+      }
+
+    def integrate(res1: MutRes, tree: Tree, _terminal: Boolean = false) =
+      res1.value match {
+        case MRValue.Abort => res1
+        case _ =>
+          val res2 = loop(tree, _heap = res1.heap, _terminal = _terminal)
+          MutRes(
+            res1.heap merge res2.heap,
+            mergeMRValues(res1.value, res2.value),
+            mergeReturns(res1.returns, res2.returns)
           )
       }
+
+    /** Merge mut-results from two _branching_ codepaths. */
+    def merge(res1: MutRes, res2: MutRes): MutRes = {
+      val mergedValues = (res1.value, res2.value) match {
+        case (MRValue.Abort, MRValue.Proper(av)) => MRValue.Proper(av)
+        case (MRValue.Proper(av), MRValue.Abort) => MRValue.Proper(av)
+        case _ => mergeMRValues(res1.value, res2.value)
+      }
+
+      MutRes(
+        res1.heap merge res2.heap,
+        mergedValues,
+        mergeReturns(res1.returns, res2.returns)
+      )
+    }
 
     def _analyze(tree: Tree, _heap: Heap = heap)(implicit ctx: Context) = analyse(tree, store, cache, _heap)
 
@@ -141,7 +175,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       } do {
         // ! SSA-assumptions
         // NOTE b/c of SSA-assumption, expressions here necessarily evaluate to a value
-        val abstractArg = loop(arg, _terminal = true).asInstanceOf[MutRes.Return].result
+        val abstractArg = loop(arg, _terminal = true).value.asInstanceOf[MRValue.Proper].value
         abstractArgsBld += abstractArg
         res = res.updated(vp.symbol, abstractArg)
       }
@@ -149,25 +183,27 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       (res, abstractArgsBld.result)
     }
 
+    inline def mrvalue(value: => AV) =
+      if (terminal) MRValue.Proper(value) else MRValue.Skipped
+
     val uncluttered = unclutter(tree, dropBlocks = false)
     trace(i"accumulate(${tersely(uncluttered)}; terminal=$terminal; ${store.keys.map(_.name).toList}%, %)", debug, showHeap) {
 
       debug.println("{{{")
-      debug.println(i"#uncluttered = {{{\n${uncluttered}\n}}}")
+      debug.println(i"#tree = {{{\n${uncluttered}\n}}}")
       debug.println(s"#store = {{{\n${Store.display(store, 0)}\n}}}")
-      debug.println(i"#tree = {{{\n${tree}\n}}}")
       debug.println("}}}")
+
 
       uncluttered match {
         /// constructor
         case tree @ Apply(Select(_, ident), _) if ident == nme.CONSTRUCTOR =>
           // ! SSA-assumption
-
-          // just delegate to analyse
-          if (!terminal)
-            MutRes.NoReturn(heap)
-          else
-            MutRes.Return(heap, _analyze(tree), total = true)
+          MutRes(
+            heap,
+            mrvalue(_analyze(tree)),
+            Map.empty
+          )
 
         case Assign(lhs, rhs) =>
           debug.println(i"#!acc-assign {{{")
@@ -175,10 +211,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           debug.println(i"#rhs {${rhs.productPrefix}} {{{\n${rhs}\n}}}")
           debug.println("}}}")
 
-          if (!terminal)
-            MutRes.NoReturn(heap)
-          else
-            MutRes.Return(heap, AV(AP.Constant -> LabelSet.empty), total = true)
+          MutRes(heap, mrvalue(AV(AP.Constant -> LabelSet.empty)), Map.empty)
 
         // TODO array mutations have their own magick symbol-less methods
 
@@ -206,18 +239,12 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               }
             }
 
-          if (!terminal)
-            MutRes.NoReturn(heap)
-          else
-            MutRes.Return(heap, AV(AP.Constant -> LabelSet.empty), total = true)
+          MutRes(heap, mrvalue(AV(AP.Constant -> LabelSet.empty)), Map.empty)
 
         case tree @ Apply(fun, args) =>
 
           def fallbackResult =
-            if (!terminal)
-              MutRes.NoReturn(heap)
-            else
-              MutRes.Return(heap, _analyze(tree, heap), total = true)
+            MutRes(heap, mrvalue(_analyze(tree, heap)), Map.empty)
 
           val maybeFunDef = fun.symbol.defTree
 
@@ -235,10 +262,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case If(cond, thenp, elsep) =>
           val res1 = loop(cond)
-          val done = res1 match {
-            case _: MutRes.NoReturn => false
-            case MutRes.Return(_, _, total) => total
-          }
+          val done = res1.value == MRValue.Abort
 
           // TODO test the code for exiting from if-conditions
           if (done) res1 else {
@@ -256,14 +280,38 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           debug.println("}}}")
 
           // TODO: analyse the expr for terrible nested returns
-          MutRes.Return(heap, _analyze(expr, _heap = heap), total = true)
+          MutRes(heap, MRValue.Abort, Map(from.symbol.name -> _analyze(expr, _heap = heap)))
 
         case Labeled(bind, tree) =>
           debug.println(i"#!labeled {{{")
           debug.println(i"#bind {${bind.productPrefix}} {{{\n${bind}\n}}}")
           debug.println("}}}")
 
-          loop(tree, _terminal = terminal)
+          val res1 = loop(tree, _terminal = terminal)
+
+          val blockLabel = bind.symbol.name
+          val returnedAV =
+            res1.returns.getOrElse(blockLabel, {
+              // TODO ASK: is it ever possible to have a Labeled that has no associated returns?
+              debug.println("#!!!labeled-no-returns")
+              AV.Empty
+            })
+
+          def result(av: AV) =
+            res1.copy(
+              value = MRValue.Proper(av),
+              returns = res1.returns - blockLabel
+            )
+
+
+          res1.value match {
+            case MRValue.Abort =>
+              result(returnedAV)
+            case MRValue.Proper(av) =>
+              // TODO ASK: it is ever possible for a labeled block to actually evaluate to a value?
+              result(av merge returnedAV)
+            case MRValue.Skipped => sys.error("terminal accumulation returned a MRValue.skipped")
+          }
 
         case Block(stmts, expr) =>
           var res: MutRes = null
@@ -275,7 +323,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 loop(iter.next)
               else
                 integrate(res, iter.next)
-            done = res.isInstanceOf[MutRes.Return]
+            done = res.value == MRValue.Abort
           }
 
           if (!done) {
@@ -289,10 +337,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           res
 
         case tree =>
-          if (!terminal)
-            MutRes.NoReturn(heap)
-          else
-            MutRes.Return(heap, _analyze(tree), total = true)
+          MutRes(heap, mrvalue(_analyze(tree)), Map.empty)
       }
     }
   }
@@ -358,10 +403,9 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
     trace(i"analyse(${tersely(uncluttered)}; ${store.keys.map(_.name).toList}%, %)", debug, showResult) {
       debug.println("{{{")
-      debug.println(i"#uncluttered = {{{\n${uncluttered}\n}}}")
+      debug.println(i"#tree = {{{\n${uncluttered}\n}}}")
       debug.println(s"#store = {{{\n${Store.display(store, 0)}\n}}}")
       debug.println(s"#heap = {{{\n${Heap.display(heap)}\n}}}")
-      debug.println(i"#tree = {{{\n${tree}\n}}}")
       debug.println("}}}")
 
       uncluttered match {
@@ -430,7 +474,13 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               case EmptyTree => sys.error(i"missing def tree for {${tree.symbol}} shouldn't happen, missing -Yretain-trees")
               case dt: ValDef =>
                 debug.println(i"going into def tree of $tree")
-                loop(dt.rhs)
+                accumulate(
+                  dt.rhs,
+                  store = store,
+                  cache = cache,
+                  heap = heap,
+                  terminal = true
+                ).value.expected_!
             }
           )
 
@@ -684,7 +734,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 store = newStore,
                 heap = heap,
                 terminal = true
-              ).asInstanceOf[MutRes.Return].result
+              ).value.asInstanceOf[MRValue.Proper].value
             },
             onError = {
               debug.println(i"#! Run out of abstract stack when interpreting ${fun.symbol}")
@@ -740,18 +790,18 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     if (localParams.size > 0) {
       debug.println(i"${tree.name}: detected local params")
       val mutRes = accumulate(tree.rhs, localStore.toMap, Map.empty, Heap.Empty, terminal = true)
-      val (heap, av) = mutRes match {
-        case MutRes.NoReturn(heap) =>
-          debug.println("#mut-res-no-return")
-          // val analysed = analyse(finalExpr, localStore.toMap, Map.empty, heap)
-          (heap, AV.Empty)
-        case MutRes.Return(heap, res, total) =>
-          debug.println("#mut-res-return")
-          assert(total)
-          (heap, res)
+      val av = mutRes.value match {
+        case MRValue.Proper(av) =>
+          debug.println("#mut-res: proper")
+          av
+        case MRValue.Abort =>
+          debug.println("#mut-res: abort")
+          // TODO: the values here are escaping, need to check them
+          AV.Empty
+        case MRValue.Skipped => assert(false) // shouldn't happen when terminal
       }
 
-      val resolved = AV.resolve(av, heap)
+      val resolved = AV.resolve(av, mutRes.heap)
       val escapees =
         resolved.self.keysIterator.filter(ap => localParams.contains(ap.maybeSym)).toSeq
       if (escapees.size > 0) {
@@ -928,13 +978,15 @@ object EscapeAnalysisEngine {
       val spaces = " " * indent
       var nl_? = false
       def nl() =
-        if nl_? then res append "\n"
+        if nl_? then {
+          res append "\n"
+          res append spaces
+        }
         nl_? = true
 
       for (k, v) <- av.iterator
       do
         nl()
-        res append spaces
         res append k.display
         res append s" ← ${v.display}"
 
@@ -944,14 +996,18 @@ object EscapeAnalysisEngine {
 
   type Cache = Map[(AP, List[AV]), AV | "err"]
 
-  trait HasHeap {
-    def heap: Heap
+  enum MRValue {
+    def expected_! = this match {
+      case Proper(av) => av
+      case _ => sys.error("expected MRValue to be proper!")
+    }
+
+    case Skipped;
+    case Abort;
+    case Proper(value: AV);
   }
 
-  enum MutRes extends HasHeap {
-    case NoReturn(heap: Heap);
-    case Return(heap: Heap, result: AV, total: Boolean);
-  }
+  case class MutRes(heap: Heap, value: MRValue, returns: Map[Name, AV])
 
   class Heap (val self: Map[AP, Map[Symbol, AV]]) extends AnyVal {
     def get(ap: AP, sym: Symbol): Option[AV] =
@@ -976,7 +1032,7 @@ object EscapeAnalysisEngine {
             for { (sym, av1) <- inner1 } do {
               innerRes = innerRes.updatedWith(sym) {
                 case None => Some(av1)
-                case Some(av2) => Some(AV.merge(av1.iterator ++ av2.iterator))
+                case Some(av2) => Some(av1 merge av2)
               }
             }
             Some(innerRes)
@@ -1017,9 +1073,9 @@ object EscapeAnalysisEngine {
       for ((ap, sym), v) <- heap.iterator
       do {
         nl()
-        val ln = s"${ap.display}.${sym.name} →"
+        val ln = s"${ap.display}.${sym.name} → "
         buf append ln
-        buf append AV.display(v, ln.length + 1).drop(ln.length)
+        buf append AV.display(v, ln.length)
       }
 
       buf.toString
@@ -1040,9 +1096,9 @@ object EscapeAnalysisEngine {
       for (k, v) <- store
       do
         nl()
-        val ln = s"${spaces}${k.name} →"
+        val ln = s"${spaces}${k.name} → "
         buf append ln
-        buf append AV.display(v, ln.length + 1).drop(ln.length)
+        buf append AV.display(v, ln.length)
       buf.toString
   }
 
