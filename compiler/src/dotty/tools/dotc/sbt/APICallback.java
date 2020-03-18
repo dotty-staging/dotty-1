@@ -11,6 +11,12 @@ public interface APICallback {
     int PACKAGE_MODULE = 3;
   }
 
+  interface Variance {
+    int CONTRAVARIANT = 0;
+    int COVARIANT = 1;
+    int INVARIANT = 2;
+  }
+
   default void startSource(Path src) {}
   default void endSource() {}
 
@@ -22,6 +28,8 @@ public interface APICallback {
 
   /** register the last seen value as a nonLocalClass and consume it */
   default void saveNonLocalClass() {}
+
+  default void registerMainClass(String name) {}
 
   /**
    * Cache the last seen value by id.
@@ -35,26 +43,45 @@ public interface APICallback {
    */
   default void sharedValue(long id) {}
 
-  default void startStrictLazy() {}
-  default void endStrictLazy() {}
-  default void embedLazy(Runnable task) {}
-  default void forceAllLazy() {}
+  default void startEvaluatedTask() {}
+  default void endEvaluatedTask() {}
+  default void delayTask(Runnable task) {}
+  default void forceDelayedTasks() {}
 
   default void startStructure(){}
   default void endStructure(){}
 
   default void endTypeSequence() {}
   default void endClassDefinitionSequence() {}
+  default void endTypeParameterSequence() {}
+  default void endAnnotationSequence() {}
+  default void endAnnotationArgumentSequence() {}
+  default void endParameterListSequence() {}
+  default void endStringSequence() {}
+
+  default void startTypeParameter(String name, int variance) {}
+  default void endTypeParameter() {}
+
+  default void startTypeDeclaration(String name) {}
+  default void endTypeDeclaration() {}
+
+  default void startTypeAlias(String name) {}
+  default void endTypeAlias() {}
+
+  default void startAnnotation() {}
+  default void endAnnotation() {}
 
   default void startVal(String name) {}
   default void endVal() {}
 
+  default void startVar(String name) {}
+  default void endVar() {}
+
   default void startDef(String name) {}
-  default void endParamLists() {}
   default void endDef() {}
 
-  default void startParamList(boolean isImplicit) {}
-  default void endParamList() {}
+  default void startParameterList(boolean isImplicit) {}
+  default void endParameterList() {}
 
   default void startProjection(String selected) {}
   default void endProjection() {}
@@ -70,6 +97,7 @@ public interface APICallback {
 
   default void emptyType() {}
 
+  default void annotationArgument(String name, String value) {}
   default void id(String name) {}
   default void thisId() {}
   default void publicAPI() {}

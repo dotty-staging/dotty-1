@@ -89,8 +89,16 @@ class APICallbackTests:
     val defs = compileOnlyBuild("HelloWorld.scala")
     println(defs)
 
+  @test def boxBuilder: Unit =
+    val defs = compileOnlyBuild("Box.scala")
+    println(defs)
+
   @test def innerRecursiveBuilder: Unit =
     val defs = compileOnlyBuild("InnerRecursive.scala")
+    println(defs)
+
+  @test def classTParamsBuilder: Unit =
+    val defs = compileOnlyBuild("ClassTParams.scala")
     println(defs)
 
   private def compileOnly(src: String): APIEventHolder =
@@ -130,6 +138,7 @@ object APICallbackTests:
     case EndVal
     case StartDef(name: String)
     case EndDef
+    case StartTypeParameter(name: String, variance: Int)
     case StartParamList(isImplicit: Boolean)
     case EndParamList
     case StartConstant(value: String)
@@ -173,8 +182,6 @@ object APICallbackTests:
     override def endClassLike(): Unit = accept(EndClassLike)
 
     override def startStructure(): Unit = accept(StartStructure)
-    // override def endParents(): Unit = accept(EndParents)
-    // override def endDecls(): Unit = accept(EndDecls)
     override def endStructure(): Unit = accept(EndStructure)
 
     override def startVal(name: String): Unit = accept(StartVal(name))
@@ -183,8 +190,8 @@ object APICallbackTests:
     override def startDef(name: String): Unit = accept(StartDef(name))
     override def endDef(): Unit = accept(EndDef)
 
-    override def startParamList(isImplicit: Boolean): Unit = accept(StartParamList(isImplicit))
-    override def endParamList(): Unit = accept(EndParamList)
+    override def startParameterList(isImplicit: Boolean): Unit = accept(StartParamList(isImplicit))
+    override def endParameterList(): Unit = accept(EndParamList)
 
     override def startProjection(selected: String): Unit = accept(StartProjection(selected))
     override def endProjection(): Unit = accept(EndProjection)
@@ -221,42 +228,55 @@ object APICallbackTests:
 
     private val cache = mutable.LongMap.empty[Any]
     private val allNonLocalClassesInSrc = new mutable.HashSet[api.ClassLike]
+    private val _mainClasses = new mutable.HashSet[String]
 
     private var stack = List.empty[Any] // replace with mutable.ArrayDeque.empty[Any]
     private def modify[A,B](f: A => B) = stack = f(stack.head.asInstanceOf[A]) :: stack.tail
     private def accept(any: Any) = stack ::= any
     private def peelFront[T: reflect.ClassTag](qual: Any => Boolean): (Array[T], List[Any]) =
       (stack.takeWhile(qual).asInstanceOf[List[T]].reverse.toArray, stack.dropWhile(qual))
+    private def collectSequence[T: reflect.ClassTag](qual: Any => Boolean): Unit =
+      stack = stack.takeWhile(qual).asInstanceOf[List[T]].reverse.toArray :: stack.dropWhile(qual)
 
     def classLikes: List[api.ClassLike] = allNonLocalClassesInSrc.toList
 
-    private def definitionType(dt: Int): api.DefinitionType = dt match {
+    private def apiDefinitionType(dt: Int): api.DefinitionType = dt match {
       case APICallback.DefinitionType.CLASS_DEF      => api.DefinitionType.ClassDef
       case APICallback.DefinitionType.TRAIT          => api.DefinitionType.Trait
       case APICallback.DefinitionType.MODULE         => api.DefinitionType.Module
       case APICallback.DefinitionType.PACKAGE_MODULE => api.DefinitionType.PackageModule
     }
 
+    private def apiVariance(dt: Int): api.Variance = dt match {
+      case APICallback.Variance.CONTRAVARIANT => api.Variance.Contravariant
+      case APICallback.Variance.COVARIANT     => api.Variance.Covariant
+      case APICallback.Variance.INVARIANT     => api.Variance.Invariant
+    }
+
     override def startClassLike(dt: Int, name: String, topLevel: Boolean): Unit = accept(StartClassLike(dt, name, topLevel))
     override def endClassLike(): Unit =
-      val (structure: api.Lazy[Any]) ::
+      val (savedAnnots: Array[String]) ::
+          (children: Array[api.Type]) ::
+          (structure: api.Lazy[Any]) ::
+          (tparams: Array[api.TypeParameter]) ::
           (selfTpe: api.Lazy[Any]) ::
+          (annots: Array[api.Annotation]) ::
           (mods: api.Modifiers) ::
           (access: api.Access) ::
           StartClassLike(dt, name, topLevel) :: stack1 = stack
-      val definitionTpe = definitionType(dt)
       stack = api.ClassLike.create(
-        name, access, mods, Array.empty, definitionTpe, selfTpe.asInstanceOf,
-        structure.asInstanceOf, Array.empty, Array.empty, topLevel, Array.empty) :: stack1
+        name, access, mods, annots, apiDefinitionType(dt), selfTpe.asInstanceOf,
+        structure.asInstanceOf, savedAnnots, children, topLevel, tparams) :: stack1
 
     override def startClassLikeDef(dt: Int, name: String): Unit = accept(StartClassLikeDef(dt, name))
     override def endClassLikeDef(): Unit =
-      val (mods: api.Modifiers) ::
+      val (tparams: Array[api.TypeParameter]) ::
+          (annots: Array[api.Annotation]) ::
+          (mods: api.Modifiers) ::
           (access: api.Access) ::
           StartClassLikeDef(dt, name) :: stack1 = stack
-      val definitionTpe = definitionType(dt)
       stack = api.ClassLikeDef.create(
-        name, access, mods, Array.empty, Array.empty, definitionTpe) :: stack1
+        name, access, mods, annots, tparams, apiDefinitionType(dt)) :: stack1
 
     override def registerSharedWith(id: Long): Unit = cache.put(id, stack.head)
     override def sharedValue(id: Long): Unit = accept(cache(id))
@@ -264,6 +284,8 @@ object APICallbackTests:
     override def saveNonLocalClass(): Unit =
       allNonLocalClassesInSrc += stack.head.asInstanceOf[api.ClassLike]
       stack = stack.tail
+
+    override def registerMainClass(name: String): Unit = _mainClasses += name
 
     override def startStructure(): Unit = ()
     override def endStructure(): Unit =
@@ -273,17 +295,39 @@ object APICallbackTests:
       stack = api.Structure.create(parents.asInstanceOf, decls.asInstanceOf, inherited.asInstanceOf) :: stack1
 
     override def endTypeSequence(): Unit =
-      val (types, stack1) = peelFront[api.Type](_.isInstanceOf[api.Type])
-      stack = types :: stack1
+      collectSequence[api.Type](_.isInstanceOf[api.Type])
 
     override def endClassDefinitionSequence(): Unit =
-      val (definitions, stack1) = peelFront[api.ClassDefinition](_.isInstanceOf[api.ClassDefinition])
-      stack = definitions :: stack1
+      collectSequence[api.ClassDefinition](_.isInstanceOf[api.ClassDefinition])
 
-    override def startStrictLazy(): Unit = ()
-    override def endStrictLazy(): Unit = modify(api.SafeLazy.strict)
+    override def endTypeParameterSequence(): Unit =
+      collectSequence[api.TypeParameter](_.isInstanceOf[api.TypeParameter])
 
-    override def embedLazy(task: Runnable): Unit =
+    override def endAnnotationSequence(): Unit =
+      collectSequence[api.Annotation](_.isInstanceOf[api.Annotation])
+
+    override def endAnnotationArgumentSequence(): Unit =
+      collectSequence[api.AnnotationArgument](_.isInstanceOf[api.AnnotationArgument])
+
+    override def endParameterListSequence(): Unit =
+      collectSequence[api.ParameterList](_.isInstanceOf[api.ParameterList])
+
+    override def endStringSequence(): Unit =
+      collectSequence[String](_.isInstanceOf[String])
+
+    override def startTypeParameter(name: String, variance: Int): Unit = accept(StartTypeParameter(name, variance))
+    override def endTypeParameter(): Unit =
+      val (hi: api.Type) ::
+          (lo: api.Type) ::
+          (tparams: Array[api.TypeParameter]) ::
+          (annots: Array[api.Annotation]) ::
+          StartTypeParameter(name, variance)  :: stack1 = stack
+      stack = api.TypeParameter.create(name, annots, tparams, apiVariance(variance), lo, hi) :: stack1
+
+    override def startEvaluatedTask(): Unit = ()
+    override def endEvaluatedTask(): Unit = modify(api.SafeLazy.strict)
+
+    override def delayTask(task: Runnable): Unit =
       val embedded = api.SafeLazy { () =>
         task.run()
         val result = stack.head
@@ -292,30 +336,62 @@ object APICallbackTests:
       }
       accept(lzy(embedded))
 
-    override def forceAllLazy(): Unit = forceThunks()
+    override def forceDelayedTasks(): Unit = forceThunks()
 
     override def startVal(name: String): Unit = accept(name)
-    override def endVal(): Unit =
+    override def endVal(): Unit = endValOrVar(api.Val.create)
+
+    override def startVar(name: String): Unit = accept(name)
+    override def endVar(): Unit = endValOrVar(api.Var.create)
+
+    private def endValOrVar[T](f: (String, api.Access, api.Modifiers, Array[api.Annotation], api.Type) => T): Unit =
       val (retTpe: api.Type) ::
+          (annots: Array[api.Annotation]) ::
           (mods: api.Modifiers) ::
           (access: api.Access) ::
           (name: String) :: stack1 = stack
-      stack = api.Val.create(name, access, mods, Array.empty, retTpe) :: stack1
+      stack = f(name, access, mods, annots, retTpe) :: stack1
 
     override def startDef(name: String): Unit = accept(name)
-    override def endParamLists(): Unit =
-      val (paramLists, stack1) = peelFront[api.ParameterList](_.isInstanceOf[api.ParameterList])
-      stack = paramLists :: stack1
     override def endDef(): Unit =
       val (retTpe: api.Type) ::
           (paramss: Array[api.ParameterList]) ::
+          (tparams: Array[api.TypeParameter]) ::
+          (annots: Array[api.Annotation]) ::
           (mods: api.Modifiers) ::
           (access: api.Access) ::
           (name: String) :: stack1 = stack
-      stack = api.Def.create(name, access, mods, Array.empty, Array.empty, paramss, retTpe) :: stack1
+      stack = api.Def.create(name, access, mods, annots, tparams, paramss, retTpe) :: stack1
 
-    override def startParamList(isImplicit: Boolean): Unit = accept(isImplicit)
-    override def endParamList(): Unit = modify((isImplicit: Boolean) => api.ParameterList.create(Array.empty, isImplicit))
+    override def startParameterList(isImplicit: Boolean): Unit = accept(isImplicit)
+    override def endParameterList(): Unit = modify((isImplicit: Boolean) => api.ParameterList.create(Array.empty, isImplicit))
+
+    override def startTypeDeclaration(name: String): Unit = accept(name)
+    override def endTypeDeclaration(): Unit =
+      val (hi: api.Type) ::
+          (lo: api.Type) ::
+          (tparams: Array[api.TypeParameter]) ::
+          (annots: Array[api.Annotation]) ::
+          (mods: api.Modifiers) ::
+          (access: api.Access) ::
+          (name: String) :: stack1 = stack
+      stack = api.TypeDeclaration.create(name, access, mods, annots, tparams, lo, hi) :: stack1
+
+    override def startTypeAlias(name: String): Unit = accept(name)
+    override def endTypeAlias(): Unit =
+      val (alias: api.Type) ::
+          (tparams: Array[api.TypeParameter]) ::
+          (annots: Array[api.Annotation]) ::
+          (mods: api.Modifiers) ::
+          (access: api.Access) ::
+          (name: String) :: stack1 = stack
+      stack = api.TypeAlias.create(name, access, mods, annots, tparams, alias) :: stack1
+
+    override def startAnnotation(): Unit = {}
+    override def endAnnotation(): Unit =
+      val (args: Array[api.AnnotationArgument]) ::
+          (tpe: api.Type) :: stack1 = stack
+      stack = api.Annotation.create(tpe, args) :: stack1
 
     override def startProjection(selected: String): Unit = accept(selected)
     override def endProjection(): Unit =
@@ -335,6 +411,7 @@ object APICallbackTests:
       val (components, stack1) = peelFront[api.PathComponent](_.isInstanceOf[api.PathComponent])
       stack = api.Path.create(components) :: stack1
 
+    override def annotationArgument(name: String, value: String) = accept(api.AnnotationArgument.create(name, value))
     override def id(name: String): Unit = accept(api.Id.create(name))
     override def thisId(): Unit = accept(Constants.thisPath)
 

@@ -144,7 +144,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
 
   private var cacheID: Long = -1L
 
-  def newId: Long =
+  private def newId: Long =
     cacheID += 1
     cacheID
   end newId
@@ -164,19 +164,6 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
   // private val allNonLocalClassesInSrc = new mutable.HashSet[xsbti.api.ClassLike]
   private val _mainClasses = new mutable.HashSet[String]
 
-  private object Constants {
-    val emptyStringArray = Array[String]()
-    val local            = api.ThisQualifier.create()
-    val public           = api.Public.create()
-    val privateLocal     = api.Private.create(local)
-    val protectedLocal   = api.Protected.create(local)
-    val unqualified      = api.Unqualified.create()
-    val thisPath         = api.This.create()
-    val emptyType        = api.EmptyType.create()
-    val emptyModifiers   =
-      new api.Modifiers(false, false, false, false, false,false, false, false)
-  }
-
   /** Some Dotty types do not have a corresponding type in xsbti.api.* that
    *  represents them. Until this is fixed we can workaround this by using
    *  special annotations that can never appear in the source code to
@@ -187,14 +174,23 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
    */
   private def withMarker(tp: api.Type, marker: api.Annotation) =
     api.Annotated.of(tp, Array(marker))
-  private def marker(name: String) =
-    api.Annotation.of(api.Constant.of(Constants.emptyType, name), Array())
-  private val orMarker = marker("Or")
-  private val byNameMarker = marker("ByName")
-  private val matchMarker = marker("Match")
+
+  private def marker(name: String): Unit = apiCallback { cb =>
+    // api.Annotation.of(api.Constant.of(Constants.emptyType, name), Array())
+    cb.startAnnotation()
+    cb.startConstant(name)
+    cb.emptyType()
+    cb.endConstant()
+    cb.endAnnotationArgumentSequence()
+    cb.endAnnotation()
+  }
+
+  private def orMarker = marker("Or")
+  private def byNameMarker = marker("ByName")
+  private def matchMarker = marker("Match")
 
   /** Extract the API representation of a source file */
-  def apiSource(tree: Tree): Unit = {
+  def apiSource(tree: Tree): Unit = apiCallback { cb =>
     def apiClasses(tree: Tree): Unit = tree match {
       case PackageDef(_, stats) =>
         stats.foreach(apiClasses)
@@ -204,29 +200,28 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     }
 
     apiClasses(tree)
-    apiCallback(_.forceAllLazy())
-
-    // allNonLocalClassesInSrc.toSeq
+    cb.forceDelayedTasks()
   }
 
-  def cacheCallback[T](key: T, map: mutable.Map[T, Long])(compute: T => Unit): Unit =
+  def cacheCallback[T](key: T, map: mutable.Map[T, Long])(compute: T => Unit): Unit = apiCallback { cb =>
     if (map.contains(key)) {
-      apiCallback(_.sharedValue(map(key)))
+      cb.sharedValue(map(key))
     } else {
       compute(key)
       val id = newId
-      apiCallback(_.registerSharedWith(id))
+      cb.registerSharedWith(id)
       map.put(key, id)
     }
+  }
 
   def apiClass(sym: ClassSymbol): Unit = cacheCallback(sym, classLikeCache)(computeClass)
 
   def mainClasses: Set[String] = {
-    apiCallback(_.forceAllLazy())
+    apiCallback(_.forceDelayedTasks())
     _mainClasses.toSet
   }
 
-  private def computeClass(sym: ClassSymbol): Unit /*api.ClassLikeDef*/ = {
+  private def computeClass(sym: ClassSymbol): Unit /*api.ClassLikeDef*/ = apiCallback { cb =>
     import APICallback.{DefinitionType => dt}
     val defType =
       if (sym.is(Trait)) dt.TRAIT
@@ -235,65 +230,70 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         else dt.MODULE
       } else dt.CLASS_DEF
 
+    def childrenOfSealedClass(): Unit = {
+      sym.children.sorted(classFirstSort).foreach(c =>
+        if (c.isClass)
+          apiType(c.typeRef)
+        else
+          apiType(c.termRef)
+      )
+      cb.endTypeSequence
+    }
+
+    def tparams(): Unit = {
+      sym.typeParams.foreach(apiTypeParameter)
+      cb.endTypeParameterSequence()
+    }
+
+    def selfType(): Unit = evaluatedTask(apiType(sym.givenSelfType))
+    def structure(): Unit = evaluatedTask(apiClassStructure(sym))
+
+    def savedAnnotations(): Unit = cb.endStringSequence()
+
     val name = sym.fullName.stripModuleClassSuffix.toString
     val topLevel = sym.isTopLevelClass
       // We strip module class suffix. Zinc relies on a class and its companion having the same name
 
-    apiCallback(_.startClassLike(defType, name, topLevel))
-    apiAccess(sym)
-    apiModifiers(sym)
-
-    val selfType = strictLazy { apiType(sym.givenSelfType) }
-
-    // val tparams = sym.typeParams.map(apiTypeParameter).toArray
-
-    strictLazy { apiClassStructure(sym) }
-    // val acc = apiAccess(sym)
-    // val modifiers = apiModifiers(sym)
-    // val anns = apiAnnotations(sym).toArray
-    // val childrenOfSealedClass = sym.children.sorted(classFirstSort).map(c =>
-    //   if (c.isClass)
-    //     apiType(c.typeRef)
-    //   else
-    //     apiType(c.termRef)
-    // ).toArray
-
     // val cl = api.ClassLike.of(
     //   name, acc, modifiers, anns, defType, api.SafeLazy.strict(selfType), api.SafeLazy.strict(structure), Constants.emptyStringArray,
     //   childrenOfSealedClass, topLevel, tparams)
-
-    // allNonLocalClassesInSrc += cl
-
-    // if (sym.isStatic && !sym.is(Trait) && ctx.platform.hasMainMethod(sym)) {
-    //    // If sym is an object, all main methods count, otherwise only @static ones count.
-    //   _mainClasses += name
-    // }
-
-    apiCallback(_.endClassLike())
-
-    apiCallback(_.saveNonLocalClass())
-
-    apiCallback(_.startClassLikeDef(defType, name))
+    cb.startClassLike(defType, name, topLevel)
     apiAccess(sym)
     apiModifiers(sym)
-    apiCallback(_.endClassLikeDef)
+    apiAnnotations(sym)
+    selfType()
+    tparams()
+    structure()
+    childrenOfSealedClass()
+    savedAnnotations()
+    cb.endClassLike()
+
+    cb.saveNonLocalClass() // allNonLocalClassesInSrc += cl
+
+    if (sym.isStatic && !sym.is(Trait) && ctx.platform.hasMainMethod(sym)) {
+      // If sym is an object, all main methods count, otherwise only @static ones count.
+      // _mainClasses += name
+      cb.registerMainClass(name)
+    }
 
     // api.ClassLikeDef.of(name, acc, modifiers, anns, tparams, defType)
+    cb.startClassLikeDef(defType, name)
+    apiAccess(sym) // TODO reuse with a cache on client side?
+    apiModifiers(sym) // TODO reuse with a cache on client side?
+    apiAnnotations(sym) // TODO reuse with a cache on client side?
+    tparams() // TODO reuse with a cache on client side?
+    cb.endClassLikeDef
   }
 
-  def embedLazy(t: => Unit): Unit = {
-    apiCallback(_.embedLazy(() => t))
+  def delayTask(t: => Unit): Unit = apiCallback(_.delayTask(() => t))
+
+  def evaluatedTask(t: => Unit): Unit = apiCallback { cb =>
+    cb.startEvaluatedTask()
+    t
+    cb.endEvaluatedTask()
   }
 
-  def strictLazy(t: => Unit): Unit = {
-    apiCallback { cb =>
-      cb.startStrictLazy
-      t
-      cb.endStrictLazy
-    }
-  }
-
-  def apiClassStructure(csym: ClassSymbol): Unit /*api.Structure*/ = {
+  def apiClassStructure(csym: ClassSymbol): Unit /*api.Structure*/ = apiCallback { cb =>
     val cinfo = csym.classInfo
 
     val bases = {
@@ -316,26 +316,31 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         ancestorTypes0
     }
 
-    apiCallback(_.startStructure())
-
-    strictLazy {
+    def apiBases(bases: List[Type]): Unit = evaluatedTask {
       bases.foreach(apiType)
-      apiCallback(_.endTypeSequence())
+      cb.endTypeSequence()
     }
 
-    // apiCallback(_.endParents())
+    def apiDecls(decls: List[Symbol]): Unit = evaluatedTask {
+      apiDefinitions(decls)
+      cb.endClassDefinitionSequence()
+    }
+
+    def apiInherited(inherited: List[Symbol]) = delayTask {
+      apiDefinitions(inherited)
+      cb.endClassDefinitionSequence()
+    }
+
+    cb.startStructure()
+
+    apiBases(bases)
 
     // Synthetic methods that are always present do not affect the API
     // and can therefore be ignored.
     def alwaysPresent(s: Symbol) = csym.is(ModuleClass) && s.isConstructor
     val decls = cinfo.decls.filter(!alwaysPresent(_))
 
-    strictLazy {
-      apiDefinitions(decls)
-      apiCallback(_.endClassDefinitionSequence())
-    }
-
-    // apiCallback(_.endDecls())
+    apiDecls(decls)
 
     val declSet = decls.toSet
     // TODO: We shouldn't have to compute inherited members. Instead, `Structure`
@@ -344,12 +349,9 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       .filter(bc => !bc.is(Scala2x))
       .flatMap(_.classInfo.decls.filter(s => !(s.is(Private) || declSet.contains(s))))
 
-    embedLazy {
-      apiDefinitions(inherited)
-      apiCallback(_.endClassDefinitionSequence())
-    }
+    apiInherited(inherited)
 
-    apiCallback(_.endStructure())
+    cb.endStructure()
 
     // api.Structure.of(api.SafeLazy.strict(apiBases.toArray), api.SafeLazy.strict(apiDecls.toArray), apiInherited)
   }
@@ -392,7 +394,15 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     defs.sorted(classFirstSort).foreach(apiDefinition)
   }
 
-  def apiDefinition(sym: Symbol): Unit /*api.ClassDefinition*/ = {
+  def apiDefinition(sym: Symbol): Unit /*api.ClassDefinition*/ = apiCallback { cb =>
+
+    def sharedValOrVar(): Unit = {
+      apiAccess(sym)
+      apiModifiers(sym)
+      apiAnnotations(sym)
+      apiType(sym.info)
+    }
+
     if (sym.isClass) {
       apiClass(sym.asClass)
     } else if (sym.isType) {
@@ -400,87 +410,101 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     } else if (sym.is(Mutable, butNot = Accessor)) {
       // api.Var.of(sym.name.toString, apiAccess(sym), apiModifiers(sym),
       //   apiAnnotations(sym).toArray, apiType(sym.info))
+      cb.startVar(sym.name.toString)
+      sharedValOrVar()
+      cb.endVar()
     } else if (sym.isStableMember && !sym.isRealMethod) {
-      apiCallback(_.startVal(sym.name.toString))
-      apiAccess(sym)
-      apiModifiers(sym)
       // api.Val.of(sym.name.toString, apiAccess(sym), apiModifiers(sym),
       //   apiAnnotations(sym).toArray, apiType(sym.info))
-      apiType(sym.info)
-      apiCallback(_.endVal)
+      cb.startVal(sym.name.toString)
+      sharedValOrVar()
+      cb.endVal()
     } else {
       apiDef(sym.asTerm)
     }
   }
 
-  def apiDef(sym: TermSymbol): Unit/*api.Def*/ = {
-    def paramLists(t: Type, start: Int = 0): Unit = t match {
-      case pt: TypeLambda =>
-        assert(start == 0)
-        paramLists(pt.resultType)
-      case mt @ MethodTpe(pnames, ptypes, restpe) =>
-        // TODO: We shouldn't have to work so hard to find the default parameters
-        // of a method, Dotty should expose a convenience method for that, see #1143
-        // val defaults =
-        //   if (sym.is(DefaultParameterized)) {
-        //     val qual =
-        //       if (sym.isClassConstructor)
-        //         sym.owner.companionModule // default getters for class constructors are found in the companion object
-        //       else
-        //         sym.owner
-        //     pnames.indices.map(i =>
-        //       qual.info.member(DefaultGetterName(sym.name, start + i)).exists)
-        //   } else
-        //     pnames.indices.map(Function.const(false))
-        // val params = pnames.lazyZip(ptypes).lazyZip(defaults).map((pname, ptype, isDefault) =>
-        //   api.MethodParameter.of(pname.toString, apiType(ptype),
-        //     isDefault, api.ParameterModifier.Plain))
-        apiCallback(_.startParamList(mt.isImplicitMethod))
-        // api.ParameterList.of(params.toArray, mt.isImplicitMethod) :: paramLists(restpe, params.length)
-        apiCallback(_.endParamList)
-        paramLists(restpe, 0 /*params.length*/)
-      case _ =>
-        // Nil
+  def apiDef(sym: TermSymbol): Unit/*api.Def*/ = apiCallback { cb =>
+    def paramLists(t: Type): Unit = {
+      def inner(t: Type, start: Int = 0): Unit = t match {
+        case pt: TypeLambda =>
+          assert(start == 0)
+          inner(pt.resultType)
+        case mt @ MethodTpe(pnames, ptypes, restpe) =>
+          // TODO: We shouldn't have to work so hard to find the default parameters
+          // of a method, Dotty should expose a convenience method for that, see #1143
+          // val defaults =
+          //   if (sym.is(DefaultParameterized)) {
+          //     val qual =
+          //       if (sym.isClassConstructor)
+          //         sym.owner.companionModule // default getters for class constructors are found in the companion object
+          //       else
+          //         sym.owner
+          //     pnames.indices.map(i =>
+          //       qual.info.member(DefaultGetterName(sym.name, start + i)).exists)
+          //   } else
+          //     pnames.indices.map(Function.const(false))
+          // val params = pnames.lazyZip(ptypes).lazyZip(defaults).map((pname, ptype, isDefault) =>
+          //   api.MethodParameter.of(pname.toString, apiType(ptype),
+          //     isDefault, api.ParameterModifier.Plain))
+          cb.startParameterList(mt.isImplicitMethod)
+          // api.ParameterList.of(params.toArray, mt.isImplicitMethod) :: inner(restpe, params.length)
+          cb.endParameterList()
+          inner(restpe, 0 /*params.length*/)
+        case _ =>
+          // Nil
+      }
+      inner(t)
+
+      cb.endParameterListSequence()
     }
 
-    apiCallback(_.startDef(sym.name.toString))
+    def typeParams(tpe: Type): Unit = {
+      tpe match { // tparams
+        case pt: TypeLambda =>
+          pt.paramNames.lazyZip(pt.paramInfos).foreach((pname, pbounds) =>
+            apiTypeParameter(pname.toString, 0, pbounds.lo, pbounds.hi))
+        case _ =>
+          ()
+      }
+      cb.endTypeParameterSequence()
+    }
 
+    cb.startDef(sym.name.toString)
     apiAccess(sym)
     apiModifiers(sym)
-
-    // val tparams = sym.info match {
-    //   case pt: TypeLambda =>
-    //     pt.paramNames.lazyZip(pt.paramInfos).map((pname, pbounds) =>
-    //       apiTypeParameter(pname.toString, 0, pbounds.lo, pbounds.hi))
-    //   case _ =>
-    //     Nil
-    // }
-    paramLists(sym.info) // val vparamss = paramLists(sym.info)
-    apiCallback(_.endParamLists())
-    val retTp = sym.info.finalResultType.widenExpr
-
+    apiAnnotations(sym)
+    typeParams(sym.info)
+    paramLists(sym.info)
+    apiType(sym.info.finalResultType.widenExpr)
+    cb.endDef()
     // api.Def.of(sym.name.toString, apiAccess(sym), apiModifiers(sym),
     //   apiAnnotations(sym).toArray, tparams.toArray, vparamss.toArray, apiType(retTp))
-
-    apiType(retTp)
-    apiCallback(_.endDef())
   }
 
-  def apiTypeMember(sym: TypeSymbol): api.TypeMember = {
-    // val typeParams = Array[api.TypeParameter]()
-    // val name = sym.name.toString
-    // val access = apiAccess(sym)
-    // val modifiers = apiModifiers(sym)
-    // val as = apiAnnotations(sym)
-    // val tpe = sym.info
-
-    // if (sym.isAliasType)
-    //   api.TypeAlias.of(name, access, modifiers, as.toArray, typeParams, apiType(tpe.bounds.hi))
-    // else {
-    //   assert(sym.isAbstractType)
-    //   api.TypeDeclaration.of(name, access, modifiers, as.toArray, typeParams, apiType(tpe.bounds.lo), apiType(tpe.bounds.hi))
-    // }
-    ???
+  def apiTypeMember(sym: TypeSymbol): Unit /*api.TypeMember*/ = apiCallback { cb =>
+    val name = sym.name.toString
+    val tpe = sym.info
+    def shared(): Unit = {
+      apiAccess(sym)
+      apiModifiers(sym)
+      apiAnnotations(sym)
+      cb.endTypeParameterSequence()
+    }
+    if (sym.isAliasType) {
+      cb.startTypeAlias(name)
+      shared()
+      apiType(tpe.bounds.hi)
+      cb.endTypeAlias()
+    }
+    else {
+      assert(sym.isAbstractType)
+      cb.startTypeDeclaration(name)
+      shared()
+      apiType(tpe.bounds.lo)
+      apiType(tpe.bounds.hi)
+      cb.endTypeDeclaration()
+    }
   }
 
   // Hack to represent dotty types which don't have an equivalent in xsbti
@@ -491,15 +515,15 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
 
   def apiType(tp: Type): Unit /*: api.Type*/ = cacheCallback(tp, typeCache)(computeType)
 
-  private def computeType(tp: Type): Unit/*: api.Type*/ = {
+  private def computeType(tp: Type): Unit/*: api.Type*/ = apiCallback { cb =>
     // TODO: Never dealias. We currently have to dealias because
     // sbt main class discovery relies on the signature of the main
     // method being fully dealiased. See https://github.com/sbt/zinc/issues/102
     val tp2 = if (!tp.isLambdaSub) tp.dealiasKeepAnnots else tp
     tp2 match {
       case NoPrefix | NoType =>
-        apiCallback(_.emptyType())
         // Constants.emptyType
+        cb.emptyType()
       case tp: NamedType =>
         val sym = tp.symbol
         // A type can sometimes be represented by multiple different NamedTypes
@@ -514,10 +538,11 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
           sym.owner.thisType
         else
           tp.prefix
-        apiCallback(_.startProjection(sym.name.toString))
+
         // api.Projection.of(apiType(prefix), sym.name.toString)
+        cb.startProjection(sym.name.toString)
         apiType(prefix)
-        apiCallback(_.endProjection)
+        cb.endProjection()
       // case AppliedType(tycon, args) =>
       //   def processArg(arg: Type): api.Type = arg match {
       //     case arg @ TypeBounds(lo, hi) => // Handle wildcard parameters
@@ -603,10 +628,10 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       //   val s = combineApiTypes(apiType(bound) :: apiType(scrut) :: cases.map(apiType): _*)
       //   withMarker(s, matchMarker)
       case ConstantType(constant) =>
-        apiCallback(_.startConstant(constant.stringValue))
         // api.Constant.of(apiType(constant.tpe), constant.stringValue)
+        cb.startConstant(constant.stringValue)
         apiType(constant.tpe)
-        apiCallback(_.endConstant())
+        cb.endConstant()
       // case AnnotatedType(tpe, annot) =>
       //   api.Annotated.of(apiType(tpe), Array(apiAnnotation(annot)))
       case tp: ThisType =>
@@ -622,7 +647,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       case _ => {
         ctx.warning(i"sbt-api: Unhandled type ${tp.getClass} : $tp")
         // Constants.emptyType
-        apiCallback(_.emptyType())
+        cb.emptyType()
       }
     }
   }
@@ -635,47 +660,53 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     ???
   }
 
-  def apiThis(sym: Symbol) /*: api.Singleton */ = {
-    apiCallback(_.startSingleton())
-    apiCallback(_.startPath())
+  def apiThis(sym: Symbol) /*: api.Singleton */ = apiCallback { cb =>
     // val pathComponents = sym.ownersIterator.takeWhile(!_.isEffectiveRoot)
     //   .map(s => api.Id.of(s.name.toString))
     // api.Singleton.of(api.Path.of(pathComponents.toArray.reverse ++ Array(Constants.thisPath)))
-    apiCallback(_.thisId())
-    sym.ownersIterator.takeWhile(!_.isEffectiveRoot)
-      .foreach(s => apiCallback(_.id(s.name.toString)))
-    apiCallback(_.endPath())
-    apiCallback(_.endSingleton())
+    cb.startSingleton()
+    cb.startPath()
+    cb.thisId()
+    sym.ownersIterator
+       .takeWhile(!_.isEffectiveRoot)
+       .foreach(s => cb.id(s.name.toString))
+    cb.endPath()
+    cb.endSingleton()
   }
 
-  def apiTypeParameter(tparam: ParamInfo): api.TypeParameter =
+  def apiTypeParameter(tparam: ParamInfo): Unit =
     apiTypeParameter(tparam.paramName.toString, tparam.paramVarianceSign,
       tparam.paramInfo.bounds.lo, tparam.paramInfo.bounds.hi)
 
-  def apiTypeParameter(name: String, variance: Int, lo: Type, hi: Type): api.TypeParameter =
-    // api.TypeParameter.of(name, Array(), Array(), apiVariance(variance),
-    //   apiType(lo), apiType(hi))
-    ???
-
-  def apiVariance(v: Int): api.Variance = {
-    import api.Variance._
-    if (v < 0) Contravariant
-    else if (v > 0) Covariant
-    else Invariant
+  def apiTypeParameter(name: String, variance: Int, lo: Type, hi: Type): Unit = apiCallback { cb =>
+    // api.TypeParameter.of(name, Array(), Array(), apiVariance(variance), apiType(lo), apiType(hi))
+    cb.startTypeParameter(name, apiVariance(variance))
+    cb.endAnnotationSequence()
+    cb.endTypeParameterSequence()
+    apiType(lo)
+    apiType(hi)
+    cb.endTypeParameter()
   }
 
-  def apiAccess(sym: Symbol): Unit = {
+  def apiVariance(variance: Int): Int = {
+    import APICallback.{Variance => v}
+    if (variance < 0) v.CONTRAVARIANT
+    else if (variance > 0) v.COVARIANT
+    else v.INVARIANT
+  }
+
+  def apiAccess(sym: Symbol): Unit = apiCallback { cb =>
     // Symbols which are private[foo] do not have the flag Private set,
     // but their `privateWithin` exists, see `Parsers#ParserCommon#normalize`.
     if (!sym.isOneOf(Protected | Private) && !sym.privateWithin.exists)
-      apiCallback(_.publicAPI())
       // Constants.public
+      cb.publicAPI()
     else if (sym.isAllOf(PrivateLocal))
       // Constants.privateLocal
-      apiCallback(_.localAPI(false))
+      cb.localAPI(false)
     else if (sym.isAllOf(ProtectedLocal))
       // Constants.protectedLocal
-      apiCallback(_.localAPI(true))
+      cb.localAPI(true)
     else {
       val qualifier =
         if (sym.privateWithin eq NoSymbol)
@@ -686,25 +717,22 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
           sym.privateWithin.fullName.toString
       if (sym.is(Protected))
         // api.Protected.of(qualifier)
-        apiCallback(_.qualifiedAPI(true, qualifier))
+        cb.qualifiedAPI(true, qualifier)
       else
         // api.Private.of(qualifier)
-        apiCallback(_.qualifiedAPI(false, qualifier))
+        cb.qualifiedAPI(false, qualifier)
     }
   }
 
-  def apiModifiers(sym: Symbol): api.Modifiers = {
+  def apiModifiers(sym: Symbol): Unit = apiCallback { cb =>
     val absOver = sym.is(AbsOverride)
     val abs = absOver || sym.isOneOf(Trait | Abstract | Deferred)
     val over = absOver || sym.is(Override)
-    apiCallback(_.modifiers(abs, over, sym.is(Final), sym.is(Sealed),
-      sym.isOneOf(GivenOrImplicit), sym.is(Lazy), sym.is(Macro), sym.isSuperAccessor))
-    new api.Modifiers(abs, over, sym.is(Final), sym.is(Sealed),
+    cb.modifiers(abs, over, sym.is(Final), sym.is(Sealed),
       sym.isOneOf(GivenOrImplicit), sym.is(Lazy), sym.is(Macro), sym.isSuperAccessor)
   }
 
-  def apiAnnotations(s: Symbol): List[api.Annotation] = {
-    val annots = new mutable.ListBuffer[api.Annotation]
+  def apiAnnotations(s: Symbol): Unit /*List[api.Annotation]*/ = apiCallback { cb =>
     val inlineBody = Inliner.bodyToInline(s)
     if (!inlineBody.isEmpty) {
       // FIXME: If the body of an inlineable method changes, all the reverse
@@ -714,7 +742,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       // To do this properly we would need a way to hash trees and types in
       // dotty itself.
       val printTypesCtx = ctx.fresh.setSetting(ctx.settings.XprintTypes, true)
-      annots += marker(inlineBody.show(printTypesCtx))
+      marker(inlineBody.show(printTypesCtx))
     }
 
     // In the Scala2 ExtractAPI phase we only extract annotations that extend
@@ -722,13 +750,13 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     // extract everything (except inline body annotations which are handled
     // above).
     s.annotations.filter(_.symbol != defn.BodyAnnot) foreach { annot =>
-      annots += apiAnnotation(annot)
+      apiAnnotation(annot)
     }
 
-    annots.toList
+    cb.endAnnotationSequence()
   }
 
-  def apiAnnotation(annot: Annotation): api.Annotation = {
+  def apiAnnotation(annot: Annotation): Unit /*api.Annotation*/ = apiCallback { cb =>
     // FIXME: To faithfully extract an API we should extract the annotation tree,
     // sbt instead wants us to extract the annotation type and its arguments,
     // to do this properly we would need a way to hash trees and types in dotty itself,
@@ -736,9 +764,14 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     // However, we still need to extract the annotation type in the way sbt expect
     // because sbt uses this information to find tests to run (for example
     // junit tests are annotated @org.junit.Test).
+
     // api.Annotation.of(
     //   apiType(annot.tree.tpe), // Used by sbt to find tests to run
     //   Array(api.AnnotationArgument.of("FULLTREE", annot.tree.show)))
-    ???
+    cb.startAnnotation()
+    apiType(annot.tree.tpe)
+    cb.annotationArgument("FULLTREE", annot.tree.show)
+    cb.endAnnotationArgumentSequence()
+    cb.endAnnotation()
   }
 }
