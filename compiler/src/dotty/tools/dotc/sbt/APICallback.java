@@ -17,6 +17,12 @@ public interface APICallback {
     int INVARIANT = 2;
   }
 
+  interface ParameterModifier {
+    int REPEATED = 0;
+    int PLAIN = 1;
+    int BY_NAME = 2;
+  }
+
   default void startSource(Path src) {}
   default void endSource() {}
 
@@ -82,6 +88,9 @@ public interface APICallback {
 
   default void startParameterList(boolean isImplicit) {}
   default void endParameterList() {}
+
+  default void startMethodParameter(String name, boolean isDefault, int parameterModifier) {}
+  default void endMethodParameter() {}
 
   default void startProjection(String selected) {}
   default void endProjection() {}

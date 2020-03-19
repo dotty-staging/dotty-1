@@ -422,9 +422,12 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     } else {
       apiDef(sym.asTerm)
     }
+
   }
 
   def apiDef(sym: TermSymbol): Unit/*api.Def*/ = apiCallback { cb =>
+    import APICallback.ParameterModifier
+
     def paramLists(t: Type): Unit = {
       def inner(t: Type, start: Int = 0): Unit = t match {
         case pt: TypeLambda =>
@@ -433,26 +436,30 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         case mt @ MethodTpe(pnames, ptypes, restpe) =>
           // TODO: We shouldn't have to work so hard to find the default parameters
           // of a method, Dotty should expose a convenience method for that, see #1143
-          // val defaults =
-          //   if (sym.is(DefaultParameterized)) {
-          //     val qual =
-          //       if (sym.isClassConstructor)
-          //         sym.owner.companionModule // default getters for class constructors are found in the companion object
-          //       else
-          //         sym.owner
-          //     pnames.indices.map(i =>
-          //       qual.info.member(DefaultGetterName(sym.name, start + i)).exists)
-          //   } else
-          //     pnames.indices.map(Function.const(false))
-          // val params = pnames.lazyZip(ptypes).lazyZip(defaults).map((pname, ptype, isDefault) =>
-          //   api.MethodParameter.of(pname.toString, apiType(ptype),
-          //     isDefault, api.ParameterModifier.Plain))
-          cb.startParameterList(mt.isImplicitMethod)
+          val defaults =
+            if (sym.is(DefaultParameterized)) {
+              val qual =
+                if (sym.isClassConstructor)
+                  sym.owner.companionModule // default getters for class constructors are found in the companion object
+                else
+                  sym.owner
+              pnames.indices.map(i =>
+                qual.info.member(DefaultGetterName(sym.name, start + i)).exists)
+            } else
+              pnames.indices.map(Function.const(false))
+
           // api.ParameterList.of(params.toArray, mt.isImplicitMethod) :: inner(restpe, params.length)
+          cb.startParameterList(mt.isImplicitMethod)
+          pnames.lazyZip(ptypes).lazyZip(defaults).foreach { (pname, ptype, isDefault) =>
+            cb.startMethodParameter(pname.toString, isDefault, ParameterModifier.PLAIN)
+            apiType(ptype)
+            cb.endMethodParameter()
+          }
           cb.endParameterList()
-          inner(restpe, 0 /*params.length*/)
+
+          inner(restpe, pnames.length)
         case _ =>
-          // Nil
+          ()
       }
       inner(t)
 
@@ -460,7 +467,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     }
 
     def typeParams(tpe: Type): Unit = {
-      tpe match { // tparams
+      tpe match {
         case pt: TypeLambda =>
           pt.paramNames.lazyZip(pt.paramInfos).foreach((pname, pbounds) =>
             apiTypeParameter(pname.toString, 0, pbounds.lo, pbounds.hi))

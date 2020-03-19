@@ -138,6 +138,7 @@ object APICallbackTests:
     case EndVal
     case StartDef(name: String)
     case EndDef
+    case StartMethodParameter(name: String, isDefault: Boolean, parameterModifier: Int)
     case StartTypeParameter(name: String, variance: Int)
     case StartParamList(isImplicit: Boolean)
     case EndParamList
@@ -247,10 +248,16 @@ object APICallbackTests:
       case APICallback.DefinitionType.PACKAGE_MODULE => api.DefinitionType.PackageModule
     }
 
-    private def apiVariance(dt: Int): api.Variance = dt match {
+    private def apiVariance(v: Int): api.Variance = v match {
       case APICallback.Variance.CONTRAVARIANT => api.Variance.Contravariant
       case APICallback.Variance.COVARIANT     => api.Variance.Covariant
       case APICallback.Variance.INVARIANT     => api.Variance.Invariant
+    }
+
+    private def apiParameterModifier(m: Int): api.ParameterModifier = m match {
+      case APICallback.ParameterModifier.REPEATED => api.ParameterModifier.Repeated
+      case APICallback.ParameterModifier.PLAIN    => api.ParameterModifier.Plain
+      case APICallback.ParameterModifier.BY_NAME  => api.ParameterModifier.ByName
     }
 
     override def startClassLike(dt: Int, name: String, topLevel: Boolean): Unit = accept(StartClassLike(dt, name, topLevel))
@@ -364,7 +371,17 @@ object APICallbackTests:
       stack = api.Def.create(name, access, mods, annots, tparams, paramss, retTpe) :: stack1
 
     override def startParameterList(isImplicit: Boolean): Unit = accept(isImplicit)
-    override def endParameterList(): Unit = modify((isImplicit: Boolean) => api.ParameterList.create(Array.empty, isImplicit))
+    override def endParameterList(): Unit =
+      val (params: Array[api.MethodParameter], (isImplicit: Boolean) :: stack1) =
+        peelFront[api.MethodParameter](_.isInstanceOf[api.MethodParameter])
+      stack = api.ParameterList.create(params, isImplicit) :: stack1
+
+    override def startMethodParameter(name: String, isDefault: Boolean, parameterModifier: Int): Unit =
+      accept(StartMethodParameter(name, isDefault, parameterModifier))
+
+    override def endMethodParameter(): Unit =
+      val (tpe: api.Type) :: (StartMethodParameter(name, isDefault, mod)) :: stack1 = stack
+      stack = api.MethodParameter.create(name, tpe, isDefault, apiParameterModifier(mod)) :: stack1
 
     override def startTypeDeclaration(name: String): Unit = accept(name)
     override def endTypeDeclaration(): Unit =
