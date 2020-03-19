@@ -25,10 +25,7 @@ private[sbt] trait ThunkHolder {
    *  It will be forced by the next call to `forceThunks()`
    */
   def lzy[T <: AnyRef](t: => T): api.Lazy[T] = {
-    lzy(api.SafeLazy.apply(() => t))
-  }
-
-  def lzy[T <: AnyRef](thunk: api.Lazy[T]): api.Lazy[T] = {
+    val thunk = api.SafeLazy.apply(() => t)
     thunks += thunk
     thunk
   }

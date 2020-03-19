@@ -57,12 +57,25 @@ public interface APICallback {
   default void startStructure(){}
   default void endStructure(){}
 
+  default void startTypeSequence() {}
   default void endTypeSequence() {}
+
+  default void startClassDefinitionSequence() {}
   default void endClassDefinitionSequence() {}
+
+  default void startTypeParameterSequence() {}
   default void endTypeParameterSequence() {}
+
+  default void startAnnotationSequence() {}
   default void endAnnotationSequence() {}
+
+  default void startAnnotationArgumentSequence() {}
   default void endAnnotationArgumentSequence() {}
+
+  default void startParameterListSequence() {}
   default void endParameterListSequence() {}
+
+  default void startStringSequence() {}
   default void endStringSequence() {}
 
   default void startTypeParameter(String name, int variance) {}
@@ -74,8 +87,20 @@ public interface APICallback {
   default void startTypeAlias(String name) {}
   default void endTypeAlias() {}
 
+  default void startAnnotated() {}
+  default void endAnnotated() {}
+
   default void startAnnotation() {}
   default void endAnnotation() {}
+
+  default void startParameterized() {}
+  default void endParameterized() {}
+
+  default void startPolymorphic() {}
+  default void endPolymorphic() {}
+
+  default void startExistential() {}
+  default void endExistential() {}
 
   default void startVal(String name) {}
   default void endVal() {}
@@ -106,6 +131,7 @@ public interface APICallback {
 
   default void emptyType() {}
 
+  default void parameterRef(String paramName) {}
   default void annotationArgument(String name, String value) {}
   default void id(String name) {}
   default void thisId() {}

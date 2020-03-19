@@ -172,8 +172,16 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
    *  @param tp      An approximation of the type we're trying to represent
    *  @param marker  A special annotation to differentiate our type
    */
-  private def withMarker(tp: api.Type, marker: api.Annotation) =
-    api.Annotated.of(tp, Array(marker))
+  private def withMarker(tp: => Unit, marker: => Unit): Unit = apiCallback { cb =>
+    // api.Annotated.of(tp, Array(marker))
+    cb.startAnnotated()
+    tp
+    cb.startAnnotationSequence()
+    marker
+    cb.endAnnotationSequence()
+    cb.endAnnotated()
+  }
+
 
   private def marker(name: String): Unit = apiCallback { cb =>
     // api.Annotation.of(api.Constant.of(Constants.emptyType, name), Array())
@@ -181,13 +189,45 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     cb.startConstant(name)
     cb.emptyType()
     cb.endConstant()
-    cb.endAnnotationArgumentSequence()
+    emptyAnnotationArgumentSequence()
     cb.endAnnotation()
   }
 
   private def orMarker = marker("Or")
   private def byNameMarker = marker("ByName")
   private def matchMarker = marker("Match")
+
+  private def emptyAnnotationArgumentSequence(): Unit = apiCallback { cb =>
+    cb.startAnnotationArgumentSequence()
+    cb.endAnnotationArgumentSequence()
+  }
+
+  private def emptyAnnotationSequence(): Unit = apiCallback { cb =>
+    cb.startAnnotationSequence()
+    cb.endAnnotationSequence()
+  }
+
+  private def emptyClassDefinitionSequence(): Unit = apiCallback { cb =>
+    cb.startClassDefinitionSequence()
+    cb.endClassDefinitionSequence()
+  }
+
+  private def emptyTypeParameterSequence(): Unit = apiCallback { cb =>
+    cb.startTypeParameterSequence()
+    cb.endTypeParameterSequence()
+  }
+
+  private def typeSequence(op: => Unit): Unit = apiCallback { cb =>
+    cb.startTypeSequence()
+    op
+    cb.endTypeSequence()
+  }
+
+  private def typeParameterSequence(op: => Unit): Unit = apiCallback { cb =>
+    cb.startTypeParameterSequence()
+    op
+    cb.endTypeParameterSequence()
+  }
 
   /** Extract the API representation of a source file */
   def apiSource(tree: Tree): Unit = apiCallback { cb =>
@@ -230,25 +270,24 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         else dt.MODULE
       } else dt.CLASS_DEF
 
-    def childrenOfSealedClass(): Unit = {
+    def childrenOfSealedClass(): Unit = typeSequence {
       sym.children.sorted(classFirstSort).foreach(c =>
         if (c.isClass)
           apiType(c.typeRef)
         else
           apiType(c.termRef)
       )
-      cb.endTypeSequence
     }
 
-    def tparams(): Unit = {
-      sym.typeParams.foreach(apiTypeParameter)
-      cb.endTypeParameterSequence()
+    def tparams(): Unit = typeParameterSequence { sym.typeParams.foreach(apiTypeParameter) }
+
+    def selfType(): Unit = evaluatedTask { apiType(sym.givenSelfType) }
+    def structure(): Unit = evaluatedTask { apiClassStructure(sym) }
+
+    def savedAnnotations(): Unit = {
+      cb.startStringSequence()
+      cb.endStringSequence()
     }
-
-    def selfType(): Unit = evaluatedTask(apiType(sym.givenSelfType))
-    def structure(): Unit = evaluatedTask(apiClassStructure(sym))
-
-    def savedAnnotations(): Unit = cb.endStringSequence()
 
     val name = sym.fullName.stripModuleClassSuffix.toString
     val topLevel = sym.isTopLevelClass
@@ -317,16 +356,19 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     }
 
     def apiBases(bases: List[Type]): Unit = evaluatedTask {
+      cb.startTypeSequence()
       bases.foreach(apiType)
       cb.endTypeSequence()
     }
 
     def apiDecls(decls: List[Symbol]): Unit = evaluatedTask {
+      cb.startClassDefinitionSequence()
       apiDefinitions(decls)
       cb.endClassDefinitionSequence()
     }
 
     def apiInherited(inherited: List[Symbol]) = delayTask {
+      cb.startClassDefinitionSequence()
       apiDefinitions(inherited)
       cb.endClassDefinitionSequence()
     }
@@ -461,12 +503,13 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         case _ =>
           ()
       }
-      inner(t)
 
+      cb.startParameterListSequence()
+      inner(t)
       cb.endParameterListSequence()
     }
 
-    def typeParams(tpe: Type): Unit = {
+    def typeParams(tpe: Type): Unit = typeParameterSequence {
       tpe match {
         case pt: TypeLambda =>
           pt.paramNames.lazyZip(pt.paramInfos).foreach((pname, pbounds) =>
@@ -474,7 +517,6 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         case _ =>
           ()
       }
-      cb.endTypeParameterSequence()
     }
 
     cb.startDef(sym.name.toString)
@@ -496,7 +538,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       apiAccess(sym)
       apiModifiers(sym)
       apiAnnotations(sym)
-      cb.endTypeParameterSequence()
+      emptyTypeParameterSequence()
     }
     if (sym.isAliasType) {
       cb.startTypeAlias(name)
@@ -515,9 +557,17 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
   }
 
   // Hack to represent dotty types which don't have an equivalent in xsbti
-  def combineApiTypes(apiTps: api.Type*): api.Type = {
-    api.Structure.of(api.SafeLazy.strict(apiTps.toArray),
-      api.SafeLazy.strict(Array()), api.SafeLazy.strict(Array()))
+  /**
+   *  @param apiTps operation that produces a sequence of types with an end marker
+   */
+  def combineApiTypes(apiTps: Type*): Unit /*api.Type*/ = apiCallback { cb =>
+    // api.Structure.of(api.SafeLazy.strict(apiTps.toArray),
+    //   api.SafeLazy.strict(Array()), api.SafeLazy.strict(Array()))
+    cb.startStructure()
+    evaluatedTask { typeSequence { apiTps.foreach(apiType) } }
+    evaluatedTask { emptyClassDefinitionSequence() }
+    evaluatedTask { emptyClassDefinitionSequence() }
+    cb.endStructure()
   }
 
   def apiType(tp: Type): Unit /*: api.Type*/ = cacheCallback(tp, typeCache)(computeType)
@@ -550,28 +600,41 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         cb.startProjection(sym.name.toString)
         apiType(prefix)
         cb.endProjection()
-      // case AppliedType(tycon, args) =>
-      //   def processArg(arg: Type): api.Type = arg match {
-      //     case arg @ TypeBounds(lo, hi) => // Handle wildcard parameters
-      //       if (lo.isDirectRef(defn.NothingClass) && hi.isDirectRef(defn.AnyClass))
-      //         Constants.emptyType
-      //       else {
-      //         val name = "_"
-      //         val ref = api.ParameterRef.of(name)
-      //         api.Existential.of(ref,
-      //           Array(apiTypeParameter(name, 0, lo, hi)))
-      //       }
-      //     case _ =>
-      //       apiType(arg)
-      //   }
+      case AppliedType(tycon, args) =>
+        def processArg(arg: Type): Unit /*api.Type*/ = arg match {
+          case arg @ TypeBounds(lo, hi) => // Handle wildcard parameters
+            if (lo.isDirectRef(defn.NothingClass) && hi.isDirectRef(defn.AnyClass))
+              // Constants.emptyType
+              cb.emptyType()
+            else {
+              val name = "_"
+              // val ref = api.ParameterRef.of(name)
+              // api.Existential.of(ref,
+              //   Array(apiTypeParameter(name, 0, lo, hi)))
+              cb.startExistential()
+              typeParameterSequence { apiTypeParameter(name, 0, lo, hi) }
+              cb.parameterRef(name)
+              cb.endExistential()
+            }
+          case _ =>
+            apiType(arg)
+        }
 
-      //   val apiTycon = apiType(tycon)
-      //   val apiArgs = args.map(processArg)
-      //   api.Parameterized.of(apiTycon, apiArgs.toArray)
-      // case tl: TypeLambda =>
-      //   val apiTparams = tl.typeParams.map(apiTypeParameter)
-      //   val apiRes = apiType(tl.resType)
-      //   api.Polymorphic.of(apiRes, apiTparams.toArray)
+        // val apiTycon = apiType(tycon)
+        // val apiArgs = args.map(processArg)
+        // api.Parameterized.of(apiTycon, apiArgs.toArray)
+        cb.startParameterized()
+        typeSequence { args.foreach(processArg) }
+        apiType(tycon)
+        cb.endParameterized()
+      case tl: TypeLambda =>
+        // val apiTparams = tl.typeParams.map(apiTypeParameter)
+        // val apiRes = apiType(tl.resType)
+        // api.Polymorphic.of(apiRes, apiTparams.toArray)
+        cb.startPolymorphic()
+        typeParameterSequence { tl.typeParams.foreach(apiTypeParameter) }
+        apiType(tl.resType)
+        cb.endPolymorphic()
       // case rt: RefinedType =>
       //   val name = rt.refinedName.toString
       //   val parent = apiType(rt.parent)
@@ -617,40 +680,51 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       //     val adecl: Array[api.ClassDefinition] = if (decl == null) Array() else Array(decl)
       //     api.Structure.of(api.SafeLazy.strict(Array(parent)), api.SafeLazy.strict(adecl), api.SafeLazy.strict(Array()))
       //   })
-      // case tp: RecType =>
-      //   apiType(tp.parent)
-      // case RecThis(recType) =>
-      //   // `tp` must be present inside `recType`, so calling `apiType` on
-      //   // `recType` would lead to an infinite recursion, we avoid this by
-      //   //  computing the representation of `recType` lazily.
-      //   apiLazy(recType)
-      // case tp: AndType =>
-      //   combineApiTypes(apiType(tp.tp1), apiType(tp.tp2))
-      // case tp: OrType =>
-      //   val s = combineApiTypes(apiType(tp.tp1), apiType(tp.tp2))
-      //   withMarker(s, orMarker)
-      // case ExprType(resultType) =>
-      //   withMarker(apiType(resultType), byNameMarker)
-      // case MatchType(bound, scrut, cases) =>
-      //   val s = combineApiTypes(apiType(bound) :: apiType(scrut) :: cases.map(apiType): _*)
-      //   withMarker(s, matchMarker)
+      case tp: RecType =>
+        apiType(tp.parent)
+      case RecThis(recType) =>
+        // `tp` must be present inside `recType`, so calling `apiType` on
+        // `recType` would lead to an infinite recursion, we avoid this by
+        //  computing the representation of `recType` lazily.
+        apiLazy(recType)
+      case tp: AndType =>
+        // combineApiTypes(apiType(tp.tp1), apiType(tp.tp2))
+        combineApiTypes(tp.tp1, tp.tp2)
+      case tp: OrType =>
+        // val s = combineApiTypes(apiType(tp.tp1), apiType(tp.tp2))
+        // withMarker(s, orMarker)
+        withMarker(combineApiTypes(tp.tp1, tp.tp2), orMarker)
+      case ExprType(resultType) =>
+        withMarker(apiType(resultType), byNameMarker)
+      case MatchType(bound, scrut, cases) =>
+        // val s = combineApiTypes(apiType(bound) :: apiType(scrut) :: cases.map(apiType): _*)
+        // withMarker(s, matchMarker)
+        withMarker(combineApiTypes(bound :: scrut :: cases: _*), matchMarker)
       case ConstantType(constant) =>
         // api.Constant.of(apiType(constant.tpe), constant.stringValue)
         cb.startConstant(constant.stringValue)
         apiType(constant.tpe)
         cb.endConstant()
-      // case AnnotatedType(tpe, annot) =>
-      //   api.Annotated.of(apiType(tpe), Array(apiAnnotation(annot)))
+      case AnnotatedType(tpe, annot) =>
+        // api.Annotated.of(apiType(tpe), Array(apiAnnotation(annot)))
+        cb.startAnnotated()
+        apiType(tpe)
+        cb.startAnnotationSequence()
+        apiAnnotation(annot)
+        cb.endAnnotationSequence()
+        cb.endAnnotated()
       case tp: ThisType =>
         apiThis(tp.cls)
-      // case tp: ParamRef =>
-      //   // TODO: Distinguishing parameters based on their names alone is not enough,
-      //   // the binder is also needed (at least for type lambdas).
-      //   api.ParameterRef.of(tp.paramName.toString)
-      // case tp: LazyRef =>
-      //   apiType(tp.ref)
-      // case tp: TypeVar =>
-      //   apiType(tp.underlying)
+      case tp: ParamRef =>
+        // TODO: Distinguishing parameters based on their names alone is not enough,
+        // the binder is also needed (at least for type lambdas).
+
+        // api.ParameterRef.of(tp.paramName.toString)
+        cb.parameterRef(tp.paramName.toString)
+      case tp: LazyRef =>
+        apiType(tp.ref)
+      case tp: TypeVar =>
+        apiType(tp.underlying)
       case _ => {
         ctx.warning(i"sbt-api: Unhandled type ${tp.getClass} : $tp")
         // Constants.emptyType
@@ -659,12 +733,22 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     }
   }
 
-  def apiLazy(tp: => Type): api.Type = {
+  def apiLazy(tp: => Type): /*api.Type*/ Unit = apiCallback { cb =>
     // TODO: The sbt api needs a convenient way to make a lazy type.
     // For now, we repurpose Structure for this.
+
     // val apiTp = lzy(Array(apiType(tp)))
     // api.Structure.of(apiTp, api.SafeLazy.strict(Array()), api.SafeLazy.strict(Array()))
-    ???
+
+    cb.startStructure()
+    delayTask {
+      typeSequence {
+        apiType(tp)
+      }
+    }
+    evaluatedTask { emptyClassDefinitionSequence() }
+    evaluatedTask { emptyClassDefinitionSequence() }
+    cb.endStructure()
   }
 
   def apiThis(sym: Symbol) /*: api.Singleton */ = apiCallback { cb =>
@@ -688,8 +772,8 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
   def apiTypeParameter(name: String, variance: Int, lo: Type, hi: Type): Unit = apiCallback { cb =>
     // api.TypeParameter.of(name, Array(), Array(), apiVariance(variance), apiType(lo), apiType(hi))
     cb.startTypeParameter(name, apiVariance(variance))
-    cb.endAnnotationSequence()
-    cb.endTypeParameterSequence()
+    emptyAnnotationSequence()
+    emptyTypeParameterSequence()
     apiType(lo)
     apiType(hi)
     cb.endTypeParameter()
@@ -752,6 +836,8 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
       marker(inlineBody.show(printTypesCtx))
     }
 
+    cb.startAnnotationSequence()
+
     // In the Scala2 ExtractAPI phase we only extract annotations that extend
     // StaticAnnotation, but in Dotty we currently pickle all annotations so we
     // extract everything (except inline body annotations which are handled
@@ -777,6 +863,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     //   Array(api.AnnotationArgument.of("FULLTREE", annot.tree.show)))
     cb.startAnnotation()
     apiType(annot.tree.tpe)
+    cb.startAnnotationArgumentSequence()
     cb.annotationArgument("FULLTREE", annot.tree.show)
     cb.endAnnotationArgumentSequence()
     cb.endAnnotation()
