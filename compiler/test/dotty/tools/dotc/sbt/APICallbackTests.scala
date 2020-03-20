@@ -24,19 +24,23 @@ class APICallbackTests:
 
   @test def helloWorldBuilder: Unit =
     val defs = compileOnlyBuild("HelloWorld.scala")
-    println(defs)
+    assert(defs.nonEmpty)
 
   @test def boxBuilder: Unit =
     val defs = compileOnlyBuild("Box.scala")
-    println(defs)
+    assert(defs.nonEmpty)
+
+  @test def refinementsBuilder: Unit =
+    val defs = compileOnlyBuild("Refinements.scala")
+    assert(defs.nonEmpty)
 
   @test def innerRecursiveBuilder: Unit =
     val defs = compileOnlyBuild("InnerRecursive.scala")
-    println(defs)
+    assert(defs.nonEmpty)
 
   @test def classTParamsBuilder: Unit =
     val defs = compileOnlyBuild("ClassTParams.scala")
-    println(defs)
+    assert(defs.nonEmpty)
 
   private def compileOnlyBuild(src: String): List[xsbti.api.ClassLike] =
     compileBuild(rootSrc.resolve(src) :: Nil)

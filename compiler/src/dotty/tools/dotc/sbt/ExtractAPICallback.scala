@@ -144,7 +144,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
 
   private var cacheID: Long = -1L
 
-  private def newId: Long =
+  private def newId(): Long =
     cacheID += 1
     cacheID
   end newId
@@ -159,7 +159,11 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
    *  see the comment in the `RefinedType` case in `computeType`
    *  The cache key is (api of RefinedType#parent, api of RefinedType#refinedInfo).
     */
-  private val refinedTypeCache = new mutable.HashMap[(api.Type, api.Definition), Long]
+  private val refinedTypeCache = new mutable.HashMap[(Long, RefinedTypeHash), Long]
+
+  private sealed abstract class RefinedTypeHash
+  private final case class TypeAliasHash(name: String, alias: Long) extends RefinedTypeHash
+  private final case class TypeBoundsHash(name: String, lo: Long, hi: Long) extends RefinedTypeHash
 
   // private val allNonLocalClassesInSrc = new mutable.HashSet[xsbti.api.ClassLike]
   private val _mainClasses = new mutable.HashSet[String]
@@ -223,6 +227,12 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     cb.endTypeSequence()
   }
 
+  private def classDefinitionSequence(op: => Unit): Unit = apiCallback { cb =>
+    cb.startClassDefinitionSequence()
+    op
+    cb.endClassDefinitionSequence()
+  }
+
   private def typeParameterSequence(op: => Unit): Unit = apiCallback { cb =>
     cb.startTypeParameterSequence()
     op
@@ -243,18 +253,42 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     cb.forceDelayedTasks()
   }
 
-  def cacheCallback[T](key: T, map: mutable.Map[T, Long])(compute: T => Unit): Unit = apiCallback { cb =>
+  /** Fusion of forceId with computeOrFetch
+   */
+  private def cacheCallback[T](key: T, map: mutable.Map[T, Long])(compute: T => Unit)(cb: APICallback): Unit = {
     if (map.contains(key)) {
       cb.sharedValue(map(key))
     } else {
-      compute(key)
-      val id = newId
-      cb.registerSharedWith(id)
-      map.put(key, id)
+      computeRegister(key)({ newIdFor(key, map) })(compute)(cb)
     }
   }
 
-  def apiClass(sym: ClassSymbol): Unit = cacheCallback(sym, classLikeCache)(computeClass)
+  private def computeOrFetch[T](id: Long, key: T, computed: Boolean)(compute: T => Unit)(cb: APICallback): Unit = {
+    if (computed) {
+      cb.sharedValue(id)
+    } else {
+      computeRegister(key)(id)(compute)(cb)
+    }
+  }
+
+  private def newIdFor[T](key: T, map: mutable.Map[T, Long]): Long = {
+    newId().tap(map.put(key, _))
+  }
+
+  private def forceId[T](key: T, map: mutable.Map[T, Long]): (Long, Boolean) = {
+    if (map.contains(key)) {
+      map(key) -> true
+    } else {
+      newIdFor(key, map) -> false
+    }
+  }
+
+  private def computeRegister[T](key: T)(idGen: => Long)(compute: T => Unit)(cb: APICallback): Unit = {
+    compute(key)
+    cb.registerSharedWith(idGen)
+  }
+
+  def apiClass(sym: ClassSymbol): Unit = apiCallback(cacheCallback(sym, classLikeCache)(computeClass))
 
   def mainClasses: Set[String] = {
     apiCallback(_.forceDelayedTasks())
@@ -570,7 +604,10 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     cb.endStructure()
   }
 
-  def apiType(tp: Type): Unit /*: api.Type*/ = cacheCallback(tp, typeCache)(computeType)
+  def apiType(tp: Type): Unit /*: api.Type*/ = apiCallback(cacheCallback(tp, typeCache)(computeType))
+  def forceTypeId(tp: Type): (Long, Boolean) = forceId(tp, typeCache)
+  def forceApiType(tp: Type, id: Long, computed: Boolean)(cb: APICallback): Unit =
+    computeOrFetch(id, tp, computed)(computeType)(cb)
 
   private def computeType(tp: Type): Unit/*: api.Type*/ = apiCallback { cb =>
     // TODO: Never dealias. We currently have to dealias because
@@ -635,51 +672,93 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         typeParameterSequence { tl.typeParams.foreach(apiTypeParameter) }
         apiType(tl.resType)
         cb.endPolymorphic()
-      // case rt: RefinedType =>
-      //   val name = rt.refinedName.toString
-      //   val parent = apiType(rt.parent)
+      case rt: RefinedType =>
+        val name = rt.refinedName.toString
+        val (parent, parentComputed) = forceTypeId(rt.parent)
 
-      //   def typeRefinement(name: String, tp: TypeBounds): api.TypeMember = tp match {
-      //     case TypeAlias(alias) =>
-      //       api.TypeAlias.of(name,
-      //         Constants.public, Constants.emptyModifiers, Array(), Array(), apiType(alias))
-      //     case TypeBounds(lo, hi) =>
-      //       api.TypeDeclaration.of(name,
-      //         Constants.public, Constants.emptyModifiers, Array(), Array(), apiType(lo), apiType(hi))
-      //   }
-      //   val decl = rt.refinedInfo match {
-      //     case rinfo: TypeBounds =>
-      //       typeRefinement(name, rinfo)
-      //     case _ =>
-      //       ctx.debuglog(i"sbt-api: skipped structural refinement in $rt")
-      //       null
-      //   }
+        def typeRefinement(name: String, tp: TypeBounds): (RefinedTypeHash, () => Unit) = tp match {
+          case TypeAlias(alias) =>
+            val (aliasId, computedAlias) = forceTypeId(alias)
 
-      //   // Aggressive caching for RefinedTypes: `typeCache` is enough as long as two
-      //   // RefinedType are `==`, but this is only the case when their `refinedInfo`
-      //   // are `==` and this is not always the case, consider:
-      //   //
-      //   //     val foo: { type Bla = a.b.T }
-      //   //     val bar: { type Bla = a.b.T }
-      //   //
-      //   // The sbt API representations of `foo` and `bar` (let's call them `apiFoo`
-      //   // and `apiBar`) will both be instances of `Structure`. If `typeCache` was
-      //   // the only cache, then in some cases we would have `apiFoo eq apiBar` and
-      //   // in other cases we would just have `apiFoo == apiBar` (this happens
-      //   // because the dotty representation of `a.b.T` is unstable, see the comment
-      //   // in the `NamedType` case above).
-      //   //
-      //   // The fact that we may or may not have `apiFoo eq apiBar` is more than
-      //   // an optimisation issue: it will determine whether the sbt name hash for
-      //   // `Bla` contains one or two entries (because sbt `NameHashing` will not
-      //   // traverse both `apiFoo` and `apiBar` if they are `eq`), therefore the
-      //   // name hash of `Bla` will be unstable, unless we make sure that
-      //   // `apiFoo == apiBar` always imply `apiFoo eq apiBar`. This is what
-      //   // `refinedTypeCache` is for.
-      //   refinedTypeCache.getOrElseUpdate((parent, decl), {
-      //     val adecl: Array[api.ClassDefinition] = if (decl == null) Array() else Array(decl)
-      //     api.Structure.of(api.SafeLazy.strict(Array(parent)), api.SafeLazy.strict(adecl), api.SafeLazy.strict(Array()))
-      //   })
+            val computeDecl = () => {
+              cb.startTypeAlias(name)
+              cb.publicAPI()
+              cb.modifiers(false, false, false, false, false, false, false, false)
+              emptyAnnotationSequence()
+              emptyTypeParameterSequence()
+              forceApiType(alias, aliasId, computedAlias)(cb)
+              cb.endTypeAlias()
+            }
+
+            TypeAliasHash(name, aliasId) -> computeDecl
+            // api.TypeAlias.of(name,
+            //   Constants.public, Constants.emptyModifiers, Array(), Array(), apiType(alias))
+          case TypeBounds(lo, hi) =>
+            val (loId, computedLo) = forceTypeId(lo)
+            val (hiId, computedHi) = forceTypeId(hi)
+
+            val computeDecl = () => {
+              cb.startTypeDeclaration(name)
+              cb.publicAPI()
+              cb.modifiers(false, false, false, false, false, false, false, false)
+              emptyAnnotationSequence()
+              emptyTypeParameterSequence()
+              forceApiType(lo, loId, computedLo)(cb)
+              forceApiType(hi, hiId, computedHi)(cb)
+              cb.endTypeDeclaration()
+            }
+
+            TypeBoundsHash(name, loId, hiId) -> computeDecl
+            // api.TypeDeclaration.of(name,
+            //   Constants.public, Constants.emptyModifiers, Array(), Array(), apiType(lo), apiType(hi))
+        }
+        val (hash, computeDecl) = rt.refinedInfo match {
+          case rinfo: TypeBounds =>
+            typeRefinement(name, rinfo)
+          case _ =>
+            ctx.debuglog(i"sbt-api: skipped structural refinement in $rt")
+            (null, null)
+        }
+
+        // Aggressive caching for RefinedTypes: `typeCache` is enough as long as two
+        // RefinedType are `==`, but this is only the case when their `refinedInfo`
+        // are `==` and this is not always the case, consider:
+        //
+        //     val foo: { type Bla = a.b.T }
+        //     val bar: { type Bla = a.b.T }
+        //
+        // The sbt API representations of `foo` and `bar` (let's call them `apiFoo`
+        // and `apiBar`) will both be instances of `Structure`. If `typeCache` was
+        // the only cache, then in some cases we would have `apiFoo eq apiBar` and
+        // in other cases we would just have `apiFoo == apiBar` (this happens
+        // because the dotty representation of `a.b.T` is unstable, see the comment
+        // in the `NamedType` case above).
+        //
+        // The fact that we may or may not have `apiFoo eq apiBar` is more than
+        // an optimisation issue: it will determine whether the sbt name hash for
+        // `Bla` contains one or two entries (because sbt `NameHashing` will not
+        // traverse both `apiFoo` and `apiBar` if they are `eq`), therefore the
+        // name hash of `Bla` will be unstable, unless we make sure that
+        // `apiFoo == apiBar` always imply `apiFoo eq apiBar`. This is what
+        // `refinedTypeCache` is for.
+        cacheCallback(parent -> hash, refinedTypeCache){ _ =>
+          cb.startStructure()
+          evaluatedTask {
+            typeSequence {
+              forceApiType(rt.parent, parent, parentComputed)(cb)
+            }
+          }
+          evaluatedTask {
+            if (hash == null) emptyClassDefinitionSequence()
+            else classDefinitionSequence { computeDecl() }
+          }
+          evaluatedTask { emptyClassDefinitionSequence() }
+          cb.endStructure()
+        }(cb)
+        // refinedTypeCache.getOrElseUpdate(parent -> hash, {
+        //   val adecl: Array[api.ClassDefinition] = if (decl == null) Array() else Array(decl)
+        //   api.Structure.of(api.SafeLazy.strict(Array(parent)), api.SafeLazy.strict(adecl), api.SafeLazy.strict(Array()))
+        // })
       case tp: RecType =>
         apiType(tp.parent)
       case RecThis(recType) =>
