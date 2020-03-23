@@ -676,6 +676,19 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
         val name = rt.refinedName.toString
         val (parent, parentComputed) = forceTypeId(rt.parent)
 
+
+        // TODO [Investigate]: The purpose of this hashing originally was to ensure that two cached `Structures`
+        // representing type refinements will only be `=:=` if they are `eq`.
+        // In the case for `TypeAlias(alias)`, two different `alias` Type keys will definitely produce different Long
+        // IDs, but perhaps the types could have been `=:=`: in the case for NamedType, we know that two types
+        // may be `=:=`, but not `==`, this means that they will produce different Long IDs, but be the same type.
+        // For Zinc, there needs to be a canonical form for all types.
+        // *****
+        // What we want is the possibility for two different `case rt: RefinedType` to produce an identical Structure,
+        // because the `canonical` form of the type in the refinement is identical.
+        // This means that this current implementation is not suitable.
+        // We either need to calculate the canonical form in the compiler, or somehow tell the callback the component
+        // parts of the refinement so that it can do its own unification based on what it has produced.
         def typeRefinement(name: String, tp: TypeBounds): (RefinedTypeHash, () => Unit) = tp match {
           case TypeAlias(alias) =>
             val (aliasId, computedAlias) = forceTypeId(alias)
