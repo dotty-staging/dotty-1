@@ -7,7 +7,7 @@ object IteratorTest {
 
   def withFile[T](path: String)(@local thunk: (SFile @local) => T): T = {
     val f = new SFile(path)
-    thunk(f)
+      thunk(f)
   }
 
 
@@ -21,24 +21,27 @@ object IteratorTest {
     }
   }
 
+  def main(@local u: Unit): Unit = {
+    withFile("") {
+      f => // error
+      val iter = new Iterator[Any] {
+        def next() = ???
+      }
 
-  withFile("") { f =>
-    val iter = new Iterator[Any] {
-      def next() = ???
-    }
-
-    iter.map(_ => length(f)) // error
-  }
-
-  withFile("") { f =>
-    val iter = new Iterator[Any] {
-      def next() = ???
-    }
-
-    val iter2 =
       iter.map(_ => length(f))
+    }
 
-    length(f)
+    withFile("") {
+      f =>
+      val iter = new Iterator[Any] {
+        def next() = ???
+      }
+
+      val iter2 =
+        iter.map(_ => length(f))
+
+      length(f)
+    }
+
   }
-
 }

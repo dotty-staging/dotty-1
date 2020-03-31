@@ -12,12 +12,16 @@ object WithFileTest {
     thunk(f)
   }
 
-  withFile("") { f =>
-    length(f) // error
-  }
+  def main(@local u: Unit): Unit = {
+    withFile("") {
+      f => // error
+      length(f)
+    }
 
-  withFile("") { f =>
-    val res = { () => length(f) }
-    res() // error
+    withFile("") {
+      f => // error
+      val res = { () => length(f) }
+      res()
+    }
   }
 }

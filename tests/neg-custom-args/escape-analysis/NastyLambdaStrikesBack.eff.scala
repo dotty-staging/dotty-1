@@ -6,7 +6,7 @@ object NastyLambdaStrikesBack {
   }
 
   def foo(
-    @local i: Int
+    @local i: Int // error
   ): Cell = {
     val c: Cell = Cell()
     bar(c, () => i)

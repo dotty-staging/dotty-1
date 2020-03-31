@@ -12,17 +12,21 @@ object Method {
     def fileLength = f
   }
 
-  withFile("") { f =>
-    val c = new Class1(f)
-    c.fileLength // error
-  }
+  def main(@local u: Unit): Unit = {
+    withFile("") {
+      f => // error
+      val c = new Class1(f)
+      c.fileLength
+    }
 
-  class Class2(val f: SFile) {
-    def fileLength = f
-  }
+    class Class2(val f: SFile) {
+      def fileLength = f
+    }
 
-  withFile("") { f =>
-    val c = new Class2(f)
-    c.fileLength // error
+    withFile("") {
+      f => // error
+      val c = new Class2(f)
+      c.fileLength
+    }
   }
 }

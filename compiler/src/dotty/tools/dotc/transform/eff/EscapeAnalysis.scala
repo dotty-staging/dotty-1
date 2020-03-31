@@ -16,12 +16,12 @@ class EscapeAnalysis extends MiniPhase {
   val phaseName = EscapeAnalysis.name
 
   override def transformApply(tree: Apply)(implicit ctx: Context): Tree = {
-    if (!ctx.settings.YescapeAnalysis.value) return tree
-    val Apply(fun, args) = tree
-    val fsym = fun.symbol
-    if fsym.exists && fsym.hasAnnotation(ctx.definitions.LocalParamsAnnot) then
-      val engine = new EscapeAnalysisEngine(ctx)
-      engine.analyseToplevel(tree)
+    // if (!ctx.settings.YescapeAnalysis.value) return tree
+    // val Apply(fun, args) = tree
+    // val fsym = fun.symbol
+    // if fsym.exists && fsym.hasAnnotation(ctx.definitions.LocalParamsAnnot) then
+    //   val engine = new EscapeAnalysisEngine(ctx)
+    //   engine.analyseToplevel(tree)
     tree
   }
 

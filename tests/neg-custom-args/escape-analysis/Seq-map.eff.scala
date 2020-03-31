@@ -25,12 +25,12 @@ object SeqTest {
       l1
     }
 
-    def control(
-      @local x: Int
-    ): List2[Int] = {
-      val l1 = map(Cons2(0, Nil2()), i => x)
-      val l2 = map(Cons2(0, Nil2()), i => 1)
-      l2
-    }
+    // def control(
+    //   @local x: Int
+    // ): List2[Int] = {
+    //   val l1 = map(Cons2(0, Nil2()), i => x)
+    //   val l2 = map(Cons2(0, Nil2()), i => 1)
+    //   l2
+    // }
   }
 }

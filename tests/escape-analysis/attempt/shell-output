@@ -1,0 +1,14 @@
+-- [E029] Pattern Match Exhaustivity Warning: pseudolibrary/LList.scala:14:4 ---
+14 |    l match {
+   |    ^
+   |    match may not be exhaustive.
+   |
+   |    It would fail on pattern case: pseudolibrary.NNil()
+
+longer explanation available when compiling with `-explain`
+-- Error: pseudolibrary/obj.scala:20:17 ----------------------------------------
+20 |  def bar(@local c: Console): Any = c
+   |                 ^
+   |                 (m) local escapes (value c)
+1 warning found
+1 error found

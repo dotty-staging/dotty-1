@@ -1,0 +1,3 @@
+bin/dotc -d pseudolibrary/out pseudolibrary/LList.scala \
+		&& bin/dotc -d pseudolibrary/out-user -classpath pseudolibrary/out pseudolibrary/obj.scala \
+		&& bin/dotc -Yescape-analysis -d pseudolibrary/out-final -classpath pseudolibrary/out:pseudolibrary/out-user -from-tasty userspace.obj
