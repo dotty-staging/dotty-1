@@ -5,31 +5,33 @@ object WithFileTest {
 
   def withFile[T](path: String)(@local thunk: (SFile @local) => T): T = {
     val f = new SFile(path)
-    thunk(f)
+    thunk(f) // error // error // error // error // error // error
   }
 
-  def foo(@local u: Unit): Unit = {
-    withFile("") {
-      f => // error
+  def foo_a(@local u: Unit): Unit = {
+    withFile("") { f =>
       f
     }
+  }
 
-    withFile("") {
-      f1 => // error
+  def foo_b(@local u: Unit): Unit = {
+    withFile("") { f1 =>
       val res: () => SFile = withFile("") { f2 =>
         { () => f1 }
       }
       res()
     }
+  }
 
-    withFile("") {
-      f => // error
+  def foo_c(@local u: Unit): Unit = {
+    withFile("") { f =>
       val res = { () => f }
       res
     }
+  }
 
-    withFile("") {
-      f => // error
+  def foo_d(@local u: Unit): Unit = {
+    withFile("") { f =>
       {
         val res = { () => f }
         res
@@ -40,15 +42,14 @@ object WithFileTest {
   class Container[T](value: T)
   def bar(@local u: Unit): Unit = {
     withFile("") {
-      f => // error
+      f =>
       new Container(f)
     }
   }
 
   class Container2[T](val value: T)
   def baz(@local u: Unit): Unit = {
-    withFile("") {
-      f => // error
+    withFile("") { f =>
       new Container2(f).value
     }
   }

@@ -9,17 +9,17 @@ object WithFileTest {
 
   def withFile[T](path: String)(@local thunk: (SFile @local) => T): T = {
     val f = new SFile(path)
-    thunk(f)
+    thunk(f) // error // error
   }
 
   def main(@local u: Unit): Unit = {
     withFile("") {
-      f => // error
+      f =>
       length(f)
     }
 
     withFile("") {
-      f => // error
+      f =>
       val res = { () => length(f) }
       res()
     }

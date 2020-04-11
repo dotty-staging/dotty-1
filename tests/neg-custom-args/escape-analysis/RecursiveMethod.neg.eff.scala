@@ -8,11 +8,12 @@ object RecursiveMethod {
       if (i == 0) f else count(i - 1)
   }
 
-  def withFile[T](thunk: (SFile @local) => T): T = thunk(new SFile)
+  def withFile[T](thunk: (SFile @local) => T): T =
+    thunk(new SFile) // error
 
   def main(@local u: Unit): Unit = {
     withFile {
-      f => // error
+      f =>
       val v = new Class(f)
 
       v.count(5)

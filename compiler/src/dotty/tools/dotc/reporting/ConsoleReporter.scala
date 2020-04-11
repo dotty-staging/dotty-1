@@ -11,7 +11,7 @@ import Diagnostic.{ Error, ConditionalWarning }
   */
 class ConsoleReporter(
   reader: BufferedReader = Console.in,
-  writer: PrintWriter = new PrintWriter(Console.err, true)
+  writer: PrintWriter = new PrintWriter(Console.out, true)
 ) extends AbstractReporter {
 
   import Diagnostic._

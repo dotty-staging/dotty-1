@@ -5,7 +5,7 @@ object Method {
 
   def withFile[T](path: String)(@local thunk: (SFile @local) => T): T = {
     val f = new SFile(path)
-    thunk(f)
+    thunk(f) // error // error
   }
 
   class Class1(f: SFile) {
@@ -14,7 +14,7 @@ object Method {
 
   def main(@local u: Unit): Unit = {
     withFile("") {
-      f => // error
+      f =>
       val c = new Class1(f)
       c.fileLength
     }
@@ -24,7 +24,7 @@ object Method {
     }
 
     withFile("") {
-      f => // error
+      f =>
       val c = new Class2(f)
       c.fileLength
     }

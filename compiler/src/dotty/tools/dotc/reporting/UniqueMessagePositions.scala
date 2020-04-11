@@ -17,7 +17,10 @@ trait UniqueMessagePositions extends Reporter {
    */
   override def isHidden(dia: Diagnostic)(implicit ctx: Context): Boolean =
     super.isHidden(dia) || {
-      dia.pos.exists && !ctx.settings.YshowSuppressedErrors.value && {
+      dia.pos.exists
+      && !ctx.settings.YshowSuppressedErrors.value
+      && !dia.msg.isInstanceOf[transform.eff.EscapeAnalysisEngine.LocalValueEscapesMsg]
+      && {
         var shouldHide = false
         for (pos <- dia.pos.start to dia.pos.end)
           positions get (ctx.source, pos) match {

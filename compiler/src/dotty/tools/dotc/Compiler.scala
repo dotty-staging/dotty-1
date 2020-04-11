@@ -116,7 +116,7 @@ class Compiler {
                                      // Note: in this mini-phase block scopes are incorrect. No phases that rely on scopes should be here
          new ElimStaticThis,         // Replace `this` references to static objects by global identifiers
          new CountOuterAccesses) ::  // Identify outer accessors that can be dropped
-    List(new init.SetDefTree) ::
+    List(new init.SetDefTree(forced = true)) ::
     List(new eff.EscapeAnalysis) ::
     List(new DropOuterAccessors,     // Drop unused outer accessors
          new Flatten,                // Lift all inner classes to package scope
