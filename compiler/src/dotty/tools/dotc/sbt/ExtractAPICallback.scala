@@ -28,7 +28,7 @@ import scala.util.chaining._
  *
  *  This is used by sbt for incremental recompilation.
  *
- *  See the documentation of `ExtractAPICollector`, `ExtractDependencies`,
+ *  See the documentation of `APICallbackCollector`, `ExtractDependencies`,
  *  `ExtractDependenciesCollector` and
  *  http://www.scala-sbt.org/0.13/docs/Understanding-Recompilation.html for more
  *  information on incremental recompilation.
@@ -132,7 +132,7 @@ class ExtractAPICallback extends Phase {
  *  without going through an intermediate representation, see
  *  http://www.scala-sbt.org/0.13/docs/Understanding-Recompilation.html#Hashing+an+API+representation
  */
-private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolder {
+private class APICallbackCollector(implicit ctx: Context) extends ThunkHolder {
   import tpd._
   import xsbti.api
 
@@ -505,41 +505,31 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     import APICallback.ParameterModifier
 
     def paramLists(t: Type): Unit = {
-      def inner(t: Type, start: Int = 0): Unit = t match {
+      def inner(t: Type, paramss: List[List[Symbol]]): Unit = t match {
         case pt: TypeLambda =>
-          assert(start == 0)
-          inner(pt.resultType)
+          inner(pt.resultType, paramss.drop(1))
         case mt @ MethodTpe(pnames, ptypes, restpe) =>
-          // TODO: We shouldn't have to work so hard to find the default parameters
-          // of a method, Dotty should expose a convenience method for that, see #1143
-          val defaults =
-            if (sym.is(DefaultParameterized)) {
-              val qual =
-                if (sym.isClassConstructor)
-                  sym.owner.companionModule // default getters for class constructors are found in the companion object
-                else
-                  sym.owner
-              pnames.indices.map(i =>
-                qual.info.member(DefaultGetterName(sym.name, start + i)).exists)
-            } else
-              pnames.indices.map(Function.const(false))
 
-          // api.ParameterList.of(params.toArray, mt.isImplicitMethod) :: inner(restpe, params.length)
-          cb.startParameterList(mt.isImplicitMethod)
-          pnames.lazyZip(ptypes).lazyZip(defaults).foreach { (pname, ptype, isDefault) =>
-            cb.startMethodParameter(pname.toString, isDefault, ParameterModifier.PLAIN)
+          assert(paramss.nonEmpty && paramss.head.hasSameLengthAs(pnames),
+            i"mismatch for $sym, ${sym.info}, ${sym.paramSymss}")
+
+          def apiParams() = paramss.head.lazyZip(ptypes).foreach { (param, ptype) =>
+            cb.startMethodParameter(param.name.toString, param.is(HasDefault), ParameterModifier.PLAIN)
             apiType(ptype)
             cb.endMethodParameter()
           }
+
+          cb.startParameterList(mt.isImplicitMethod)
+          apiParams()
           cb.endParameterList()
 
-          inner(restpe, pnames.length)
+          inner(restpe, paramss.tail)
         case _ =>
           ()
       }
 
       cb.startParameterListSequence()
-      inner(t)
+      inner(t, sym.paramSymss)
       cb.endParameterListSequence()
     }
 
@@ -917,35 +907,38 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
 
   def apiAnnotations(s: Symbol): Unit /*List[api.Annotation]*/ = apiCallback { cb =>
     val inlineBody = Inliner.bodyToInline(s)
-    if (!inlineBody.isEmpty) {
-      // FIXME: If the body of an inlineable method changes, all the reverse
-      // dependencies of this method need to be recompiled. sbt has no way
-      // of tracking method bodies, so as a hack we include the pretty-printed
-      // typed tree of the method as part of the signature we send to sbt.
-      // To do this properly we would need a way to hash trees and types in
-      // dotty itself.
-      val printTypesCtx = ctx.fresh.setSetting(ctx.settings.XprintTypes, true)
-      marker(inlineBody.show(printTypesCtx))
-    }
+
+    def annots() =
+      if (!inlineBody.isEmpty) {
+        // FIXME: If the body of an inlineable method changes, all the reverse
+        // dependencies of this method need to be recompiled. sbt has no way
+        // of tracking method bodies, so as a hack we include the printed
+        // tree of the method as part of the signature we send to sbt.
+        // To do this properly we would need a way to hash trees and types in
+        // dotty itself.
+        marker(inlineBody.toString)
+      }
+
+      // In the Scala2 ExtractAPI phase we only extract annotations that extend
+      // StaticAnnotation, but in Dotty we currently pickle all annotations so we
+      // extract everything (except inline body annotations which are handled
+      // above).
+      s.annotations.filter(_.symbol != defn.BodyAnnot) foreach { annot =>
+        apiAnnotation(annot)
+      }
+    end annots
 
     cb.startAnnotationSequence()
-
-    // In the Scala2 ExtractAPI phase we only extract annotations that extend
-    // StaticAnnotation, but in Dotty we currently pickle all annotations so we
-    // extract everything (except inline body annotations which are handled
-    // above).
-    s.annotations.filter(_.symbol != defn.BodyAnnot) foreach { annot =>
-      apiAnnotation(annot)
-    }
-
+    annots()
     cb.endAnnotationSequence()
+
   }
 
   def apiAnnotation(annot: Annotation): Unit /*api.Annotation*/ = apiCallback { cb =>
     // FIXME: To faithfully extract an API we should extract the annotation tree,
     // sbt instead wants us to extract the annotation type and its arguments,
     // to do this properly we would need a way to hash trees and types in dotty itself,
-    // instead we pretty-print the annotation tree.
+    // instead we use the raw string representation of the annotation tree.
     // However, we still need to extract the annotation type in the way sbt expect
     // because sbt uses this information to find tests to run (for example
     // junit tests are annotated @org.junit.Test).
@@ -956,7 +949,7 @@ private class APICallbackCollector(implicit val ctx: Context) extends ThunkHolde
     cb.startAnnotation()
     apiType(annot.tree.tpe)
     cb.startAnnotationArgumentSequence()
-    cb.annotationArgument("FULLTREE", annot.tree.show)
+    cb.annotationArgument("FULLTREE", annot.tree.toString)
     cb.endAnnotationArgumentSequence()
     cb.endAnnotation()
   }
