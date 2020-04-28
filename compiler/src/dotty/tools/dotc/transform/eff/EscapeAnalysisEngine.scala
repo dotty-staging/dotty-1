@@ -874,10 +874,9 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     if (localParams.size != 0)
       effect.println(i"local params for ${tree.symbol} ==> ${localParams.toList}%, %")
 
-    val finalExpr = finalExprOf(tree.rhs)
 
     // import given Flags.FlagOps
-    if (localParams.size > 0) {
+    if (localParams.size > 0 || tree.symbol.hasAnnotation(ctx.definitions.EntryAnnot)) {
       effect.println(i"${tree.name}: detected local params")
       val mutRes =
         accumulate(

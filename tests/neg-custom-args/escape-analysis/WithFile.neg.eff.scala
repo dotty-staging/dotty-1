@@ -1,5 +1,5 @@
 object WithFileTest {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
 
   class SFile(path: String)
 
@@ -8,13 +8,13 @@ object WithFileTest {
     thunk(f) // error // error // error // error // error // error
   }
 
-  def foo_a(@local u: Unit): Unit = {
+  @entry def foo_a(): Unit = {
     withFile("") { f =>
       f
     }
   }
 
-  def foo_b(@local u: Unit): Unit = {
+  @entry def foo_b(): Unit = {
     withFile("") { f1 =>
       val res: () => SFile = withFile("") { f2 =>
         { () => f1 }
@@ -23,14 +23,14 @@ object WithFileTest {
     }
   }
 
-  def foo_c(@local u: Unit): Unit = {
+  @entry def foo_c(): Unit = {
     withFile("") { f =>
       val res = { () => f }
       res
     }
   }
 
-  def foo_d(@local u: Unit): Unit = {
+  @entry def foo_d(): Unit = {
     withFile("") { f =>
       {
         val res = { () => f }
@@ -40,7 +40,7 @@ object WithFileTest {
   }
 
   class Container[T](value: T)
-  def bar(@local u: Unit): Unit = {
+  @entry def bar(): Unit = {
     withFile("") {
       f =>
       new Container(f)
@@ -48,7 +48,7 @@ object WithFileTest {
   }
 
   class Container2[T](val value: T)
-  def baz(@local u: Unit): Unit = {
+  @entry def baz(): Unit = {
     withFile("") { f =>
       new Container2(f).value
     }

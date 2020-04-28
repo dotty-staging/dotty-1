@@ -789,6 +789,7 @@ class Definitions {
   @tu lazy val DeprecatedAnnot: ClassSymbol = ctx.requiredClass("scala.deprecated")
   @tu lazy val LocalAnnot: ClassSymbol = ctx.requiredClass("scala.annotation.internal.local")
   @tu lazy val LocalParamsAnnot: ClassSymbol = ctx.requiredClass("scala.annotation.internal.localParams")
+  @tu lazy val EntryAnnot: ClassSymbol = ctx.requiredClass("scala.annotation.internal.entry")
   @tu lazy val ImplicitAmbiguousAnnot: ClassSymbol = ctx.requiredClass("scala.annotation.implicitAmbiguous")
   @tu lazy val ImplicitNotFoundAnnot: ClassSymbol = ctx.requiredClass("scala.annotation.implicitNotFound")
   @tu lazy val InlineParamAnnot: ClassSymbol = ctx.requiredClass("scala.annotation.internal.InlineParam")

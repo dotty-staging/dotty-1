@@ -1,5 +1,5 @@
 object WithFileTest {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
 
   class SFile(path: String)
 
@@ -10,7 +10,7 @@ object WithFileTest {
     thunk(f)
   }
 
-  def main(@local unit: Unit): Unit = {
+  @entry def main(): Unit = {
     withFile("") { f =>
       length(f)
     }
