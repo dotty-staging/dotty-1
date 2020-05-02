@@ -1,5 +1,5 @@
 object Method {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
 
   class SFile(path: String)
 
@@ -12,17 +12,19 @@ object Method {
     def fileLength = 0
   }
 
-  withFile("") { f =>
-    val c = new Class1(f)
-    c.fileLength
-  }
+  @entry def foo() = 
+    withFile("") { f =>
+      val c = new Class1(f)
+      c.fileLength
+    }
 
   class Class2(val f: SFile) {
     def fileLength = 0
   }
 
-  withFile("") { f =>
-    val c = new Class2(f)
-    c.fileLength
-  }
+  @entry def bar() = 
+    withFile("") { f =>
+      val c = new Class2(f)
+      c.fileLength
+    }
 }

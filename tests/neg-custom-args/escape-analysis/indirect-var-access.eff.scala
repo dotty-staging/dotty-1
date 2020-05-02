@@ -6,7 +6,7 @@ object WithFileTest {
     def getValue = value
   }
 
-  def foo(@local u: Unit): Unit = {
+  @entry def foo: Unit = { // error
     withFile("") {
       f =>
       val c = Cell[Fun[SFile]]()
@@ -20,7 +20,7 @@ object WithFileTest {
     def getValue = this.value
   }
 
-  def bar(@local u: Unit): Unit = {
+  @entry def bar(): Unit = { // error
     withFile("") {
       f =>
       val c = Cell[Fun[SFile]]()
@@ -36,7 +36,7 @@ object WithFileTest {
 
   def withFile[T](path: String)(@local thunk: (SFile @local) => T): T = {
     val f = new SFile(path)
-    thunk(f) // error // error
+    thunk(f)
   }
 
 }

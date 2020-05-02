@@ -1,5 +1,5 @@
 object RecursiveMethod {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
 
   class SFile
 
@@ -10,9 +10,10 @@ object RecursiveMethod {
 
   def withFile[T](thunk: (SFile @local) => T): T = thunk(new SFile)
 
-  withFile { f =>
-    val v = new Class(f)
+  @entry def foo() =
+    withFile { f =>
+      val v = new Class(f)
 
-    v.count(5)
-  }
+      v.count(5)
+    }
 }

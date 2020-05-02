@@ -1,28 +1,30 @@
 object Method {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
 
   class SFile(path: String)
 
   def withFile[T](path: String)(@local thunk: (SFile @local) => T): T = {
     val f = new SFile(path)
-    thunk(f) // error // error
+    thunk(f)
   }
 
   class Class1(f: SFile) {
     def fileLength = f
   }
 
-  def main(@local u: Unit): Unit = {
+  @entry def foo(): Unit = { // error
     withFile("") {
       f =>
       val c = new Class1(f)
       c.fileLength
     }
+  }
 
-    class Class2(val f: SFile) {
-      def fileLength = f
-    }
+  class Class2(val f: SFile) {
+    def fileLength = f
+  }
 
+  @entry def bar(): Unit = { // error
     withFile("") {
       f =>
       val c = new Class2(f)

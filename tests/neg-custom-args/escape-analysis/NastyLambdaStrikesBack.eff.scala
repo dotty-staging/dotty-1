@@ -1,19 +1,23 @@
 object NastyLambdaStrikesBack {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
+  import lib._
 
-  class Cell {
-    var i: Int = 0
+  @entry def foo() = local (null) { v =>
+    val c = Cell[v.type]()
+    bar(c, () => v)
   }
 
-  def foo(
-    @local i: Int // error
-  ): Cell = {
-    val c: Cell = Cell()
-    bar(c, () => i)
-  }
-
-  def bar(c: Cell, @local f: () => Int): Cell = {
-    c.i = f() // error
+  def bar[T](c: Cell[T], @local f: () => T) = {
+    c.value = f() // error
     c
+  }
+
+  object lib {
+    case class Pair[A, B](a: A, b: B)
+
+    class Cell[T] { var value: T = _ }
+
+    def local[T, U](t: T)(thunk: (T @local) => U): U =
+      thunk(t)
   }
 }

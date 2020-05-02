@@ -42,8 +42,13 @@ class EscapeAnalysisEngineBase(implicit ctx: Context) {
 
   val `scala.Int.int2long` = defn.IntClass.companionModule.requiredMethod("int2long")
 
+  val ObjectRef_create = ctx.requiredModule("scala.runtime.ObjectRef").requiredMethod("create")
+  val ObjectRef_elem = ctx.requiredClass("scala.runtime.ObjectRef").requiredValue("elem")
+
   /** Special symbol used to represent `this` in the store */
   val thisStoreKey = ctx.newSymbol(NoSymbol, "<!this!>".toTermName, Flags.EmptyFlags, NoType)
+  /** Special symbol used to represent local variables in the heap */
+  val scopeHeapKey = ctx.newSymbol(NoSymbol, "<!scope!>".toTermName, Flags.EmptyFlags, NoType)
 }
 
 // TODO this engine should probably only be initialised /once/
@@ -99,7 +104,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     cache: Cache,
     heap: Heap,
     terminal: Boolean
-  )(using ctx: Context, stack: Stack): MutRes = {
+  )(using ctx: Context, stack: Stack, entrypoint: Entrypoint): MutRes = {
     def loop(
       tree: Tree,
       _heap: Heap = heap,
@@ -182,7 +187,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       onMiss: Cache => MutRes,
       onError: => MutRes
     ): MutRes =
-      cache.get((newHeap, ap, sym, abstractArgs)) match {
+      (cache.get((newHeap, ap, sym, abstractArgs)): @unchecked) match {
         case Some(mr: MutRes) => mr
         case Some("err") => onError
         case None =>
@@ -201,7 +206,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     )(using ctx: Context, stack: Stack): MutRes =
       loopCached0(heap, ap, sym, abstractArgs)(
         { newCache =>
-          accumulate(body, newStore, newCache, heap, terminal = true)(using ctx, stack)
+          accumulate(body, newStore, newCache, heap, terminal = true)(using ctx, stack, entrypoint)
         },
         onError
       )
@@ -231,7 +236,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
         val abstractArg1 = loopTerminal(arg).value.expected_!
         val abstractArg0 =
           abstractArg1.map {
-            case (ap, sp) if sp.labels.isEmpty =>
+            case (ap, sp) if sp.isDirect =>
               val newTaints =
                 if !ps.tainted then sp.taints
                 else {
@@ -279,8 +284,27 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             Map.empty
           )
 
+        case tree: ValDef if tree.symbol.is(Flags.Mutable) =>
+          val rhsMR = loopTerminal(tree.rhs)
+          val rhsAV = rhsMR.value.expected_!
+          MutRes(
+            rhsMR.heap.merge(AP.Sym(scopeHeapKey), tree.symbol, rhsAV),
+            mrvalue(AV(AP.Constant, LabelSet.empty)),
+            Map.empty
+          )
+
+        case Assign(ident: Ident, rhs) =>
+          // local variable assignment
+          val rhsMR = loopTerminal(rhs)
+          val rhsAV = rhsMR.value.expected_!
+          MutRes(
+            rhsMR.heap.merge(AP.Sym(scopeHeapKey), ident.symbol, rhsAV),
+            mrvalue(AV(AP.Constant, LabelSet.empty)),
+            Map.empty
+          )
+
         case Assign(lhs, rhs) =>
-          effect.println(i"#!acc-assign {{{")
+          effect.println(i"#acc-assign {{{")
           effect.println(i"#lhs {${lhs.productPrefix}} {{{\n${lhs}\n}}}")
           effect.println(i"#rhs {${rhs.productPrefix}} {{{\n${rhs}\n}}}")
           effect.println("}}}")
@@ -288,36 +312,32 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case tree @ Apply(sel @ Select(obj, _), args) if sel.symbol.isSetter && sel.symbol.is(Flags.Mutable) =>
           // TODO array mutations have their own magick symbol-less methods
-          effect.println(i"#!acc-setter-apply")
-
           val fieldName = sel.symbol.name.asTermName.getterName
           val d = sel.symbol.owner.info.decl(fieldName)
           val arg :: Nil = args // expecting only one arg for a setter
 
           val objMR = loop(obj, _terminal = true)
-          val argMR = maybeMergeSeq(objMR, newHeap => loop(arg, _heap = newHeap, _terminal = true))
+          val argMR = maybeMergeSeq(objMR, newHeap => loopTerminal(arg, _heap = newHeap))
           argMR.value match {
             case MRValue.Abort => objMR
             case MRValue.Skipped => sys.error("did not expect an MRValue.Skipped!")
             case MRValue.Proper(argAV) =>
               val objAV = objMR.value.expected_!
 
-              val escapingLocals =
-                store.keys.filter { sym => argAV.self.contains(AP(sym)) }.toList
+              val localsEscape =
+                argAV.iterator.exists { case (_, sp) => !sp.taints.isEmpty }
 
-              if (escapingLocals.nonEmpty) {
-                ctx.error(i"Locals escaping through assignment: $escapingLocals%, %", tree.sourcePos)
+              if localsEscape then {
+                ctx.error("Tainted values escaping through assignment", tree.sourcePos)
               }
 
               val heap1 = argMR.heap
               val heap0 =
                 (for {
                   (ap, sp) <- objAV.iterator
-                  if sp.labels.isEmpty // TODO only the strongs must be empty, find an error case
+                  if sp.isDirect
                 } yield ap).foldLeft(heap1) { (heap, ap) =>
-                  heap.updatedWith(ap, d.symbol, argAV) { av =>
-                    av merge argAV
-                  }
+                  heap.merge(ap, d.symbol, argAV)
                 }
 
               MutRes(heap0, mrvalue(AV(AP.Constant, LabelSet.empty)), Map.empty)
@@ -343,7 +363,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 val closDef = closRef.symbol.defTree.asInstanceOf[DefDef]
                 val vparams :: Nil = closDef.vparamss
 
-                effect.println(i"#!clos-data {{{")
+                effect.println(i"#clos-data {{{")
                 effect.println(i"#sig ${sig}")
                 effect.println(i"#vparams [${vparams.length}] ${vparams}%, %")
                 effect.println(i"#env [${env.length}] $env%, %")
@@ -379,10 +399,6 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   newStore
                 }
 
-                effect.println(s"#!len abstractArgs: ${abstractArgs.length}")
-                effect.println(i"#!newStore1 {{{\n${Store.display(newStore1, 0)}\n}}}")
-                effect.println(i"#!newStore0 {{{\n${Store.display(newStore0, 0)}\n}}}")
-
                 // TODO: justify why we don't prune the AV here
                 loopCached0(heap, ap, closRef.symbol, abstractArgs)(
                   onMiss = { newCache =>
@@ -394,7 +410,11 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                       case (Some(t), MRValue.Proper(av)) =>
                         val untaintedAV = av.map {
                           case (ap, sp) if sp.taints.contains(t) =>
-                            ctx.error(LocalValueEscapesMsg(t, stack), tree.sourcePos)
+                            val newStack = Stack(
+                              i"$tree :${tree.sourcePos.line}"
+                              :: stack.elements
+                            )
+                            ctx.error(LocalValueEscapesMsg(t, newStack), entrypoint.tree.sourcePos)
                             ap -> sp.copy(taints = sp.taints - t)
                           case o => o
                         }
@@ -419,11 +439,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   analyseArgsIntoNewStore(args, methDef.vparamss.head, sig)
 
                 // we filter out other "direct" values, as they cannot possibly be the value of `this`
-                val filteredAbstractObj =
-                  objAV.filter { case (ap_, sp) => (ap_ eq ap) || !sp.labels.isEmpty}
-
                 val newStore0 =
-                  newStore1.updated(thisStoreKey, filteredAbstractObj)
+                  newStore1.updated(thisStoreKey, objAV)
 
                 loopCached(ap, methSym, abstractArgs)(methDef.rhs, newStore0)(
                   onError = {
@@ -471,6 +488,27 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             }
           }
 
+          effect.println(i"#!method-call")
+          effect.println(i"#sel.symbol ${selT.symbol}")
+          effect.println(i"#selT.symbol.owner ${selT.symbol.owner}")
+
+          def apAgreesWithClass(ap: AP, sym: Symbol): Boolean = {
+            ap match {
+              case AP.Tree(New(tpt)) =>
+                val ci = tpt.tpe.asInstanceOf[TypeRef].underlying.asInstanceOf[ClassInfo]
+                ci.cls.derivesFrom(selT.symbol.owner)
+              case AP.Tree(_: Closure) =>
+                // TODO implement
+                true
+              case _ => false
+            }
+          }
+
+          val selectorOwnerClassSym = {
+            val res = selT.symbol.owner
+            res.ensuring(_.isClass)
+          }
+
           // TODO take effects into account
           val objAV = {
             effect.println(i"#:object")
@@ -478,11 +516,11 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           }
           var res = MutRes(Heap.Empty, MRValue.Proper(AV.Empty), Map.empty)
           for {
-            (ap, spec) <- objAV.iterator
-            if spec.labels.isEmpty // TODO only the /strong/ set should be empty, find an error case for this
-            // TODO if types overlap (why types need to overlap? does it make more sense to check if ident exists on ap?)
+            (ap, sp) <- objAV.iterator
+            if sp.isDirect
+            && apAgreesWithClass(ap, selectorOwnerClassSym)
           } do {
-            res = mergeAlt(res, accumulateMethodCall(ap, spec.sig, objAV))
+            res = mergeAlt(res, accumulateMethodCall(ap, sp.sig, objAV))
           }
 
           res
@@ -510,12 +548,6 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                       val arity =
                         // TODO doesn't work for XXL, need to use time travel
                         ctx.definitions.scalaClassName(p.symbol.info).functionArity
-                      effect.println(i"#!sig {{{")
-                      effect.println(i"#p.symbol ${p.symbol}")
-                      effect.println(i"#p.symbol.info ${p.symbol.info}")
-                      effect.println(i"#arity ${arity}")
-                      effect.println("}}}")
-
 
                       val paramSigs =
                         (0 to (arity - 1)).iterator
@@ -568,11 +600,6 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           }
 
         case Return(expr, from) =>
-          effect.println(i"#!return {{{")
-          effect.println(i"#expr {${expr.productPrefix}} {{{\n${expr}\n}}}")
-          effect.println(i"#from {${from.productPrefix}} {{{\n${from}\n}}}")
-          effect.println("}}}")
-
           val exprMR = loopTerminal(expr)
           exprMR.value.unskipped match {
             case MRValue.Abort => exprMR
@@ -588,10 +615,6 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           }
 
         case Labeled(bind, tree) =>
-          effect.println(i"#!labeled {{{")
-          effect.println(i"#bind {${bind.productPrefix}} {{{\n${bind}\n}}}")
-          effect.println("}}}")
-
           val res1 = loop(tree, _terminal = terminal)
 
           val blockLabel = bind.symbol.name
@@ -657,7 +680,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     store: Store,
     cache: Cache,
     heap: Heap
-  )(using ctx: Context, stack: Stack): AV = {
+  )(using ctx: Context, stack: Stack, entrypoint: Entrypoint): AV = {
     def loop(
       tree: Tree,
       _store: Store = store,
@@ -667,6 +690,15 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       accumulate(tree, _store, _cache, _heap, terminal = true).value.expected_!
 
     val uncluttered = unclutter(tree, dropBlocks = true)
+
+    def heapLookup(sym: Symbol)(implicit ctx: Context): AV =
+      heap.get(AP.Sym(scopeHeapKey), sym) match {
+        case None =>
+          effect.println(i"#!!! $sym#${sym.##} absent from local mutable heap!")
+          ctx.error(s"$sym#${sym.##} absent from local mutable heap!")
+          AV.Empty
+        case Some(av) => av
+      }
 
     def storeLookup(storeKey: Symbol)(implicit ctx: Context): AV =
       store.get(storeKey) match {
@@ -693,7 +725,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 tree.symbol.owner.info.decl(name).symbol
               }
               av.iterator.foldLeft(AV.Empty) { (av, kv) => kv match {
-                case (ap, sp) if sp.labels.isEmpty =>
+                case (ap, sp) if sp.isDirect =>
                   av.merge(heap.getOrElse(ap, underlyingSym, {
                     effect.println(i"#!!! Heap misses a field: ${ap.display}.$underlyingSym#${underlyingSym.##}")
                     // TODO: error?
@@ -728,7 +760,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           var res = AV.Empty
           for {
             (ap, sp) <- loop(obj).iterator
-            if sp.labels.isEmpty // TODO only the strongs must be empty, find a test case
+            if sp.isDirect
           } do {
             res = res.merge(heap.getOrElse(ap, sym, {
               effect.println(i"#!!! Mutable symbol absent from heap! AP: ${ap.display} ; sym: ${sym}")
@@ -739,6 +771,15 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           res
 
         case This(_) => storeLookup(thisStoreKey)
+
+        case tree @ Ident(_) if tree.symbol.is(Flags.Mutable) =>
+          heapLookup(tree.symbol)
+
+        case tree @ Ident(_) if tree.symbol.is(Flags.Module) =>
+          val rhsT = tree.symbol.defTree.asInstanceOf[ValDef].rhs
+          val Apply(Select(newT, _), _) = rhsT
+          val ap = AP.Tree(newT)
+          AV(ap, LabelSet.empty)
 
         case tree @ Select(This(_), name) =>
           // assuming that we have a member
@@ -772,6 +813,14 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 ).value.expected_!
             }
           )
+
+        case tree @ Apply(createT, args) if createT.symbol == ObjectRef_create =>
+          val List(arg) = args
+          val argAV = loop(arg)
+          val ap = AP.Tree(tree)
+          AV(ap, LabelSet.empty) merge argAV.iterator.map {
+            case (argAP, sp) => argAP -> (sp offset ObjectRef_elem.name)
+          }
 
         /// constructor
         case tree @ Apply(fun @ Select(new_, ident), args) if ident == nme.CONSTRUCTOR =>
@@ -881,8 +930,10 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       val mutRes =
         accumulate(
           tree.rhs, localStore.toMap, Map.empty, Heap.Empty, terminal = true
-        )(
-          using ctx, Stack(s"${tree.symbol}:${tree.sourcePos.line}" :: Nil)
+        )(using
+          ctx,
+          Stack(s"${tree.symbol}:${tree.sourcePos.line}" :: Nil),
+          Entrypoint(tree)
         )
       val av = mutRes.value match {
         case MRValue.Proper(av) =>
@@ -901,7 +952,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       if (escapees.size > 0) {
         escapees.foreach { s => (s: @unchecked) match {
           case AP.Sym(sym) =>
-            ctx.error(i"(m) local escapes ($sym)", sym.sourcePos)
+            // ctx.error(i"(m) local escapes ($sym)", sym.sourcePos)
             ctx.reporter.flush()
         }}
       } else {
@@ -973,9 +1024,10 @@ object EscapeAnalysisEngine {
   type LocalParams = SimpleIdentitySet[Symbol]
 
   enum AP extends Showable {
-    case Sym(symbol: Symbol)
-    case Tree(tree: tpd.Tree)
-    case Constant
+    case Sym(symbol: Symbol);
+    case Tree(tree: tpd.Tree);
+    case MutScope();
+    case Constant;
 
     def maybeSym: Symbol =
       this match {
@@ -990,6 +1042,7 @@ object EscapeAnalysisEngine {
       val txt = this match {
         case Sym(v) => printer.toText(v)
         case Tree(v) => printer.toText(v)
+        case MutScope() => Str(s"Scope#${this.##}")
         case Constant => Str("Constant")
       }
 
@@ -1000,6 +1053,7 @@ object EscapeAnalysisEngine {
       this match {
         case AP.Sym(s) => s.name
         case AP.Tree(t) => s"${tersely(t)}#${t.##}"
+        case MutScope() => s"<Scope#${this.##}>"
         case AP.Constant => "<Constant>"
       }
   }
@@ -1159,8 +1213,9 @@ object EscapeAnalysisEngine {
     case Abort;
     case Proper(value: AV);
   }
-
-  case class MutRes(heap: Heap, value: MRValue, returns: Map[Name, AV])
+  /** Non-standard returns */
+  type NSRs = Map[Name, AV]
+  case class MutRes(heap: Heap, value: MRValue, returns: NSRs)
 
   class Heap (val self: Map[AP, Map[Symbol, AV]]) extends AnyVal {
     def get(ap: AP, sym: Symbol): Option[AV] =
@@ -1193,6 +1248,9 @@ object EscapeAnalysisEngine {
       }
       Heap(res)
     }
+
+    def merge(ap: AP, sym: Symbol, av: AV): Heap =
+      updatedWith(ap, sym, av) { _ merge av }
 
     def updatedWith(ap: AP, sym: Symbol, default: AV)(thunk: AV => AV): Heap =
       Heap(self.updatedWith(ap) {
@@ -1255,8 +1313,6 @@ object EscapeAnalysisEngine {
       buf.toString
   }
 
-  case class Stack(elements: List[String])
-
   object HasSym {
     def unapply(tree: Tree)(implicit ctx: Context): Some[Symbol] = Some(tree.symbol)
   }
@@ -1268,6 +1324,10 @@ object EscapeAnalysisEngine {
       case _ => s"$prefix(…)"
     }
 
+  class Entrypoint(val tree: Tree) extends AnyVal
+
+  case class Stack(elements: List[String])
+
   class LocalValueEscapesMsg(
     taint: Taint,
     stack: Stack
@@ -1278,8 +1338,9 @@ object EscapeAnalysisEngine {
         val sb = new StringBuffer
         sb append "Traceback:"
         for el <- stack.elements do {
-          sb append "\n\t"
-            sb append el
+          sb append "\n"
+          sb append "===> "
+          sb append el
         }
           sb.toString
       }

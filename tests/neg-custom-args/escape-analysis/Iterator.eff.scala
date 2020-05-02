@@ -1,5 +1,5 @@
 object IteratorTest {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
 
   class SFile(path: String)
 
@@ -21,16 +21,17 @@ object IteratorTest {
     }
   }
 
-  def main(@local u: Unit): Unit = {
-    withFile("") {
-      f => // error
+  @entry def foo(): Unit = { // error
+    withFile("") {f =>
       val iter = new Iterator[Any] {
         def next() = ???
       }
 
       iter.map(_ => length(f))
     }
+  }
 
+  @entry def bar(): Unit = {
     withFile("") {
       f =>
       val iter = new Iterator[Any] {

@@ -9,9 +9,9 @@ object RecursiveMethod {
   }
 
   def withFile[T](thunk: (SFile @local) => T): T =
-    thunk(new SFile) // error
+    thunk(new SFile)
 
-  def main(@local u: Unit): Unit = {
+  @entry def main: Unit = { // error
     withFile {
       f =>
       val v = new Class(f)

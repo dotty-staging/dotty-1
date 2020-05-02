@@ -1,10 +1,12 @@
 object test {
-  import annotation.internal.local
+  import scala.annotation.internal.{local, entry}
+  import lib._
+  import defs._
 
   object case_straight {
-    def foo(@local c: lib.Console): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
-      v.value = lib.StrictBox(0)
+    @entry def foo: Box[Int] = withConsole { c =>
+      val v: Cell[Box[Int]] = Cell()
+      v.value = StrictBox(0)
       v.value = v.value.map { i =>
         c.println(i)
         i
@@ -12,12 +14,10 @@ object test {
       v.value
     }
 
-    def bar(
-      @local c: lib.Console // error
-    ): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
-      v.value = lib.StrictBox(0)
-      v.value = lib.LazyBox(() => 0)
+    @entry def bar(): Box[Int] = withConsole { c => // error
+      val v: Cell[Box[Int]] = Cell()
+      v.value = StrictBox(0)
+      v.value = LazyBox(() => 0)
       v.value = v.value.map { i => // error
         c.println(i)
         i
@@ -25,13 +25,11 @@ object test {
       v.value
     }
 
-    def bar_crazy(
-      @local c: lib.Console // error
-    ): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
-      v.value = lib.StrictBox(0)
+    @entry def bar_crazy(): Box[Int] = withConsole { c => // error
+      val v: Cell[Box[Int]] = Cell()
+      v.value = StrictBox(0)
       def vv = {
-        v.value = lib.LazyBox(() => 0)
+        v.value = LazyBox(() => 0)
         v
       }
       vv.value = v.value.map { i => // error
@@ -41,47 +39,43 @@ object test {
       v.value
     }
 
-    def baz(
-      @local c: lib.Console // error
-    ): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
-      v.value = lib.StrictBox(0)
+    @entry def baz(): Box[Int] = withConsole { c => // error // limitation
+      val v: Cell[Box[Int]] = Cell()
+      v.value = StrictBox(0)
       val res = v.value.map { i =>
         c.println(i)
         i
       }
-      v.value = lib.LazyBox(() => 0)
+      v.value = LazyBox(() => 0)
       res
     }
 
     // interestingly, this succeeds
-    def baz_alt(@local c: lib.Console): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
-      v.value = lib.StrictBox(0)
+    @entry def baz_alt(): Box[Int] = withConsole { c =>
+      val v: Cell[Box[Int]] = Cell()
+      v.value = StrictBox(0)
       v.value = v.value.map { i =>
         c.println(i)
         i
       }
-      v.value = lib.LazyBox(() => 0)
+      v.value = LazyBox(() => 0)
       v.value
     }
   }
 
   object case_method {
-    def foo(@local c: lib.Console): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+    @entry def foo(): Box[Int] = withConsole { c =>
+      val v: Cell[Box[Int]] = Cell()
       foo_set(v)
       v.value
     }
 
-    def foo_set(v: lib.Cell[lib.Box[Int]]): Unit = {
-      v.value = lib.StrictBox(0)
+    def foo_set(v: Cell[Box[Int]]): Unit = {
+      v.value = StrictBox(0)
     }
 
-    def bar(
-      @local c: lib.Console // error
-    ): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+    @entry def bar(): Box[Int] = withConsole { c => // error
+      val v: Cell[Box[Int]] = Cell()
       bar_set(v)
       v.value = v.value.map { i => // error
         c.println(i)
@@ -90,38 +84,36 @@ object test {
       v.value
     }
 
-    def bar_set(v: lib.Cell[lib.Box[Int]]): Unit = {
-      v.value = lib.StrictBox(0)
-      v.value = lib.LazyBox(() => 0)
+    def bar_set(v: Cell[Box[Int]]): Unit = {
+      v.value = StrictBox(0)
+      v.value = LazyBox(() => 0)
     }
   }
 
   object case_method_alt {
-    def foo(@local c: lib.Console): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+    @entry def foo(): Box[Int] = withConsole { c =>
+      val v: Cell[Box[Int]] = Cell()
       foo_impl(v)(c)
       v.value
     }
 
-    def foo_impl(v: lib.Cell[lib.Box[Int]])(c: lib.Console): Unit = {
-      v.value = lib.StrictBox(0)
+    def foo_impl(v: Cell[Box[Int]])(c: Console): Unit = {
+      v.value = StrictBox(0)
       v.value = v.value.map { i =>
         c.println(i)
         i
       }
     }
 
-    def bar(
-      @local c: lib.Console // error
-    ): lib.Box[Int] = {
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+    @entry def bar(): Box[Int] = withConsole { c => // error
+      val v: Cell[Box[Int]] = Cell()
       bar_impl(v)(c)
       v.value
     }
 
-    def bar_impl(v: lib.Cell[lib.Box[Int]])(c: lib.Console): Unit = {
-      v.value = lib.StrictBox(0)
-      v.value = lib.LazyBox(() => 0)
+    def bar_impl(v: Cell[Box[Int]])(c: Console): Unit = {
+      v.value = StrictBox(0)
+      v.value = LazyBox(() => 0)
       v.value = v.value.map { i => // error
         c.println(i)
         i
@@ -130,14 +122,12 @@ object test {
   }
 
   object case_local {
-    def foo(
-      @local c: lib.Console
-    ): lib.Box[Int] = {
-      def foo_set(v: lib.Cell[lib.Box[Int]]): Unit = {
-        v.value = lib.StrictBox(0)
+    @entry def foo(): Box[Int] = withConsole { c =>
+      def foo_set(v: Cell[Box[Int]]): Unit = {
+        v.value = StrictBox(0)
       }
 
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+      val v: Cell[Box[Int]] = Cell()
       foo_set(v)
       v.value = v.value.map { i =>
         c.println(i)
@@ -146,15 +136,13 @@ object test {
       v.value
     }
 
-    def bar(
-      @local c: lib.Console // error
-    ): lib.Box[Int] = {
-      def bar_set(v: lib.Cell[lib.Box[Int]]): Unit = {
-        v.value = lib.StrictBox(0)
-        v.value = lib.LazyBox(() => 0)
+    @entry def bar(): Box[Int] = withConsole { c => // error
+      def bar_set(v: Cell[Box[Int]]): Unit = {
+        v.value = StrictBox(0)
+        v.value = LazyBox(() => 0)
       }
 
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+      val v: Cell[Box[Int]] = Cell()
       bar_set(v)
       v.value = v.value.map { i => // error
         c.println(i)
@@ -165,15 +153,13 @@ object test {
   }
 
   object case_lambda {
-    def foo(
-      @local c: lib.Console
-    ): lib.Box[Int] = {
-      val foo_set: (v: lib.Cell[lib.Box[Int]]) => Unit =
-        (v: lib.Cell[lib.Box[Int]]) => {
-          v.value = lib.StrictBox(0)
+    @entry def foo(): Box[Int] = withConsole { c =>
+      val foo_set: (v: Cell[Box[Int]]) => Unit =
+        (v: Cell[Box[Int]]) => {
+          v.value = StrictBox(0)
         }
 
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+      val v: Cell[Box[Int]] = Cell()
       foo_set(v)
       v.value = v.value.map { i =>
         c.println(i)
@@ -182,16 +168,14 @@ object test {
       v.value
     }
 
-    def bar(
-      @local c: lib.Console // error
-    ): lib.Box[Int] = {
-      val bar_set: (v: lib.Cell[lib.Box[Int]]) => Unit =
-        (v: lib.Cell[lib.Box[Int]]) => {
-          v.value = lib.StrictBox(0)
-          v.value = lib.LazyBox(() => 0)
+    @entry def bar(): Box[Int] = withConsole { c => // error
+      val bar_set: (v: Cell[Box[Int]]) => Unit =
+        (v: Cell[Box[Int]]) => {
+          v.value = StrictBox(0)
+          v.value = LazyBox(() => 0)
         }
 
-      val v: lib.Cell[lib.Box[Int]] = lib.Cell()
+      val v: Cell[Box[Int]] = Cell()
       bar_set(v)
       v.value = v.value.map { i => // error
         c.println(i)
@@ -201,13 +185,14 @@ object test {
     }
   }
 
-  object lib {
+  object defs {
     trait Console {
       def println(a: Any): Unit
     }
 
-    class Cell[T] {
-      var value: T = _
+    def withConsole[T](thunk: (Console @local) => T): T = {
+      val c = new Console { def println(a: Any) = () }
+      thunk(c)
     }
 
     trait Box[T] {
@@ -223,5 +208,14 @@ object test {
       def map[U](f: T => U): LazyBox[U] =
         LazyBox(() => f(thunk()))
     }
+  }
+
+  object lib {
+    case class Pair[A, B](a: A, b: B)
+
+    class Cell[T] { var value: T = _ }
+
+    def local[T, U](t: T)(thunk: (T @local) => U): U =
+      thunk(t)
   }
 }

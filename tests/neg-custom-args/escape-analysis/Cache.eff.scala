@@ -1,17 +1,16 @@
 object CacheTest {
-  import scala.annotation.internal.local
-
-  case class Pair[A, B](a: A, b: B)
+  import scala.annotation.internal.{local, entry}
+  import lib._
 
   object A {
-    def test(i: Int): Int = i
+    def test[T](t: T): T = t
 
-    def foo(
-      @local i: Int // error
-    ): Pair[Int, Int] = {
-      val x = test(0)
-      val y = test(i)
-      Pair(x, y)
+    @entry def foo() = { // error
+      local(null) { u =>
+        val x = test(0)
+        val y = test(u)
+        Pair(x, y)
+      }
     }
   }
 
@@ -20,13 +19,17 @@ object CacheTest {
       def test: C = this
     }
 
-    def foo(
-      @local c1: C // error
-    ): Pair[C, C] = {
+    @entry def bar() = local(new C) { c1 => // error
       val c2 = new C
       val x = c2.test
       val y = c1.test
       Pair(x, y)
     }
+  }
+
+  object lib {
+    case class Pair[A, B](a: A, b: B)
+    def local[T, U](t: T)(thunk: (T @local) => U): U =
+      thunk(t)
   }
 }
