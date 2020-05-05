@@ -39,7 +39,7 @@ object test {
       v.value
     }
 
-    @entry def baz(): Box[Int] = withConsole { c => // error // limitation
+    @entry def baz(): Box[Int] = withConsole { c =>
       val v: Cell[Box[Int]] = Cell()
       v.value = StrictBox(0)
       val res = v.value.map { i =>

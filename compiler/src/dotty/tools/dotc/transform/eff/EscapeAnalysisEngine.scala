@@ -632,40 +632,53 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             )
 
 
-          res1.value match {
+          res1.value.unskipped match {
             case MRValue.Abort =>
               result(returnedAV)
             case MRValue.Proper(av) =>
-              // TODO ASK: it is ever possible for a labeled block to actually evaluate to a value?
               result(av merge returnedAV)
-            case MRValue.Skipped => sys.error("terminal accumulation returned a MRValue.skipped")
           }
 
         case Block(stmts, expr) =>
           var res: MutRes = null
+          var curStore = store
+          var curHeap = heap
+          var returns: NSRs = Map.empty
+
           val iter = stmts.iterator
-          var done: Boolean = false
-          while (!done && iter.hasNext) {
-            res =
-              if (res == null)
-                loop(iter.next)
-              else
-                maybeMergeSeq(res, loop(iter.next, _))
-            done = res.value == MRValue.Abort
+          while res == null && iter.hasNext do {
+            iter.next match {
+              case tree: ValDef if !tree.symbol.is(Flags.Mutable) =>
+                val res1 = loopTerminal(tree.rhs, _store = curStore, _heap = curHeap)
+                res1.value.unskipped match {
+                  case MRValue.Abort =>
+                    res = res1
+                  case MRValue.Proper(av) =>
+                    curStore = curStore.updated(tree.symbol, av)
+                    curHeap = res1.heap
+                    returns = mergeReturns(returns, res1.returns)
+                }
+              case tree =>
+                // TODO clean this spaghetti up
+                val res1 = loop(tree, _store = curStore, _heap = curHeap)
+                res1.value match {
+                  case MRValue.Abort =>
+                    res = res1
+                  case _ =>
+                    curHeap = res1.heap
+                    returns = mergeReturns(returns, res1.returns)
+                }
+            }
           }
 
-          if (!done) {
-            res =
-              if (res == null)
-                loopTerminal(expr)
-              else
-                maybeMergeSeq(res, loopTerminal(expr, _))
+          if res != null then res else {
+            val res1 = loopTerminal(expr, _heap = curHeap, _store = curStore)
+            res1.copy(returns = mergeReturns(returns, res1.returns))
           }
-
-          res
 
         case Apply(thrw, _) if thrw.symbol == defn.throwMethod =>
           // TODO handle throws
+          // note: we need to have this stub here b/c pat-mat emits throws
           MutRes(heap, MRValue.Abort, Map.empty)
 
         case tree =>
@@ -1195,6 +1208,12 @@ object EscapeAnalysisEngine {
     def expected_! = this match {
       case Proper(av) => av
       case _ => sys.error("expected MRValue to be proper!")
+    }
+
+    inline def improper: Abort.type | Skipped.type = this match {
+      case mrv: Proper => sys.error("did not expect an MRValue.Proper!")
+      case Skipped => Skipped
+      case Abort => Abort
     }
 
     inline def unskipped: Abort.type | Proper = this match {
