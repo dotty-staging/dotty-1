@@ -19,7 +19,7 @@ trait UniqueMessagePositions extends Reporter {
     super.isHidden(dia) || {
       dia.pos.exists
       && !ctx.settings.YshowSuppressedErrors.value
-      && !dia.msg.isInstanceOf[transform.eff.EscapeAnalysisEngine.LocalValueEscapesMsg]
+      // && !dia.msg.isInstanceOf[transform.eff.EscapeAnalysisEngine.LocalValueEscapesMsg]
       && {
         var shouldHide = false
         for (pos <- dia.pos.start to dia.pos.end)

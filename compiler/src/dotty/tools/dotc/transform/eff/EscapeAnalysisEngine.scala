@@ -27,6 +27,7 @@ import StdNames.nme
 import reporting.trace
 
 import util.SimpleIdentitySet
+import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuilder, ListBuffer}
 
 import java.{lang => jl}
@@ -101,26 +102,23 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
   def accumulate(
     tree: Tree,
     store: Store,
-    cache: Cache,
     heap: Heap,
     terminal: Boolean
-  )(using ctx: Context, stack: Stack, entrypoint: Entrypoint): MutRes = {
+  )(using ctx: Context, stack: Stack, cache: Cache, entrypoint: Entrypoint): MutRes = {
     def loop(
       tree: Tree,
       _heap: Heap = heap,
       _store: Store = store,
-      _cache: Cache = cache,
       _terminal: Boolean = false
     )(using ctx: Context, stack: Stack) =
-      accumulate(tree, _store, _cache, _heap, _terminal)
+      accumulate(tree, _store, _heap, _terminal)
 
     def loopTerminal(
       tree: Tree,
       _heap: Heap = heap,
       _store: Store = store,
-      _cache: Cache = cache
     )(using ctx: Context, stack: Stack) =
-      accumulate(tree, _store, _cache, _heap, terminal = true)
+      accumulate(tree, _store, _heap, terminal = true)
 
     type Ret = Map[Name, AV]
     def mergeReturns(ret1: Ret, ret2: Ret): Ret =
@@ -184,14 +182,31 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       sym: Symbol,
       abstractArgs: List[AV]
     )(
-      onMiss: Cache => MutRes,
-      onError: => MutRes
+      onMiss: () => MutRes,
+      onError: () => MutRes
     ): MutRes =
-      (cache.get((newHeap, ap, sym, abstractArgs)): @unchecked) match {
+      (cache().get((newHeap, ap, sym, abstractArgs)): @unchecked) match {
+        // Already computed....
         case Some(mr: MutRes) => mr
-        case Some("err") => onError
+        // In a fixpoint, but no initial value ... most implementations of onError return bottom...
+        case Some("err") => onError()
+        // Not present ... possibly need to evaluate fixpoint.
         case None =>
-          onMiss(cache.updated((heap, ap, sym, abstractArgs), "err"))
+          cache().update((heap, ap, sym, abstractArgs), "err")
+          var check : MutRes = onMiss()
+          var go = true
+          // Do a fixpoint calculation here...
+          while (go) {
+            cache().update((heap, ap, sym, abstractArgs), check)
+            val newEntry = onMiss()
+            if (newEntry == check) {
+              go = false
+            } else {
+              check = newEntry
+            }
+          }
+
+          check
       }
 
     inline def loopCached(
@@ -202,16 +217,15 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       body: Tree,
       newStore: Store
     )(
-      onError: => MutRes
+      onError: () => MutRes
     )(using ctx: Context, stack: Stack): MutRes =
       loopCached0(heap, ap, sym, abstractArgs)(
-        { newCache =>
-          accumulate(body, newStore, newCache, heap, terminal = true)(using ctx, stack, entrypoint)
-        },
+        () => accumulate(body, newStore, heap, terminal = true) ,
         onError
       )
 
-    def _analyze(tree: Tree, _heap: Heap = heap)(implicit ctx: Context) = analyse(tree, store, cache, _heap)
+    def _analyze(tree: Tree, _heap: Heap = heap)(using ctx: Context) =
+      analyse(tree, store, _heap)
 
     def analyseArgsIntoNewStore(
       args: List[Tree],
@@ -401,7 +415,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
                 // TODO: justify why we don't prune the AV here
                 loopCached0(heap, ap, closRef.symbol, abstractArgs)(
-                  onMiss = { newCache =>
+                  onMiss = { () =>
                     val res =
                       loopTerminal(closDef.rhs, _store = newStore0)(using ctx, newStack)
                     (taintOpt, res.value) match {
@@ -422,7 +436,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                       case other => sys.error(s"unexpected result: $other")
                     }
                   },
-                  onError = {
+                  onError = { () =>
                     effect.println(i"#! StackOverflow on recursive closure: {{{")
                     effect.println(i"#clos {{{\n${clos}\n}}}")
                     effect.println("}}}")
@@ -443,7 +457,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   newStore1.updated(thisStoreKey, objAV)
 
                 loopCached(ap, methSym, abstractArgs)(methDef.rhs, newStore0)(
-                  onError = {
+                  onError = { () =>
                     effect.println(i"#! StackOverflow on recursive method: {{{")
                     effect.println(i"#methDef.rhs {{{\n${methDef.rhs}\n}}}")
                     effect.println("}}}")
@@ -574,13 +588,13 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           )
 
           loopCached0(heap, AP(fun.symbol), fun.symbol, abstractArgs)(
-            onMiss = { cache =>
-              loopTerminal(funDef.rhs,
-                _store = newStore,
-                _cache = cache
+            onMiss = { () =>
+              loopTerminal(
+                tree = funDef.rhs,
+                _store = newStore
               )(using ctx, newStack)
             },
-            onError = {
+            onError = { () =>
               effect.println(i"#! Run out of abstract stack when interpreting ${fun.symbol}")
               emptyRes() // NOTE! recursion-termination
             }
@@ -691,16 +705,14 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
   def analyse(
     tree: Tree,
     store: Store,
-    cache: Cache,
     heap: Heap
-  )(using ctx: Context, stack: Stack, entrypoint: Entrypoint): AV = {
+  )(using ctx: Context, stack: Stack, cache: Cache, entrypoint: Entrypoint): AV = {
     def loop(
       tree: Tree,
       _store: Store = store,
-      _cache: Cache = cache,
       _heap: Heap = heap
     )(using ctx: Context, stack: Stack) =
-      accumulate(tree, _store, _cache, _heap, terminal = true).value.expected_!
+      accumulate(tree, _store, _heap, terminal = true).value.expected_!
 
     val uncluttered = unclutter(tree, dropBlocks = true)
 
@@ -820,7 +832,6 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 accumulate(
                   dt.rhs,
                   store = store,
-                  cache = cache,
                   heap = heap,
                   terminal = true
                 ).value.expected_!
@@ -940,12 +951,14 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     // import given Flags.FlagOps
     if (localParams.size > 0 || tree.symbol.hasAnnotation(ctx.definitions.EntryAnnot)) {
       effect.println(i"${tree.name}: detected local params")
+      val cache = new Cache(mutable.HashMap[Cache.Key, Cache.Value]())
       val mutRes =
         accumulate(
-          tree.rhs, localStore.toMap, Map.empty, Heap.Empty, terminal = true
+          tree.rhs, localStore.toMap, Heap.Empty, terminal = true
         )(using
           ctx,
           Stack(s"${tree.symbol}:${tree.sourcePos.line}" :: Nil),
+          cache,
           Entrypoint(tree)
         )
       val av = mutRes.value match {
@@ -1202,7 +1215,16 @@ object EscapeAnalysisEngine {
     }
   }
 
-  type Cache = Map[(Heap, AP, Symbol, List[AV]), MutRes | "err"]
+  class Cache(
+    val self: mutable.Map[Cache.Key, Cache.Value]
+  ) extends AnyVal {
+    def apply() = self
+  }
+
+  object Cache {
+    type Key = (Heap, AP, Symbol, List[AV])
+    type Value = MutRes | "err"
+  }
 
   enum MRValue {
     def expected_! = this match {

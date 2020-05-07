@@ -1,5 +1,5 @@
 object RecursiveMethod {
-  import scala.annotation.internal.local
+  import scala.annotation.internal.{local, entry}
 
   class SFile
 
