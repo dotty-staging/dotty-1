@@ -228,6 +228,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       analyse(tree, store, _heap)
 
     def analyseArgsIntoNewStore(
+      callsite: Tree,
       args: List[Tree],
       params: List[Tree],
       sig: Sig,
@@ -236,7 +237,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       var res: Store = _store
 
       val abstractArgsBld = ListBuffer.empty[AV]
-      val taint = newTaint
+      val taint = Taint(tree)
 
       val paramSigs = sig match {
         case Sig.Proper(l) => l
@@ -384,7 +385,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 effect.println("}}}")
 
                 val (newStore1: Store, abstractArgs: List[AV], taintOpt) =
-                  analyseArgsIntoNewStore(args, vparams.drop(env.length), sig)
+                  analyseArgsIntoNewStore(tree, args, vparams.drop(env.length), sig)
 
                 val newStore0 = {
                   val envSz = env.length
@@ -450,7 +451,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 val cstrDef = clsT.symbol.primaryConstructor.defTree.asInstanceOf[DefDef]
 
                 val (newStore1: Store, abstractArgs: List[AV], _) =
-                  analyseArgsIntoNewStore(args, methDef.vparamss.head, sig)
+                  analyseArgsIntoNewStore(tree, args, methDef.vparamss.head, sig)
 
                 // we filter out other "direct" values, as they cannot possibly be the value of `this`
                 val newStore0 =
@@ -580,7 +581,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             }
 
           val (newStore: Store, abstractArgs: List[AV], _) =
-            analyseArgsIntoNewStore(args, funDef.vparamss.head, sig)
+            analyseArgsIntoNewStore(tree, args, funDef.vparamss.head, sig)
 
           val newStack = Stack(
             s"${funDef.symbol.show}:${funDef.sourcePos.line}"
@@ -1089,8 +1090,7 @@ object EscapeAnalysisEngine {
     def apply(tree: tpd.Tree) = AP.Tree(tree)
   }
 
-  class Taint
-  val newTaint = new Taint
+  case class Taint(callsite: Tree)
 
   case class ParamSig(tainted: Boolean, sig: Sig)
   enum Sig {
@@ -1261,6 +1261,7 @@ object EscapeAnalysisEngine {
     case Abort;
     case Proper(value: AV);
   }
+
   /** Non-standard returns */
   type NSRs = Map[Name, AV]
   case class MutRes(heap: Heap, value: MRValue, returns: NSRs)
