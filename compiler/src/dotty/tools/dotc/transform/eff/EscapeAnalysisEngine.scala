@@ -120,8 +120,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     )(using ctx: Context, stack: Stack) =
       accumulate(tree, _store, _heap, terminal = true)
 
-    type Ret = Map[Name, AV]
-    def mergeReturns(ret1: Ret, ret2: Ret): Ret =
+    def mergeReturns(ret1: NSRs, ret2: NSRs): NSRs =
       if (ret2.size > ret1.size) mergeReturns(ret2, ret1)
       else {
         var res = ret1
@@ -184,30 +183,31 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
     )(
       onMiss: () => MutRes,
       onError: () => MutRes
-    ): MutRes =
-      (cache().get((newHeap, ap, sym, abstractArgs)): @unchecked) match {
+    ): MutRes = {
+      val key = (newHeap, ap, sym, abstractArgs)
+      (cache().get(key): @unchecked) match {
         // Already computed....
         case Some(mr: MutRes) => mr
         // In a fixpoint, but no initial value ... most implementations of onError return bottom...
         case Some("err") => onError()
         // Not present ... possibly need to evaluate fixpoint.
         case None =>
-          cache().update((heap, ap, sym, abstractArgs), "err")
+          cache().update(key, "err")
           var check : MutRes = onMiss()
           var go = true
           // Do a fixpoint calculation here...
-          while (go) {
-            cache().update((heap, ap, sym, abstractArgs), check)
+          while go do {
+            cache().update(key, check)
             val newEntry = onMiss()
-            if (newEntry == check) {
+            if newEntry == check then
               go = false
-            } else {
+            else
               check = newEntry
-            }
           }
 
           check
       }
+    }
 
     inline def loopCached(
       ap: AP,
@@ -236,7 +236,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       var res: Store = _store
 
       val abstractArgsBld = ListBuffer.empty[AV]
-      val taint = new Taint
+      val taint = newTaint
 
       val paramSigs = sig match {
         case Sig.Proper(l) => l
@@ -696,7 +696,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           MutRes(heap, MRValue.Abort, Map.empty)
 
         case tree =>
-          debug.println(i"#:acc:defaulting-to-ana")
+          effect.println(i"#:acc:defaulting-to-ana")
           MutRes(heap, mrvalue(_analyze(tree)), Map.empty)
       }
     }
@@ -1090,6 +1090,8 @@ object EscapeAnalysisEngine {
   }
 
   class Taint
+  val newTaint = new Taint
+
   case class ParamSig(tainted: Boolean, sig: Sig)
   enum Sig {
     def merge(other: Sig): Sig =
@@ -1105,7 +1107,7 @@ object EscapeAnalysisEngine {
     case Proper(sigs: List[ParamSig]);
   }
 
-  type Taints = SimpleIdentitySet[Taint]
+  type Taints = Set[Taint]
   case class Spec(labels: LabelSet, taints: Taints, sig: Sig) {
     def isDirect: Boolean = labels.strong.isEmpty
 
@@ -1119,7 +1121,9 @@ object EscapeAnalysisEngine {
 
     def offset(l: Label) = copy(labels = labels + l)
 
-    def display = labels.display
+    def display =
+      labels.display
+      // s"${labels.display} / ${taints.size} / sig#${sig.##}"
   }
 
   class AV(val self: Map[AP, Spec]) extends AnyVal {
@@ -1160,7 +1164,7 @@ object EscapeAnalysisEngine {
     val Empty = AV(Map.empty)
 
     def apply(ap: AP, ls: LabelSet): AV =
-      apply((ap, Spec(ls, SimpleIdentitySet.empty, Sig.Empty)))
+      apply((ap, Spec(ls, Set.empty, Sig.Empty)))
     def apply(kv: (AP, Spec)): AV = AV(Map(kv))
     def apply(map: Map[AP, Spec]): AV = new AV(map)
 
@@ -1178,7 +1182,7 @@ object EscapeAnalysisEngine {
                   strong = sp1.labels.strong intersect sp2.labels.strong
                 ),
                 // we don't care about any of those when we resolve an AV
-                taints = SimpleIdentitySet.empty,
+                taints = Set.empty,
                 sig = Sig.Empty
               )
           }).flatten
@@ -1206,10 +1210,13 @@ object EscapeAnalysisEngine {
         }
         nl_? = true
 
-      for (k, v) <- av.iterator do
+      for (k, v) <- av.iterator do {
         nl()
+        // res append s"#(k#${k.##} v#${v.##})"
+        // nl()
         res append k.display
         res append s" ← ${v.display}"
+      }
 
       res.toString
     }
@@ -1325,6 +1332,8 @@ object EscapeAnalysisEngine {
       for ((ap, sym), v) <- heap.iterator
       do {
         nl()
+        // buf.append(s"#(ap#${ap.##}, sym#${sym.##}, av#${v.##})")
+        // nl()
         val ln = s"${ap.display}.${sym.name}#${sym.##} → "
         buf append ln
         buf append AV.display(v, ln.length)
