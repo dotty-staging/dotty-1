@@ -429,7 +429,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                               i"$tree :${tree.sourcePos.line}"
                               :: stack.elements
                             )
-                            ctx.error(LocalValueEscapesMsg(t, newStack), entrypoint.tree.sourcePos)
+                            val pos = entrypoint.tree.sourcePos
+                            ctx.error(LocalValueEscapesMsg(t, newStack), pos.copy(span = pos.span.withEnd(pos.point)))
                             ap -> sp.copy(taints = sp.taints - t)
                           case o => o
                         }
