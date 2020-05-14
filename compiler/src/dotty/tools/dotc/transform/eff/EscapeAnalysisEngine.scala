@@ -228,16 +228,15 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       analyse(tree, store, _heap)
 
     def analyseArgsIntoNewStore(
-      callsite: Tree,
+      taint: Taint,
       args: List[Tree],
       params: List[Tree],
       sig: Sig,
       _store: Store = store
-    ): (Store, List[AV], Option[Taint]) = {
+    ): (Store, List[AV], Boolean) = {
       var res: Store = _store
 
       val abstractArgsBld = ListBuffer.empty[AV]
-      val taint = Taint(tree)
 
       val paramSigs = sig match {
         case Sig.Proper(l) => l
@@ -272,7 +271,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
         res = res.updated(vp.symbol, abstractArg0)
       }
 
-      (res, abstractArgsBld.result, Option(taint).filter(_ => didTaint))
+      (res, abstractArgsBld.result, didTaint)
     }
 
     inline def mrvalue(value: => AV) =
@@ -304,7 +303,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           val rhsAV = rhsMR.value.expected_!
           MutRes(
             rhsMR.heap.merge(AP.Sym(scopeHeapKey), tree.symbol, rhsAV),
-            mrvalue(AV(AP.Constant, LabelSet.empty)),
+            mrvalue(AV(AP.Atom, LabelSet.empty)),
             Map.empty
           )
 
@@ -314,7 +313,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           val rhsAV = rhsMR.value.expected_!
           MutRes(
             rhsMR.heap.merge(AP.Sym(scopeHeapKey), ident.symbol, rhsAV),
-            mrvalue(AV(AP.Constant, LabelSet.empty)),
+            mrvalue(AV(AP.Atom, LabelSet.empty)),
             Map.empty
           )
 
@@ -323,7 +322,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           effect.println(i"#lhs {${lhs.productPrefix}} {{{\n${lhs}\n}}}")
           effect.println(i"#rhs {${rhs.productPrefix}} {{{\n${rhs}\n}}}")
           effect.println("}}}")
-          MutRes(heap, mrvalue(AV(AP.Constant, LabelSet.empty)), Map.empty)
+          MutRes(heap, mrvalue(AV(AP.Atom, LabelSet.empty)), Map.empty)
 
         case tree @ Apply(sel @ Select(obj, _), args) if sel.symbol.isSetter && sel.symbol.is(Flags.Mutable) =>
           // TODO array mutations have their own magick symbol-less methods
@@ -355,7 +354,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   heap.merge(ap, d.symbol, argAV)
                 }
 
-              MutRes(heap0, mrvalue(AV(AP.Constant, LabelSet.empty)), Map.empty)
+              MutRes(heap0, mrvalue(AV(AP.Atom, LabelSet.empty)), Map.empty)
 
           }
 
@@ -372,6 +371,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 :: stack.elements
             )
 
+            val taint = Taint(ap, tree)
+
             (ap: @unchecked) match {
               case AP.Tree(clos @ Closure(env, closRef, _)) =>
                 // TODO: test the case when the method cannot be statically determined
@@ -384,8 +385,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 effect.println(i"#env [${env.length}] $env%, %")
                 effect.println("}}}")
 
-                val (newStore1: Store, abstractArgs: List[AV], taintOpt) =
-                  analyseArgsIntoNewStore(tree, args, vparams.drop(env.length), sig)
+                val (newStore1: Store, abstractArgs: List[AV], didTaint) =
+                  analyseArgsIntoNewStore(taint, args, vparams.drop(env.length), sig)
 
                 val newStore0 = {
                   val envSz = env.length
@@ -419,23 +420,22 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   onMiss = { () =>
                     val res =
                       loopTerminal(closDef.rhs, _store = newStore0)(using ctx, newStack)
-                    (taintOpt, res.value) match {
-                      case (None, _) => res
-                      case (_, MRValue.Abort) => res
-                      case (Some(t), MRValue.Proper(av)) =>
+                    if !didTaint then res else res.value match {
+                      case MRValue.Abort => res
+                      case MRValue.Proper(av) =>
                         val untaintedAV = av.map {
-                          case (ap, sp) if sp.taints.contains(t) =>
+                          case (ap, sp) if sp.taints.contains(taint) =>
                             val newStack = Stack(
                               i"$tree :${tree.sourcePos.line}"
                               :: stack.elements
                             )
                             val pos = entrypoint.tree.sourcePos
-                            ctx.error(LocalValueEscapesMsg(t, newStack), pos.copy(span = pos.span.withEnd(pos.point)))
-                            ap -> sp.copy(taints = sp.taints - t)
+                            ctx.error(LocalValueEscapesMsg(taint, newStack), pos.copy(span = pos.span.withEnd(pos.point)))
+                            ap -> sp.copy(taints = sp.taints - taint)
                           case o => o
                         }
                         res.copy(value = MRValue.Proper(untaintedAV))
-                      case other => sys.error(s"unexpected result: $other")
+                      case other => sys.error(s"unexpected result: didTaint=$didTaint / $other")
                     }
                   },
                   onError = { () =>
@@ -452,7 +452,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 val cstrDef = clsT.symbol.primaryConstructor.defTree.asInstanceOf[DefDef]
 
                 val (newStore1: Store, abstractArgs: List[AV], _) =
-                  analyseArgsIntoNewStore(tree, args, methDef.vparamss.head, sig)
+                  analyseArgsIntoNewStore(taint, args, methDef.vparamss.head, sig)
 
                 // we filter out other "direct" values, as they cannot possibly be the value of `this`
                 val newStore0 =
@@ -494,9 +494,9 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   }
                 }
 
-              case AP.Constant =>
+              case AP.Atom =>
                 val initial =
-                  MutRes(heap, MRValue.Proper(AV(AP.Constant, LabelSet.empty)), Map.empty)
+                  MutRes(heap, MRValue.Proper(AV(AP.Atom, LabelSet.empty)), Map.empty)
 
                 args.foldLeft(initial) {
                   (av, arg) => mergeAlt(av, loopTerminal(arg)(using ctx, newStack))
@@ -582,7 +582,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             }
 
           val (newStore: Store, abstractArgs: List[AV], _) =
-            analyseArgsIntoNewStore(tree, args, funDef.vparamss.head, sig)
+            analyseArgsIntoNewStore(Taint(AP.Atom, tree), args, funDef.vparamss.head, sig)
 
           val newStack = Stack(
             s"${funDef.symbol.show}:${funDef.sourcePos.line}"
@@ -776,7 +776,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
       effect.println("}}}")
 
       uncluttered match {
-        case tpd.Literal(_) => AV(AP.Constant, LabelSet.empty)
+        case tpd.Literal(_) => AV(AP.Atom, LabelSet.empty)
 
         case tree @ Apply(sel @ Select(obj, _), Nil) if sel.symbol.isGetter && sel.symbol.is(Flags.Mutable) =>
           val sym = sel.symbol.underlyingSymbol
@@ -927,7 +927,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           res
 
         case tree @ Select(_, _) if tree.symbol == defn.Any_isInstanceOf =>
-          AV(AP.Constant, LabelSet.empty)
+          AV(AP.Atom, LabelSet.empty)
       }
     }
   }
@@ -1034,6 +1034,8 @@ object EscapeAnalysisEngine {
   ) {
     def +(label: Label) = LabelSet(weak = this.weak + label, strong = this.strong + label)
 
+    def -(label: Label) = LabelSet(weak = this.weak - label, strong = this.strong - label)
+
     def isEmpty: Boolean = weak.isEmpty && strong.isEmpty
 
     def display: String =
@@ -1055,7 +1057,7 @@ object EscapeAnalysisEngine {
     case Sym(symbol: Symbol);
     case Tree(tree: tpd.Tree);
     case MutScope();
-    case Constant;
+    case Atom;
 
     def maybeSym: Symbol =
       this match {
@@ -1071,7 +1073,7 @@ object EscapeAnalysisEngine {
         case Sym(v) => printer.toText(v)
         case Tree(v) => printer.toText(v)
         case MutScope() => Str(s"Scope#${this.##}")
-        case Constant => Str("Constant")
+        case Atom => Str("Atom")
       }
 
       Str("AP(") ~ txt ~ Str(")")
@@ -1082,7 +1084,7 @@ object EscapeAnalysisEngine {
         case AP.Sym(s) => s.name
         case AP.Tree(t) => s"${tersely(t)}#${t.##}"
         case MutScope() => s"<Scope#${this.##}>"
-        case AP.Constant => "<Constant>"
+        case AP.Atom => "<Atom>"
       }
   }
 
@@ -1091,7 +1093,7 @@ object EscapeAnalysisEngine {
     def apply(tree: tpd.Tree) = AP.Tree(tree)
   }
 
-  case class Taint(callsite: Tree)
+  case class Taint(ap: AP, callsite: Tree)
 
   case class ParamSig(tainted: Boolean, sig: Sig)
   enum Sig {
@@ -1121,6 +1123,7 @@ object EscapeAnalysisEngine {
     }
 
     def offset(l: Label) = copy(labels = labels + l)
+    def remove(l: Label) = copy(labels = labels - l)
 
     def display =
       labels.display
