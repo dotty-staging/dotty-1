@@ -193,7 +193,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
         // In a fixpoint, but no initial value ... most implementations of onError return bottom...
         case Some("err") => onError()
         // Not present ... possibly need to evaluate fixpoint.
-        case None =>
+        case None => {
           cache().update(key, "err")
           var check : MutRes = onMiss()
           var go = true
@@ -203,11 +203,12 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             val newEntry = onMiss()
             if newEntry == check then
               go = false
-            else
-              check = newEntry
+            else {
+              check = mergeAlt(check, newEntry)
+            }
           }
-
           check
+        }
       }
     }
 
@@ -535,7 +536,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           // TODO take effects into account
           val objAV = {
             effect.println(i"#:object")
-            loop(objT, _terminal = true).value.expected_!
+            val objMR = loop(objT, _terminal = true).value
+            objMR.expected_!
           }
           var res = MutRes(Heap.Empty, MRValue.Proper(AV.Empty), Map.empty)
           for {
@@ -556,6 +558,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           effect.println(i"#:acc:function-call {{{")
           effect.println(i"#funDef {${funDef.productPrefix}} {{{\n${funDef}\n}}}")
           effect.println("}}}")
+
 
           val sig =
             if !fsym.hasAnnotation(ctx.definitions.LocalParamsAnnot) then Sig.Empty
@@ -596,7 +599,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               :: stack.elements
           )
 
-          loopCached0(heap, AP(fun.symbol), fun.symbol, abstractArgs)(
+          val result = loopCached0(heap, AP(fun.symbol), fun.symbol, abstractArgs)(
             onMiss = { () =>
               loopTerminal(
                 tree = funDef.rhs,
@@ -608,6 +611,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               emptyRes() // NOTE! recursion-termination
             }
           )
+          result
 
         case If(cond, thenp, elsep) =>
           val res1 = loop(cond)
@@ -621,6 +625,23 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               loopTerminal(elsep, heap)
             )
           }
+
+        case WhileDo(cond, body) =>
+          var ourHeap = heap
+          var go = true
+          while (go) {
+            val afterCond = loopTerminal(cond, ourHeap)
+            val afterBody = loopTerminal(body, afterCond.heap)
+
+            if (ourHeap == afterBody.heap) {
+              go = false
+            } else {
+              ourHeap = ourHeap merge afterBody.heap
+            }
+          }
+          
+          // Do we care about the AV here, or would MRValue.Skipped work just as well....
+          MutRes(ourHeap, mrvalue(AV(AP.Atom, LabelSet.empty)), Map.empty)
 
         case Return(expr, from) =>
           val exprMR = loopTerminal(expr)
