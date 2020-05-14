@@ -43,6 +43,8 @@ class EscapeAnalysisEngineBase(implicit ctx: Context) {
 
   val `scala.Int.int2long` = defn.IntClass.companionModule.requiredMethod("int2long")
 
+  val BoxedUnit_UNIT = defn.BoxedUnit_UNIT
+
   val ObjectRef_create = ctx.requiredModule("scala.runtime.ObjectRef").requiredMethod("create")
   val ObjectRef_elem = ctx.requiredClass("scala.runtime.ObjectRef").requiredValue("elem")
 
@@ -398,7 +400,12 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                     envSyms.zipWithIndex.foreach { case (sym, idx) =>
                       if sp.labels.weak.contains(sym.name) then
                         envAVs(idx) = envAVs(idx) match {
-                          case av: AV => av.merge(ap, sp)
+                          case av: AV =>
+                            // !!! CAREFUL !!!
+                            // We remove the name of the env param from the labels,
+                            // as even though we think of env params as closure "fields"
+                            // they are accessed directly in the closure body.
+                            av.merge(ap, sp remove sym.name)
                           case null => AV(kv)
                         }
                     }
@@ -799,6 +806,10 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case This(_) => storeLookup(thisStoreKey)
 
+        // hardcoded shortcut for Unit literal
+        case tree @ Ident(_) if tree.symbol == BoxedUnit_UNIT =>
+          AV(AP.Atom, LabelSet.empty)
+
         case tree @ Ident(_) if tree.symbol.is(Flags.Mutable) =>
           heapLookup(tree.symbol)
 
@@ -917,6 +928,11 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           effect.println(i"#env $env%, %")
           effect.println("}}}")
 
+          // Env parameters of closure are essentially fields/constructor arguments,
+          // so we add them to the AV of closure, offset with the env param names.
+          // Said names will later on (on closure application) be trimmed from their
+          // respective label sets, as they aren't true fields and are accessed directly
+          // in the closure body.
           var res = AV(AP(tree), LabelSet.empty)
           for {
             (t, vt) <- env lazyZip closureDefTree.vparamss.head
