@@ -15,8 +15,12 @@ import core.Symbols._
 import core.StdNames._
 import core.Types._
 
+import util.Property._
+
 import MegaPhase._
 import transform.MegaPhase.MiniPhase
+
+val ResolvedMethodCallKey : Key[Set[Symbol]] = new StickyKey[Set[Symbol]]
 
 // Helper methods for recording the (discovered) class hierarchy in the set of source programs.
 class ClassHierarchy {
@@ -84,7 +88,7 @@ class ReachabilityEngine(val classHierarchy: ClassHierarchy) {
       //  2) The enclosing method M is indirectly reachable (i.e X.M has been invoked for some superclass X of T)
 
       thisPossibleMethod match {
-      case None => true
+      case None => return true
       case Some(thisMethod) => 
         // Some things are always reachable (like the main method inside a object)
         // TODO: Deal with <init> in objects that extend App.
@@ -98,6 +102,11 @@ class ReachabilityEngine(val classHierarchy: ClassHierarchy) {
         // OR if we've seen it before as reachable through an indirect call.
         if (reachableMethods.contains(thisMethod)) {
           return true
+        }
+
+        // Calls to <init> must be directly reachable.
+        if (thisMethod.name == nme.CONSTRUCTOR) {
+          return false
         }
 
         // Otherwise, we need to check if the target class is reachable.
@@ -125,10 +134,9 @@ class ReachabilityEngine(val classHierarchy: ClassHierarchy) {
             } 
           }
         }
+        // Otherwise, the method is not reachable.
+        return false
       }
-
-      // Otherwise, the method is not reachable.
-      return false
     }
 
     override def transformDefDef(tree: DefDef)(implicit ctx: Context): Tree = {
@@ -225,9 +233,61 @@ class CallGraphAnalysis extends Phase {
       // Get the symbol, mark it with the possible targets
       val target = tree.symbol
       val owner = target.owner
+      val children = classHierarchy.children.get(owner) match {
+        case Some(set) => set
+        case None => Set()
+      }
 
-      // TODO: actually tag the callsite for downstream passes.
+
+      // If we're making a super[X] call, it resolves exactly.
+      val explicitSuper = tree match {
+        case Apply(Select(Super(_, _), _), _) => true
+        case _ => false
+      }
+
+      val resolved = {
+        // Calls to a constructor are exact.
+        if (target.name == nme.CONSTRUCTOR) {
+          Set(target)
+        }
+        // Calls to a explicit super type are exact.
+        else if (explicitSuper) {
+          Set(target)
+        }
+        else {
+          reachabilityEngine.reachableMethods.filter(
+            otherMethod => {
+              // A direct match is OK
+              if (target == otherMethod) {
+                true
+              }
+              // Otherwise get instantiated methods from subclasses.
+              else if (otherMethod.name == target.name && children.contains(otherMethod.owner)) {
+                true
+              } 
+              else {
+                false
+              }
+          })
+        }
+      }
+      Console.err.println(s"Tagged call to ${owner}/${target} with ${resolved}")
+
+      // Tag the tree node
+      tree.pushAttachment(ResolvedMethodCallKey, resolved)
       tree
+    }
+    
+    // Override run and runOn to prevent new phases from being introduced (we're running as part of one squashed phase)
+    override def run(implicit ctx: Context) = {
+      ctx.compilationUnit.tpdTree =
+        singletonGroup.transformUnit(ctx.compilationUnit.tpdTree)
+    }
+    override def runOn(units: List[CompilationUnit])(implicit ctx: Context) : List[CompilationUnit] = {
+      for (unit <- units) {
+        this.run(ctx.fresh.setCompilationUnit(unit))
+      }
+      units
     }
   }
 
@@ -240,10 +300,7 @@ class CallGraphAnalysis extends Phase {
     val ourContext = ctx.withPhase(this)
     val afterCHA = recordClassesPhase.runOn(units)(ourContext)
     val afterReach = reachabilityEngine.runOn(units)(ourContext)
-    System.out.println(s"Class hierarchy: ${classHierarchy.children}")
-    System.out.println(s"Reachable classes: ${reachabilityEngine.reachableClasses}")
-    for (method <- reachabilityEngine.reachableMethods)
-      System.out.println(s"Reachable method: ${method.owner}/${method}")
-    afterReach
+    val afterTag = tagApplyPhase.runOn(units)(ourContext)
+    afterTag
   }
 }
