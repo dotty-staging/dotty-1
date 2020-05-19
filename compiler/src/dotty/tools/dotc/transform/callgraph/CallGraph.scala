@@ -232,49 +232,58 @@ class CallGraphAnalysis extends Phase {
     override def transformApply(tree: Apply)(implicit ctx: Context): Tree = {
       // Get the symbol, mark it with the possible targets
       val target = tree.symbol
-      val owner = target.owner
-      val children = classHierarchy.children.get(owner) match {
-        case Some(set) => set
-        case None => Set()
-      }
-
-
-      // If we're making a super[X] call, it resolves exactly.
-      val explicitSuper = tree match {
-        case Apply(Select(Super(_, _), _), _) => true
-        case _ => false
-      }
-
-      val resolved = {
-        // Calls to a constructor are exact.
-        if (target.name == nme.CONSTRUCTOR) {
-          Set(target)
+      if (target.name != nme.NO_NAME) {
+        val owner = target.owner
+        val children = classHierarchy.children.get(owner) match {
+          case Some(set) => set
+          case None => Set()
         }
-        // Calls to a explicit super type are exact.
-        else if (explicitSuper) {
-          Set(target)
+
+
+        // If we're making a super[X] call, it resolves exactly.
+        val explicitSuper = tree match {
+          case Apply(Select(Super(_, _), _), _) => true
+          case _ => false
+        }
+
+        val resolved = {
+          // Calls to a constructor are exact.
+          if (target.name == nme.CONSTRUCTOR) {
+            Set(target)
+          }
+          // Calls to a explicit super type are exact.
+          else if (explicitSuper) {
+            Set(target)
+          }
+          else {
+            reachabilityEngine.reachableMethods.filter(
+              otherMethod => {
+                // A direct match is OK
+                if (target == otherMethod) {
+                  true
+                }
+                // Otherwise get instantiated methods from subclasses.
+                else if (otherMethod.name == target.name && children.contains(otherMethod.owner)) {
+                  true
+                } 
+                else {
+                  false
+                }
+            })
+          }
+        }
+        Console.err.println(s"Tagged call to ${owner}/${target} with ${resolved}")
+
+        if (tree.hasAttachment(ResolvedMethodCallKey)) {
+          Console.err.println(s"Call to ${owner}/${target} already has attachment!")
         }
         else {
-          reachabilityEngine.reachableMethods.filter(
-            otherMethod => {
-              // A direct match is OK
-              if (target == otherMethod) {
-                true
-              }
-              // Otherwise get instantiated methods from subclasses.
-              else if (otherMethod.name == target.name && children.contains(otherMethod.owner)) {
-                true
-              } 
-              else {
-                false
-              }
-          })
+          // Tag the tree node
+          tree.pushAttachment(ResolvedMethodCallKey, resolved)
         }
+      } else {
+          tree.pushAttachment(ResolvedMethodCallKey, Set(target))
       }
-      Console.err.println(s"Tagged call to ${owner}/${target} with ${resolved}")
-
-      // Tag the tree node
-      tree.pushAttachment(ResolvedMethodCallKey, resolved)
       tree
     }
     
