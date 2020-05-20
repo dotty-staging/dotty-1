@@ -418,10 +418,13 @@ trait QuotesAndSplices {
     val quotedPattern =
       if (tree.quoted.isTerm) ref(defn.InternalQuoted_exprQuote.termRef).appliedToType(defn.AnyType).appliedTo(shape).select(nme.apply).appliedTo(qctx)
       else ref(defn.InternalQuoted_typeQuote.termRef).appliedToTypeTree(shape).select(nme.apply).appliedTo(qctx)
+    val fun =
+      ref(unapplySym.termRef)
+        .appliedToTypeTrees(typeBindingsTuple :: TypeTree(patType) :: Nil)
+        .appliedTo(dummyTreeOfType(defn.AnyType))
+        .appliedTo(quotedPattern, Literal(Constant(typeBindings.nonEmpty)), qctx)
     UnApply(
-      fun = ref(unapplySym.termRef).appliedToTypeTrees(typeBindingsTuple :: TypeTree(patType) :: Nil),
-      implicits = quotedPattern :: Literal(Constant(typeBindings.nonEmpty)) :: qctx :: Nil,
-      patterns = splicePat :: Nil,
+      fun = fun, implicits = Nil, patterns = splicePat :: Nil,
       proto = quoteClass.typeRef.appliedTo(replaceBindings(quoted1.tpe) & quotedPt))
   }
 }

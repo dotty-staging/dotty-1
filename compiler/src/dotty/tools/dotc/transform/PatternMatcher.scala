@@ -17,6 +17,7 @@ import config.Printers.patmatch
 import reporting.messages._
 import dotty.tools.dotc.ast._
 import util.Property._
+import typer.ProtoTypes.dummyTreeOfType
 
 /** The pattern matching transform.
  *  After this phase, the only Match nodes remaining in the code are simple switches
@@ -378,17 +379,13 @@ object PatternMatcher {
             // This plan will never execute because it'll be guarded by a `NonNullTest`.
             ResultPlan(tpd.Throw(tpd.nullLiteral))
           else {
-            def applyImplicits(acc: Tree, implicits: List[Tree], mt: Type): Tree = mt match {
-              case mt: MethodType =>
-                assert(mt.isImplicitMethod || mt.isContextualMethod)
-                val (args, rest) = implicits.splitAt(mt.paramNames.size)
-                applyImplicits(acc.appliedToArgs(args), rest, mt.resultType)
-              case _ => acc
-            }
-            val mt @ MethodType(_) = extractor.tpe.widen
-            val unapp0 = extractor.appliedTo(ref(scrutinee).ensureConforms(mt.paramInfos.head))
-            val unapp = applyImplicits(unapp0, implicits, mt.resultType)
-            unapplyPlan(unapp, args)
+            def insertScrutinee(tree: Tree): Tree = tree match
+              case Apply(fn, List(dummyTreeOfType(_))) =>
+                val mt @ MethodType(_) = fn.tpe.widen
+                cpy.Apply(tree)(fn, List(ref(scrutinee).ensureConforms(mt.paramInfos.head)))
+              case Apply(fn, args) =>
+                cpy.Apply(tree)(insertScrutinee(fn), args)
+            unapplyPlan(insertScrutinee(extractor), args)
           }
           if (scrutinee.info.isNotNull || nonNull(scrutinee)) unappPlan
           else TestPlan(NonNullTest, scrutinee, tree.span, unappPlan)
