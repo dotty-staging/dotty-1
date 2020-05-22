@@ -6,6 +6,7 @@ package callgraph
 
 import ast.tpd._
 
+
 import core._
 import core.Flags._
 import core.Denotations._
@@ -90,24 +91,32 @@ class ReachabilityEngine(val classHierarchy: ClassHierarchy) {
       thisPossibleMethod match {
       case None => return true
       case Some(thisMethod) => 
-        // Some things are always reachable (like the main method inside a object)
-        // TODO: Deal with <init> in objects that extend App.
-        if (thisMethod.name == nme.main) {
-          // Mark the method as visible also
-          reachableMethods += thisMethod
-          return true
-        }
-
         // If the method is directly reachable, we're good (note that the method symbol contains its owner).
         // OR if we've seen it before as reachable through an indirect call.
         if (reachableMethods.contains(thisMethod)) {
           return true
         }
 
+        // Some things are always reachable (like the main method inside a object)
+        // TODO: Deal with <init> in objects that extend App.
+        if (thisMethod.name == nme.main) {
+          // Mark the method as visible also
+          reachableMethods += thisMethod
+          changed = true
+          return true
+        }
+        // Marked @entry methods are reachable
+        if (thisMethod.hasAnnotation(ctx.definitions.EntryAnnot)) {
+          reachableMethods += thisMethod
+          changed = true
+          return true
+        }
+        
         // Calls to <init> must be directly reachable.
         if (thisMethod.name == nme.CONSTRUCTOR) {
           return false
         }
+
 
         // Otherwise, we need to check if the target class is reachable.
         if (reachableClasses.contains(enclosingClass)) {  
@@ -116,22 +125,18 @@ class ReachabilityEngine(val classHierarchy: ClassHierarchy) {
           for (otherMethod <- reachableMethods) {
             // If the method names match and the owner of the other method is a supertype
             // of the current method's owner, we are reachable.
-            if (otherMethod.name == thisMethod.name && {
-                  classHierarchy.children.get(otherMethod.owner) match {
-                    case Some(childrenSet) =>
-                      if (childrenSet.contains(thisClass)) {
-                        // Mark it as reachable so we save time in the future.
-                        reachableMethods += thisMethod
-                        changed = true
-                        return true
-                      } else {
-                        return false
-                      }
-                    case None => return false
-                  }
-                }) {
-              return true
-            } 
+            if (otherMethod.name == thisMethod.name) {
+                classHierarchy.children.get(otherMethod.owner) match {
+                  case Some(childrenSet) =>
+                    if (childrenSet.contains(thisClass)) {
+                      // Mark it as reachable so we save time in the future.
+                      reachableMethods += thisMethod
+                      changed = true
+                      return true
+                    }
+                  case None => ()
+                }
+            }
           }
         }
         // Otherwise, the method is not reachable.
@@ -160,6 +165,20 @@ class ReachabilityEngine(val classHierarchy: ClassHierarchy) {
 
     override def transformApply(tree: Apply)(implicit ctx: Context): Tree = {
       val Apply(target, _) = tree
+      if (isReachable(enclosingClass, enclosingMethod)) {
+        // If we reach obj.foo(), T.foo becomes reachable for all subtypes T <: Type(obj)
+        // Note that T does not become reachable, as we track that through new T() invocations.
+        if (!reachableMethods.contains(target.symbol)) {
+          reachableMethods += target.symbol
+          changed = true
+        }
+      }
+      tree
+    }
+
+    override def transformClosure(tree: Closure)(implicit ctx: Context): Tree = {
+      // Anything that is put into a closure is reachable 
+      val Closure(_, target, _) = tree
       if (isReachable(enclosingClass, enclosingMethod)) {
         // If we reach obj.foo(), T.foo becomes reachable for all subtypes T <: Type(obj)
         // Note that T does not become reachable, as we track that through new T() invocations.
@@ -256,30 +275,38 @@ class CallGraphAnalysis extends Phase {
             Set(target)
           }
           else {
-            reachabilityEngine.reachableMethods.filter(
+            val result = reachabilityEngine.reachableMethods.filter(
               otherMethod => {
-                // A direct match is OK
-                if (target == otherMethod) {
-                  true
-                }
-                // Otherwise get instantiated methods from subclasses.
-                else if (otherMethod.name == target.name && children.contains(otherMethod.owner)) {
-                  true
-                } 
-                else {
-                  false
-                }
+                // An empty tree is not callable (abstract method)
+                otherMethod.defTree match {
+                  case DefDef(_, _, _, _, EmptyTree) => {
+                    false
+                  }
+                  case _ =>
+                    // A direct match is OK
+                    if (target == otherMethod) {
+                      true
+                    }
+                    // Otherwise get instantiated methods from subclasses.
+                    else if (otherMethod.name == target.name && children.contains(otherMethod.owner)) {
+                      true
+                    } 
+                    else {
+                      false
+                    }
+                  }
             })
+            result
+
           }
         }
-        Console.err.println(s"Tagged call to ${owner}/${target} with ${resolved}")
 
         if (tree.hasAttachment(ResolvedMethodCallKey)) {
           Console.err.println(s"Call to ${owner}/${target} already has attachment!")
         }
         else {
           // Tag the tree node
-          tree.pushAttachment(ResolvedMethodCallKey, resolved)
+          tree.pushAttachment(ResolvedMethodCallKey, Set.empty ++ resolved)
         }
       } else {
           tree.pushAttachment(ResolvedMethodCallKey, Set(target))

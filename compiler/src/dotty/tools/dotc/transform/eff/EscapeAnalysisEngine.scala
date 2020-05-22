@@ -17,6 +17,8 @@ import core.NameOps.{NameDecorator, TermNameDecorator}
 import config.Printers.effect
 import config.Printers.debug
 
+import dotc.transform.callgraph.ResolvedMethodCallKey
+
 import printing.{Showable, Printer}
 import printing.Texts.Text
 
@@ -455,25 +457,41 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 )
 
               case AP.Tree(newT @ New(clsT)) =>
-                val methSym = selT.symbol.denot.matchingMember(newT.tpe)
-                val methDef = methSym.defTree.asInstanceOf[DefDef]
-                val cstrDef = clsT.symbol.primaryConstructor.defTree.asInstanceOf[DefDef]
+                var preciseMethSym = selT.symbol.denot.matchingMember(newT.tpe)
+                var methSyms = tree.attachment(ResolvedMethodCallKey)
 
-                val (newStore1: Store, abstractArgs: List[AV], _) =
-                  analyseArgsIntoNewStore(taint, args, methDef.vparamss.head, sig)
+                // TODO: benchmark against precise target?
+                //Console.err.println(s"Analyzing ${selT.symbol.owner}/${selT.symbol} with ${methSyms.size} possible targets instead of precise target of ${clsT.symbol}/${selT.symbol}")
+                //Console.err.println(s"Analyzing ${selT.symbol.owner}/${selT.symbol} with ${methSyms.size} possible targets instead of precise target of ${clsT.symbol}/${selT.symbol}")
 
-                // we filter out other "direct" values, as they cannot possibly be the value of `this`
-                val newStore0 =
-                  newStore1.updated(thisStoreKey, objAV)
+                // Do Set(preciseMethSym).map to get the original behaviour.
+                // We probably want to do something here if LHS is a real AP or not.
+                //
+                // We probably want a real AP on the left (and to use the precise type) when
+                //
+                //  1) It's a value that can escape
+                //  2) It's a value which contains a value which can escape.
+                // It's worth noting that this analysis is a little too cautious on the existing virtual method test.                
+                var analyzed = methSyms.map((methSym) => {
+                  val methDef = methSym.defTree.asInstanceOf[DefDef]
 
-                loopCached(ap, methSym, abstractArgs)(methDef.rhs, newStore0)(
-                  onError = { () =>
-                    effect.println(i"#! StackOverflow on recursive method: {{{")
-                    effect.println(i"#methDef.rhs {{{\n${methDef.rhs}\n}}}")
-                    effect.println("}}}")
-                    MutRes(heap, MRValue.Proper(AV.Empty), Map.empty)
-                  }
-                )(using ctx, newStack)
+                  val (newStore1: Store, abstractArgs: List[AV], _) =
+                    analyseArgsIntoNewStore(taint, args, methDef.vparamss.head, sig)
+
+                  // we filter out other "direct" values, as they cannot possibly be the value of `this`
+                  val newStore0 =
+                    newStore1.updated(thisStoreKey, objAV)
+
+                  loopCached(ap, methSym, abstractArgs)(methDef.rhs, newStore0)(
+                    onError = { () =>
+                      effect.println(i"#! StackOverflow on recursive method: {{{")
+                      effect.println(i"#methDef.rhs {{{\n${methDef.rhs}\n}}}")
+                      effect.println("}}}")
+                      MutRes(heap, MRValue.Proper(AV.Empty), Map.empty)
+                    }
+                  )(using ctx, newStack)
+                })
+                analyzed.reduce((x, y) => mergeAlt(x, y))
 
               case AP.Sym(sym) =>
                 val info = ctx.atPhase(ctx.postTyperPhase) { sym.denot.info }
