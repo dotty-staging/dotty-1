@@ -364,7 +364,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           }
 
         case tree @ Apply(selT @ Select(objT, ident), args)
-          if !objT.symbol.is(Flags.Module) =>
+            if !objT.symbol.is(Flags.Module)
+            && !selT.symbol.isGetter =>
           def accumulateMethodCall(ap: AP, sig: Sig, objAV: AV): MutRes = trace("accumulateMethodCall") {
             effect.println(i"#details {{{")
             effect.println(i"#ap ${ap.display}")
@@ -457,6 +458,15 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 )
 
               case AP.Tree(newT @ New(clsT)) =>
+                // this is the saved method for seeing through bridges
+                // val methSym1 = selT.symbol.denot.matchingMember(newT.tpe)
+                // val methSym0 =
+                //   if methSym1.is(Flags.Bridge) then {
+                //     val res = methSym1.nextOverriddenSymbol
+                //     if !res.defTree.asInstanceOf[DefDef].rhs.isEmpty then res else methSym1
+                //   } else methSym1
+                // val methDef = methSym0.defTree.asInstanceOf[DefDef]
+
                 var preciseMethSym = selT.symbol.denot.matchingMember(newT.tpe)
                 var methSyms = tree.attachment(ResolvedMethodCallKey)
 
@@ -530,8 +540,8 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             }
           }
 
-          effect.println(i"#!method-call")
-          effect.println(i"#sel.symbol ${selT.symbol}")
+          effect.println(i"#method-call")
+          effect.println(i"#sel.symbol ${selT.symbol}#${selT.symbol.##}")
           effect.println(i"#selT.symbol.owner ${selT.symbol.owner}")
 
           def apAgreesWithClass(ap: AP, sym: Symbol): Boolean = {
@@ -609,8 +619,19 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               Sig.Proper(paramSigs)
             }
 
-          val (newStore: Store, abstractArgs: List[AV], _) =
+          val (store1: Store, abstractArgs: List[AV], _) =
             analyseArgsIntoNewStore(Taint(AP.Atom, tree), args, funDef.vparamss.head, sig)
+
+          val store0: Store =
+            fun match {
+              case fun @ Select(qual: Ident, id) if qual.symbol.is(Flags.Module) =>
+                val rhsT = qual.symbol.defTree.asInstanceOf[ValDef].rhs
+                val Apply(Select(newT, _), _) = rhsT
+                val ap = AP.Tree(newT)
+                store1.updated(thisStoreKey, AV(ap, LabelSet.empty))
+              case _ =>
+                store1
+            }
 
           val newStack = Stack(
             s"${funDef.symbol.show}:${funDef.sourcePos.line}"
@@ -621,7 +642,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             onMiss = { () =>
               loopTerminal(
                 tree = funDef.rhs,
-                _store = newStore
+                _store = store0
               )(using ctx, newStack)
             },
             onError = { () =>
@@ -843,7 +864,17 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
           res
 
-        case This(_) => storeLookup(thisStoreKey)
+        case tree @ This(_) =>
+          val res = storeLookup(thisStoreKey)
+          if res.self.isEmpty then {
+            effect.println(i"#tree.symbol ${tree.symbol}")
+            effect.println(i"#tree.symbol.flags.flagsString ${tree.symbol.flags.flagsString}")
+          }
+          end if
+          res
+
+        case tree: Super =>
+          storeLookup(thisStoreKey)
 
         // hardcoded shortcut for Unit literal
         case tree @ Ident(_) if tree.symbol == BoxedUnit_UNIT =>
@@ -1137,6 +1168,7 @@ object EscapeAnalysisEngine {
     def display(implicit ctx: Context) =
       this match {
         case AP.Sym(s) => s.name
+        case AP.Tree(t @ New(clsT)) => i"New(${clsT.symbol})#${t.##}"
         case AP.Tree(t) => s"${tersely(t)}#${t.##}"
         case MutScope() => s"<Scope#${this.##}>"
         case AP.Atom => "<Atom>"
