@@ -6,6 +6,7 @@ import scala.collection.mutable.ArrayBuffer
 import dotty.tools.io._
 import java.util.regex.Pattern
 import java.io.IOException
+import java.nio.charset.Charset
 import scala.internal.Chars._
 import Spans._
 import scala.io.Codec
@@ -38,7 +39,7 @@ object ScriptSourceFile {
   }
 }
 
-class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends interfaces.SourceFile {
+class SourceFile(val file: AbstractFile, computeContent: => Array[Char], _charset: Charset) extends interfaces.SourceFile {
   import SourceFile._
 
   private var myContent: Array[Char] = null
@@ -48,8 +49,10 @@ class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends
     myContent
   }
 
+  def charset(): Charset = _charset
+
   private var _maybeInComplete: Boolean = false
-  
+
   def maybeIncomplete: Boolean = _maybeInComplete
 
   def this(file: AbstractFile, codec: Codec) =
@@ -59,7 +62,11 @@ class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends
     // this is significant enough to show up in our benchmarks.
     this(file,
       try new String(file.toByteArray, codec.charSet).toCharArray
-      catch case _: java.nio.file.NoSuchFileException => Array[Char]())
+      catch
+        case _: java.nio.file.NoSuchFileException => Array[Char]()
+        case e if e.getCause.isInstanceOf[java.nio.file.NoSuchFileException] => Array[Char](), codec.charSet)
+
+  def this(file: AbstractFile, computeContent: => Array[Char]) = this(file, computeContent, Codec.UTF8.charSet)
 
   /** Tab increment; can be overridden */
   def tabInc: Int = 8
@@ -228,4 +235,3 @@ object SourceFile {
   override def exists: Boolean = false
   override def atSpan(span: Span): SourcePosition = NoSourcePosition
 }
-

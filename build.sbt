@@ -1,6 +1,7 @@
 val dotty = Build.dotty
 val `dotty-bootstrapped` = Build.`dotty-bootstrapped`
 val `dotty-interfaces` = Build.`dotty-interfaces`
+val `dotty-interfaces-incremental` = Build.`dotty-interfaces-incremental`
 val `dotty-doc` = Build.`dotty-doc`
 val `dotty-doc-bootstrapped` = Build.`dotty-doc-bootstrapped`
 val `dotty-compiler` = Build.`dotty-compiler`

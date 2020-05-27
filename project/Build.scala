@@ -318,10 +318,11 @@ object Build {
       val tastyCore = packageBin.in(`tasty-core`, Compile).value
       val dottyLibrary = packageBin.in(`dotty-library`, Compile).value
       val dottyInterfaces = packageBin.in(`dotty-interfaces`, Compile).value
+      val dottyInterfacesIncremental = packageBin.in(`dotty-interfaces-incremental`, Compile).value
       val dottyCompiler = packageBin.in(`dotty-compiler`, Compile).value
       val dottyDoc = packageBin.in(`dotty-doc`, Compile).value
 
-      val allJars = Seq(tastyCore, dottyLibrary, dottyInterfaces, dottyCompiler, dottyDoc) ++ externalNonBootstrappedDeps.map(_.data)
+      val allJars = Seq(tastyCore, dottyLibrary, dottyInterfaces, dottyInterfacesIncremental, dottyCompiler, dottyDoc) ++ externalNonBootstrappedDeps.map(_.data)
 
       makeScalaInstance(
         state.value,
@@ -375,6 +376,13 @@ object Build {
 
   lazy val `dotty-interfaces` = project.in(file("interfaces")).
     settings(commonJavaSettings)
+
+  lazy val `dotty-interfaces-incremental` = project.in(file("interfaces-incremental")).
+    dependsOn(`dotty-interfaces`).
+    settings(commonJavaSettings).
+    settings(
+      libraryDependencies += Dependencies.`compiler-interface`
+    )
 
   private lazy val dottydocClasspath = Def.task {
     val jars = (packageAll in `dotty-compiler`).value
@@ -699,9 +707,10 @@ object Build {
     packageAll := Def.taskDyn { // Use a dynamic task to avoid loops when loading the settings
       Def.task {
         Map(
-          "dotty-interfaces"    -> packageBin.in(`dotty-interfaces`, Compile).value,
-          "dotty-compiler"      -> packageBin.in(Compile).value,
-          "tasty-core"          -> packageBin.in(`tasty-core`, Compile).value,
+          "dotty-interfaces"              -> packageBin.in(`dotty-interfaces`, Compile).value,
+          "dotty-interfaces-incremental"  -> packageBin.in(`dotty-interfaces-incremental`, Compile).value,
+          "dotty-compiler"                -> packageBin.in(Compile).value,
+          "tasty-core"                    -> packageBin.in(`tasty-core`, Compile).value,
 
           // NOTE: Using dotty-library-bootstrapped here is intentional: when
           // running the compiler, we should always have the bootstrapped
@@ -1160,6 +1169,7 @@ object Build {
       scripted := scripted.dependsOn(
         publishLocal in `dotty-sbt-bridge`,
         publishLocal in `dotty-interfaces`,
+        publishLocal in `dotty-interfaces-incremental`,
         publishLocal in `dotty-compiler-bootstrapped`,
         publishLocal in `dotty-library-bootstrapped`,
         publishLocal in `tasty-core-bootstrapped`,
@@ -1249,6 +1259,7 @@ object Build {
       prepareCommunityBuild := {
         (publishLocal in `dotty-sbt-bridge`).value
         (publishLocal in `dotty-interfaces`).value
+        (publishLocal in `dotty-interfaces-incremental`).value
         (publishLocal in `scala-library`).value
         (publishLocal in `scala-reflect`).value
         (publishLocal in `tasty-core-bootstrapped`).value
@@ -1380,7 +1391,7 @@ object Build {
 
     // FIXME: we do not aggregate `bin` because its tests delete jars, thus breaking other tests
     def asDottyRoot(implicit mode: Mode): Project = project.withCommonSettings.
-      aggregate(`dotty-interfaces`, dottyLibrary, dottyCompiler, tastyCore, dottyDoc, `dotty-sbt-bridge`).
+      aggregate(`dotty-interfaces`, `dotty-interfaces-incremental`, dottyLibrary, dottyCompiler, tastyCore, dottyDoc, `dotty-sbt-bridge`).
       bootstrappedAggregate(`scala-library`, `scala-compiler`, `scala-reflect`, scalap,
         `dotty-language-server`, `dotty-staging`, `dotty-tasty-inspector`, `dotty-tastydoc`).
       dependsOn(tastyCore).
@@ -1399,7 +1410,7 @@ object Build {
       )
 
     def asDottyCompiler(implicit mode: Mode): Project = project.withCommonSettings.
-      dependsOn(`dotty-interfaces`).
+      dependsOn(`dotty-interfaces`, `dotty-interfaces-incremental`).
       dependsOn(dottyLibrary).
       dependsOn(tastyCore).
       settings(dottyCompilerSettings)
@@ -1438,7 +1449,7 @@ object Build {
     def asDist(implicit mode: Mode): Project = project.
       enablePlugins(PackPlugin).
       withCommonSettings.
-      dependsOn(`dotty-interfaces`, dottyCompiler, dottyLibrary, tastyCore, `dotty-staging`, `dotty-tasty-inspector`, dottyDoc).
+      dependsOn(`dotty-interfaces`, `dotty-interfaces-incremental`, dottyCompiler, dottyLibrary, tastyCore, `dotty-staging`, `dotty-tasty-inspector`, dottyDoc).
       settings(commonDistSettings).
       bootstrappedSettings(
         target := baseDirectory.value / "target" // override setting in commonBootstrappedSettings

@@ -1,5 +1,7 @@
 package dotty.tools.dotc.interfaces;
 
+import java.nio.charset.Charset;
+
 /** A source file.
  *
  *  User code should not implement this interface, but it may have to
@@ -8,4 +10,5 @@ package dotty.tools.dotc.interfaces;
 public interface SourceFile extends AbstractFile {
   /** @return The content of this file as seen by the compiler. */
   char[] content();
+  Charset charset();
 }
