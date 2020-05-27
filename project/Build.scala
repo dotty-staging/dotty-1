@@ -837,7 +837,7 @@ object Build {
       // when sbt reads the settings.
       test in Test := (test in (LocalProject("dotty-sbt-bridge-tests"), Test)).value,
 
-      libraryDependencies += Dependencies.`compiler-interface` % Provided
+      libraryDependencies += Dependencies.`compiler-interface-snapshot` % Provided
     )
 
   // We use a separate project for the bridge tests since they can only be run

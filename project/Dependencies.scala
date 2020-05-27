@@ -13,4 +13,7 @@ object Dependencies {
   private val zincVersion = "1.2.5"
   val `compiler-interface` = "org.scala-sbt" % "compiler-interface" % zincVersion
   val `zinc-api-info` = "org.scala-sbt" %% "zinc-apiinfo" % zincVersion
+
+  private val zincVersionSnapshot = "1.4.0-M5"
+  val `compiler-interface-snapshot` = "org.scala-sbt" % "compiler-interface" % zincVersionSnapshot
 }
