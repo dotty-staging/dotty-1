@@ -188,14 +188,14 @@ object DottyPlugin extends AutoPlugin {
       scalaCompilerBridgeBinaryJar := Def.settingDyn {
         if (isDotty.value) Def.task {
           val updateReport = fetchArtifactsOf(
-            scalaOrganization.value % "dotty-sbt-bridge" % scalaVersion.value,
+            scalaOrganization.value % "dotty-sbt-bridge" % "0.25.0-bin-SNAPSHOT",
             dependencyResolution.value,
             scalaModuleInfo.value,
             updateConfiguration.value,
             (unresolvedWarningConfiguration in update).value,
             streams.value.log,
           )
-          Option(getJar(updateReport, scalaOrganization.value, "dotty-sbt-bridge", scalaVersion.value))
+          Option(getJar(updateReport, scalaOrganization.value, "dotty-sbt-bridge", "0.25.0-bin-SNAPSHOT"))
         }
         else Def.task {
           None: Option[File]

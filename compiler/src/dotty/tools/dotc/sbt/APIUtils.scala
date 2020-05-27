@@ -11,6 +11,7 @@ import Phases._
 import Types._
 import Symbols._
 import NameOps._
+import interfaces.incremental.SourceFileWrapper
 
 import xsbti.api
 import xsbti.api.SafeLazy.strict
@@ -38,9 +39,9 @@ object APIUtils {
    *  a dummy empty class can be registered instead, using this method.
    */
   def registerDummyClass(classSym: ClassSymbol)(implicit ctx: Context): Unit = {
-    if (ctx.sbtCallback != null) {
+    if (ctx.incCallback != null) {
       val classLike = emptyClassLike(classSym)
-      ctx.sbtCallback.api(ctx.compilationUnit.source.file.file, classLike)
+      ctx.incCallback.api(new SourceFileWrapper(ctx.compilationUnit.source), classLike)
     }
   }
 

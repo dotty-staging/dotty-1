@@ -16,6 +16,7 @@ import dotty.tools.dotc.core.StdNames._
 import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.transform.SymUtils._
+import dotty.tools.dotc.interfaces.incremental.SourceFileWrapper
 import dotty.tools.io
 import dotty.tools.io.{AbstractFile, PlainFile, ZipArchive}
 import xsbti.UseScope
@@ -51,7 +52,7 @@ class ExtractDependencies extends Phase {
 
   override def isRunnable(implicit ctx: Context): Boolean = {
     def forceRun = ctx.settings.YdumpSbtInc.value || ctx.settings.YforceSbtPhases.value
-    super.isRunnable && (ctx.sbtCallback != null || forceRun)
+    super.isRunnable && (ctx.incCallback != null || forceRun)
   }
 
   // Check no needed. Does not transform trees
@@ -86,13 +87,13 @@ class ExtractDependencies extends Phase {
       } finally pw.close()
     }
 
-    if (ctx.sbtCallback != null) {
+    if (ctx.incCallback != null) {
       collector.usedNames.foreach {
         case (clazz, usedNames) =>
           val className = classNameAsString(clazz)
           usedNames.names.foreach {
             case (usedName, scopes) =>
-              ctx.sbtCallback.usedName(className, usedName.toString, scopes)
+              ctx.incCallback.usedName(className, usedName.toString, scopes)
           }
       }
 
@@ -107,10 +108,11 @@ class ExtractDependencies extends Phase {
    */
   def recordDependency(dep: ClassDependency)(implicit ctx: Context): Unit = {
     val fromClassName = classNameAsString(dep.from)
+    val sourceHandle = new SourceFileWrapper(ctx.compilationUnit.source)
     val sourceFile = ctx.compilationUnit.source.file.file
 
     def binaryDependency(file: File, binaryClassName: String) =
-      ctx.sbtCallback.binaryDependency(file, binaryClassName, fromClassName, sourceFile, dep.context)
+      ctx.incCallback.binaryDependency(file.toPath, binaryClassName, fromClassName, sourceHandle, dep.context)
 
     def processExternalDependency(depFile: AbstractFile) = {
       def binaryClassName(classSegments: List[String]) =
@@ -154,7 +156,7 @@ class ExtractDependencies extends Phase {
         // We cannot ignore dependencies coming from the same source file because
         // the dependency info needs to propagate. See source-dependencies/trait-trait-211.
         val toClassName = classNameAsString(dep.to)
-        ctx.sbtCallback.classDependency(toClassName, fromClassName, dep.context)
+        ctx.incCallback.classDependency(toClassName, fromClassName, dep.context)
       }
     }
   }

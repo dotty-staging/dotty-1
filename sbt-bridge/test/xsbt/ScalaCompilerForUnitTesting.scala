@@ -176,7 +176,7 @@ class ScalaCompilerForUnitTesting {
     import dotty.tools.dotc.core.Contexts._
 
     val driver = new TestDriver
-    val ctx = (new ContextBase).initialCtx.fresh.setSbtCallback(analysisCallback)
+    val ctx = (new ContextBase).initialCtx.fresh.setIncCallback(new IncrementalCallbackImpl(analysisCallback))
     driver.getCompiler(Array("-classpath", classpath, "-usejavacp", "-d", outputDir.getAbsolutePath), ctx)
   }
 
@@ -192,4 +192,3 @@ class ScalaCompilerForUnitTesting {
   }
 
 }
-

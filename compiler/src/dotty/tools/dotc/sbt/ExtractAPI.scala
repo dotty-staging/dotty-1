@@ -18,6 +18,7 @@ import transform.ValueClasses
 import transform.SymUtils._
 import dotty.tools.io.File
 import java.io.PrintWriter
+import interfaces.incremental.SourceFileWrapper
 
 import xsbti.api.DefinitionType
 
@@ -43,7 +44,7 @@ class ExtractAPI extends Phase {
 
   override def isRunnable(implicit ctx: Context): Boolean = {
     def forceRun = ctx.settings.YdumpSbtInc.value || ctx.settings.YforceSbtPhases.value
-    super.isRunnable && (ctx.sbtCallback != null || forceRun)
+    super.isRunnable && (ctx.incCallback != null || forceRun)
   }
 
   // Check no needed. Does not transform trees
@@ -58,9 +59,10 @@ class ExtractAPI extends Phase {
 
   override def run(implicit ctx: Context): Unit = {
     val unit = ctx.compilationUnit
+    val sourceHandle = new SourceFileWrapper(unit.source)
     val sourceFile = unit.source.file
-    if (ctx.sbtCallback != null)
-      ctx.sbtCallback.startSource(sourceFile.file)
+    if (ctx.incCallback != null)
+      ctx.incCallback.startSource(sourceHandle)
 
     val apiTraverser = new ExtractAPICollector
     val classes = apiTraverser.apiSource(unit.tpdTree)
@@ -75,9 +77,9 @@ class ExtractAPI extends Phase {
       } finally pw.close()
     }
 
-    if (ctx.sbtCallback != null) {
-      classes.foreach(ctx.sbtCallback.api(sourceFile.file, _))
-      mainClasses.foreach(ctx.sbtCallback.mainClass(sourceFile.file, _))
+    if (ctx.incCallback != null) {
+      classes.foreach(ctx.incCallback.api(sourceHandle, _))
+      mainClasses.foreach(ctx.incCallback.mainClass(sourceHandle, _))
     }
   }
 }
