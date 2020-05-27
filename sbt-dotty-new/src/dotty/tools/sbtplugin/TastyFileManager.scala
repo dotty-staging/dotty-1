@@ -5,6 +5,7 @@ import java.nio.file.Files
 
 import sbt.io.IO
 import xsbti.compile.ClassFileManager
+import xsbti.{VirtualFile, PathBasedFile}
 
 import scala.collection.mutable
 
@@ -30,8 +31,14 @@ final class TastyFileManager extends ClassFileManager {
   private[this] val generatedTastyFiles = new mutable.HashSet[File]
   private[this] val movedTastyFiles = new mutable.HashMap[File, File]
 
-  override def delete(classes: Array[File]): Unit = {
-    val tasties = tastyFiles(classes)
+  private def toFile(vf: VirtualFile): File =
+    vf match {
+      case x: PathBasedFile => x.toPath.toFile
+      case x                => sys.error(s"${x.id} is not path-based")
+    }
+
+  override def delete(classes: Array[VirtualFile]): Unit = {
+    val tasties = tastyFiles(classes.map(toFile))
     val toBeBackedUp = tasties
       .filter(t => t.exists && !movedTastyFiles.contains(t) && !generatedTastyFiles(t))
     for (c <- toBeBackedUp)
@@ -39,8 +46,8 @@ final class TastyFileManager extends ClassFileManager {
     IO.deleteFilesEmptyDirs(tasties)
   }
 
-  override def generated(classes: Array[File]): Unit =
-    generatedTastyFiles ++= tastyFiles(classes)
+  override def generated(classes: Array[VirtualFile]): Unit =
+    generatedTastyFiles ++= tastyFiles(classes.map(toFile))
 
   override def complete(success: Boolean): Unit = {
     if (!success) {

@@ -190,6 +190,7 @@ class Driver {
    *                    if compilation succeeded.
    */
   def process(args: Array[String], rootCtx: Context): Reporter = {
+    // TODO should duplicate this to allow for virtual files of some kind
     val (fileNames, ctx) = setup(args, rootCtx)
     doCompile(newCompiler(ctx), fileNames)(ctx)
   }

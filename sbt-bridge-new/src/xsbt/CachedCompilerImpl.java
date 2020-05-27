@@ -7,6 +7,8 @@ import xsbti.AnalysisCallback;
 import xsbti.Logger;
 import xsbti.Reporter;
 import xsbti.Severity;
+import xsbti.VirtualFile;
+import xsbti.PathBasedFile;
 import xsbti.compile.*;
 
 import java.io.File;
@@ -31,15 +33,26 @@ public class CachedCompilerImpl implements CachedCompiler {
     if (!(output instanceof SingleOutput))
       throw new IllegalArgumentException("output should be a SingleOutput, was a " + output.getClass().getName());
 
-    this.outputArgs = new String[] { "-d", ((SingleOutput) output).getOutputDirectory().getAbsolutePath().toString() };
+    this.outputArgs =
+      new String[] { "-d", ((SingleOutput) output).getOutputDirectory().toAbsolutePath().toString() };
+  }
+
+  private String absoluteFromVF(VirtualFile source) {
+    if (source instanceof PathBasedFile) {
+      return ((PathBasedFile) source).toPath().toAbsolutePath().toString();
+    }
+    return source.id();
   }
 
   public String[] commandArguments(File[] sources) {
     String[] sortedSourcesAbsolute = new String[sources.length];
     for (int i = 0; i < sources.length; i++)
       sortedSourcesAbsolute[i] = sources[i].getAbsolutePath();
-    java.util.Arrays.sort(sortedSourcesAbsolute);
+    return commandArgumentsCommon(sortedSourcesAbsolute);
+  }
 
+  private String[] commandArgumentsCommon(String[] sortedSourcesAbsolute) {
+    java.util.Arrays.sort(sortedSourcesAbsolute);
     // Concatenate outputArgs, args and sortedSourcesAbsolute
     String[] result = new String[outputArgs.length + args.length + sortedSourcesAbsolute.length];
     int j = 0;
@@ -53,7 +66,14 @@ public class CachedCompilerImpl implements CachedCompiler {
     return result;
   }
 
-  synchronized public void run(File[] sources, DependencyChanges changes, AnalysisCallback callback, Logger log,
+  private String[] commandArgumentsVF(VirtualFile[] sources) {
+    String[] sortedSourcesAbsolute = new String[sources.length];
+    for (int i = 0; i < sources.length; i++)
+      sortedSourcesAbsolute[i] = absoluteFromVF(sources[i]);
+    return commandArgumentsCommon(sortedSourcesAbsolute);
+  }
+
+  synchronized public void run(VirtualFile[] sources, DependencyChanges changes, AnalysisCallback callback, Logger log,
       Reporter delegate, CompileProgress progress) {
     log.debug(() -> {
       String msg = "Calling Dotty compiler with arguments  (CompilerInterface):";
@@ -65,7 +85,7 @@ public class CachedCompilerImpl implements CachedCompiler {
     Context ctx = new ContextBase().initialCtx().fresh().setSbtCallback(callback)
         .setReporter(new DelegatingReporter(delegate));
 
-    dotty.tools.dotc.reporting.Reporter reporter = Main.process(commandArguments(sources), ctx);
+    dotty.tools.dotc.reporting.Reporter reporter = Main.process(commandArgumentsVF(sources), ctx);
     if (reporter.hasErrors()) {
       throw new InterfaceCompileFailed(args, new Problem[0]);
     }

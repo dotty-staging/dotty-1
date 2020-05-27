@@ -154,7 +154,7 @@ object DottyPlugin extends AutoPlugin {
   override val globalSettings: Seq[Def.Setting[_]] = Seq(
     onLoad in Global := onLoad.in(Global).value.andThen { state =>
 
-      val requiredVersion = ">=1.3.6"
+      val requiredVersion = ">=1.4.0-SNAPSHOT"
 
       val sbtV = sbtVersion.value
       if (!VersionNumber(sbtV).matchesSemVer(SemanticSelector(requiredVersion)))
@@ -188,14 +188,14 @@ object DottyPlugin extends AutoPlugin {
       scalaCompilerBridgeBinaryJar := Def.settingDyn {
         if (isDotty.value) Def.task {
           val updateReport = fetchArtifactsOf(
-            scalaOrganization.value % "dotty-sbt-bridge" % scalaVersion.value,
+            scalaOrganization.value % "dotty-sbt-bridge" % "0.25.0-bin-SNAPSHOT-new",
             dependencyResolution.value,
             scalaModuleInfo.value,
             updateConfiguration.value,
             (unresolvedWarningConfiguration in update).value,
             streams.value.log,
           )
-          Option(getJar(updateReport, scalaOrganization.value, "dotty-sbt-bridge", scalaVersion.value))
+          Option(getJar(updateReport, scalaOrganization.value, "dotty-sbt-bridge", "0.25.0-bin-SNAPSHOT-new"))
         }
         else Def.task {
           None: Option[File]

@@ -102,6 +102,8 @@ object Build {
   }
   val dottyNonBootstrappedVersion = dottyVersion + "-nonbootstrapped"
 
+  val dottySbtBridgeName = "dotty-sbt-bridge"
+
   val sbtDottyName = "sbt-dotty"
   val sbtDottyVersion = {
     if (isRelease) baseSbtDottyVersion else baseSbtDottyVersion + "-SNAPSHOT"
@@ -828,6 +830,29 @@ object Build {
     settings(commonJavaSettings).
     settings(
       description := "sbt compiler bridge for Dotty",
+      name := dottySbtBridgeName,
+
+      sources in Test := Seq(),
+      scalaSource in Compile := baseDirectory.value,
+      javaSource  in Compile := baseDirectory.value,
+
+      // Referring to the other project using a string avoids an infinite loop
+      // when sbt reads the settings.
+      test in Test := (test in (LocalProject("dotty-sbt-bridge-tests"), Test)).value,
+
+      libraryDependencies += Dependencies.`compiler-interface` % Provided
+    )
+
+  // uses compiler-interface 1.4.x +
+  lazy val `dotty-sbt-bridge-new` = project.in(file("sbt-bridge-new/src")).
+    // We cannot depend on any bootstrapped project to compile the bridge, since the
+    // bridge is needed to compile these projects.
+    dependsOn(dottyDoc(NonBootstrapped) % Provided).
+    settings(commonJavaSettings).
+    settings(
+      description := "sbt compiler bridge for Dotty",
+      name := dottySbtBridgeName,
+      version ~= (_ + "-new"),
 
       sources in Test := Seq(),
       scalaSource in Compile := baseDirectory.value,
@@ -1106,7 +1131,7 @@ object Build {
 
   // sbt plugin to use Dotty in your own build, see
   // https://github.com/lampepfl/dotty-example-project for usage.
-  lazy val `sbt-dotty` = project.in(file("sbt-dotty")).
+  lazy val `sbt-dotty` = project.in(file("sbt-dotty")). // TODO: when rebootstrap on sbt 1.4.0 merge with `sbt-dotty-new`
     enablePlugins(SbtPlugin).
     settings(commonSettings).
     settings(
@@ -1145,6 +1170,21 @@ object Build {
         publishLocal in `dotty-doc-bootstrapped`,
         publishLocal in `dotty-bootstrapped` // Needed because sbt currently hardcodes the dotty artifact
       ).evaluated
+    )
+
+  lazy val `sbt-dotty-new` = project.in(file("sbt-dotty-new")). // TODO: when rebootstrap on sbt 1.4.0 delete this proj
+    enablePlugins(SbtPlugin).
+    settings(commonSettings).
+    settings(
+      name := sbtDottyName,
+      version := sbtDottyVersion + "-new",
+      // Keep in sync with inject-sbt-dotty.sbt
+      libraryDependencies ++= Seq(
+        Dependencies.`jackson-databind`,
+        Dependencies.`compiler-interface-snapshot`
+      ),
+      unmanagedSourceDirectories in Compile +=
+        baseDirectory.value / "../language-server/src/dotty/tools/languageserver/config",
     )
 
   lazy val `vscode-dotty` = project.in(file("vscode-dotty")).

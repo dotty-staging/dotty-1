@@ -7,6 +7,7 @@ import xsbti.AnalysisCallback;
 import xsbti.Logger;
 import xsbti.Reporter;
 import xsbti.Severity;
+import xsbti.VirtualFile;
 import xsbti.compile.*;
 
 import java.io.File;
@@ -42,8 +43,9 @@ public final class CompilerInterface {
     }
   }
 
-  public void run(File[] sources, DependencyChanges changes, AnalysisCallback callback, Logger log,
-      Reporter delegate, CompileProgress progress, CachedCompiler cached) {
+  public void run(VirtualFile[] sources, DependencyChanges changes, AnalysisCallback callback, Logger log, Reporter delegate,
+      CompileProgress progress, CachedCompiler cached) {
     cached.run(sources, changes, callback, log, delegate, progress);
   }
+
 }

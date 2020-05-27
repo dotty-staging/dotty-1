@@ -9,6 +9,7 @@ val `dotty-library` = Build.`dotty-library`
 val `dotty-library-bootstrapped` = Build.`dotty-library-bootstrapped`
 val `dotty-library-bootstrappedJS` = Build.`dotty-library-bootstrappedJS`
 val `dotty-sbt-bridge` = Build.`dotty-sbt-bridge`
+val `dotty-sbt-bridge-new` = Build.`dotty-sbt-bridge-new`
 val `dotty-sbt-bridge-tests` = Build.`dotty-sbt-bridge-tests`
 val `dotty-staging` = Build.`dotty-staging`
 val `dotty-tasty-inspector` = Build.`dotty-tasty-inspector`
@@ -32,6 +33,7 @@ val sjsSandbox = Build.sjsSandbox
 val sjsJUnitTests = Build.sjsJUnitTests
 
 val `sbt-dotty` = Build.`sbt-dotty`
+val `sbt-dotty-new` = Build.`sbt-dotty-new`
 val `vscode-dotty` = Build.`vscode-dotty`
 
 inThisBuild(Build.thisBuildSettings)
