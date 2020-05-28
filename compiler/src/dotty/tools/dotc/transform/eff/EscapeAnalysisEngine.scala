@@ -388,6 +388,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 effect.println(i"#sig ${sig}")
                 effect.println(i"#vparams [${vparams.length}] ${vparams}%, %")
                 effect.println(i"#env [${env.length}] $env%, %")
+                effect.println(i"#closDef.rhs {${closDef.rhs.productPrefix}} {{{\n${closDef.rhs}\n}}}")
                 effect.println("}}}")
 
                 val (newStore1: Store, abstractArgs: List[AV], didTaint) =
@@ -461,7 +462,11 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   useAV()
 
                 def useAV() = {
-                  val preciseMethSym = selT.symbol.denot.matchingMember(newT.tpe)
+                  val preciseMethSym = objT match {
+                    case Super(_, _) => selT.symbol
+                    case _ => selT.symbol.denot.matchingMember(newT.tpe)
+                  }
+
                   doAccumulate(preciseMethSym)
                 }
 
@@ -486,7 +491,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
                 def doAccumulate(methSym: Symbol): MutRes = {
                   val methDef = methSym.defTree.asInstanceOf[DefDef]
-
+                  // Console.err.println(s"Analyzing ${methSym.owner}/$methSym")
                   val (newStore1: Store, abstractArgs: List[AV], _) =
                     analyseArgsIntoNewStore(taint, args, methDef.vparamss.head, sig)
 
@@ -524,7 +529,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
                   res
                 } else {
-                  effect.println(i"#!sym-method-call")
+                  effect.println(i"#sym-method-call")
                   // TODO retrieve signatures for arbitrary methods
                   val initial =
                     MutRes(heap, MRValue.Proper(AV(ap, LabelSet.empty)), Map.empty)
@@ -544,7 +549,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             }
           }
 
-          effect.println(i"#!method-call")
+          effect.println(i"#method-call")
           effect.println(i"#sel.symbol ${selT.symbol}")
           effect.println(i"#selT.symbol.owner ${selT.symbol.owner}")
 
@@ -748,6 +753,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           }
 
           if res != null then res else {
+            // Console.err.println(s"Invoking block return ${expr}")
             val res1 = loopTerminal(expr, _heap = curHeap, _store = curStore)
             res1.copy(returns = mergeReturns(returns, res1.returns))
           }
@@ -759,6 +765,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case tree =>
           effect.println(i"#:acc:defaulting-to-ana")
+          // Console.err.println(s"Defaulting ${tree}")
           MutRes(heap, mrvalue(_analyze(tree)), Map.empty)
       }
     }
@@ -859,6 +866,11 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case This(_) => storeLookup(thisStoreKey)
 
+        case tree: Super =>
+          // note: this is only to give Super nodes a meaningful AV
+          // [[accumulateMethodCall]] special-cases method resolution on Super nodes
+          storeLookup(thisStoreKey)
+
         // hardcoded shortcut for Unit literal
         case tree @ Ident(_) if tree.symbol == BoxedUnit_UNIT =>
           AV(AP.Atom, LabelSet.empty)
@@ -895,6 +907,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               case EmptyTree => sys.error(i"missing def tree for {${tree.symbol}} shouldn't happen, missing -Yretain-trees")
               case dt: ValDef =>
                 effect.println(i"going into def tree of $tree")
+                // Console.err.println(s"ValidDef for ${tree} = ${dt.rhs}")
                 accumulate(
                   dt.rhs,
                   store = store,
@@ -1162,7 +1175,9 @@ object EscapeAnalysisEngine {
     def apply(tree: tpd.Tree) = AP.Tree(tree)
   }
 
-  case class Taint(ap: AP, callsite: Tree)
+  case class Taint(ap: AP, callsite: Tree) {
+    def display = s"[${ap.##}#${callsite.##}]"
+  }
 
   case class ParamSig(tainted: Boolean, sig: Sig)
   enum Sig {
@@ -1195,8 +1210,7 @@ object EscapeAnalysisEngine {
     def remove(l: Label) = copy(labels = labels - l)
 
     def display =
-      labels.display
-      // s"${labels.display} / ${taints.size} / sig#${sig.##}"
+      s"${labels.display} / T#${taints.size} / S#${sig.##}"
   }
 
   class AV(val self: Map[AP, Spec]) extends AnyVal {
