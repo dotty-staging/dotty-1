@@ -372,6 +372,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
             effect.println(i"#objAV {{{\n${objAV.display}\n}}}")
             effect.println("}}}")
 
+
             val newStack = Stack(
               s"${selT.symbol.show}:${selT.sourcePos.line}"
                 :: stack.elements
@@ -467,8 +468,17 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 //   } else methSym1
                 // val methDef = methSym0.defTree.asInstanceOf[DefDef]
 
-                var preciseMethSym = selT.symbol.denot.matchingMember(newT.tpe)
-                var methSyms = tree.attachment(ResolvedMethodCallKey)
+                val preciseMethSym = selT.symbol.denot.matchingMember(newT.tpe)
+                val attachedMethSyms = tree.attachment(ResolvedMethodCallKey)
+
+                val methSyms = {
+                  objT match {
+                    case Super(_, _) => attachedMethSyms // The callgraph analysis picks the exact target when doing a super call.
+                    case _ => Set(preciseMethSym) // attachedMethSyms // Set(preciseMethSym) // TODO: When do we use the attached method symbols?
+                  }
+                }
+
+                // TODO: attachedMethSyms crashes on the strawman set, due to a call to Char.box(), which we attempt to analyze but fail. (in StringView)
 
                 // TODO: benchmark against precise target?
                 //Console.err.println(s"Analyzing ${selT.symbol.owner}/${selT.symbol} with ${methSyms.size} possible targets instead of precise target of ${clsT.symbol}/${selT.symbol}")
@@ -481,10 +491,11 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 //
                 //  1) It's a value that can escape
                 //  2) It's a value which contains a value which can escape.
-                // It's worth noting that this analysis is a little too cautious on the existing virtual method test.                
+                // It's worth noting that this analysis is a little too cautious on the existing virtual method test.
+                 
                 var analyzed = methSyms.map((methSym) => {
                   val methDef = methSym.defTree.asInstanceOf[DefDef]
-
+                  // Console.err.println(s"Analyzing ${methSym.owner}/$methSym")
                   val (newStore1: Store, abstractArgs: List[AV], _) =
                     analyseArgsIntoNewStore(taint, args, methDef.vparamss.head, sig)
 
@@ -755,6 +766,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
           }
 
           if res != null then res else {
+            // Console.err.println(s"Invoking block return ${expr}")
             val res1 = loopTerminal(expr, _heap = curHeap, _store = curStore)
             res1.copy(returns = mergeReturns(returns, res1.returns))
           }
@@ -766,6 +778,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case tree =>
           effect.println(i"#:acc:defaulting-to-ana")
+          // Console.err.println(s"Defaulting ${tree}")
           MutRes(heap, mrvalue(_analyze(tree)), Map.empty)
       }
     }
@@ -912,6 +925,7 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
               case EmptyTree => sys.error(i"missing def tree for {${tree.symbol}} shouldn't happen, missing -Yretain-trees")
               case dt: ValDef =>
                 effect.println(i"going into def tree of $tree")
+                // Console.err.println(s"ValidDef for ${tree} = ${dt.rhs}")
                 accumulate(
                   dt.rhs,
                   store = store,
@@ -1014,6 +1028,16 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
 
         case tree @ Select(_, _) if tree.symbol == defn.Any_isInstanceOf =>
           AV(AP.Atom, LabelSet.empty)
+
+        case EmptyTree => // Some libraries in the Strawman set may return the empty tree....
+                          //
+                          // eg (1 :: 2 :: 3).map(k => k) runs (eventually):
+                          //
+                          //  if(list.hasNext()) { list.next() }
+                          //  with object Nil { def next() = ??? }
+                          // Fake a return value in this case.
+                          AV(AP.Atom, LabelSet.empty) 
+          
       }
     }
   }
