@@ -457,22 +457,34 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                 )
 
               case AP.Tree(newT @ New(clsT)) =>
-                var preciseMethSym = selT.symbol.denot.matchingMember(newT.tpe)
-                var methSyms = tree.attachment(ResolvedMethodCallKey)
+                def main(): MutRes =
+                  useAV()
 
-                // TODO: benchmark against precise target?
-                //Console.err.println(s"Analyzing ${selT.symbol.owner}/${selT.symbol} with ${methSyms.size} possible targets instead of precise target of ${clsT.symbol}/${selT.symbol}")
-                //Console.err.println(s"Analyzing ${selT.symbol.owner}/${selT.symbol} with ${methSyms.size} possible targets instead of precise target of ${clsT.symbol}/${selT.symbol}")
+                def useAV() = {
+                  val preciseMethSym = selT.symbol.denot.matchingMember(newT.tpe)
+                  doAccumulate(preciseMethSym)
+                }
 
-                // Do Set(preciseMethSym).map to get the original behaviour.
-                // We probably want to do something here if LHS is a real AP or not.
-                //
-                // We probably want a real AP on the left (and to use the precise type) when
-                //
-                //  1) It's a value that can escape
-                //  2) It's a value which contains a value which can escape.
-                // It's worth noting that this analysis is a little too cautious on the existing virtual method test.                
-                var analyzed = methSyms.map((methSym) => {
+                def useVirtDispAnalysis() = {
+                  val methSyms = tree.attachment(ResolvedMethodCallKey)
+
+                  // TODO: benchmark against precise target?
+                  //Console.err.println(s"Analyzing ${selT.symbol.owner}/${selT.symbol} with ${methSyms.size} possible targets instead of precise target of ${clsT.symbol}/${selT.symbol}")
+                  //Console.err.println(s"Analyzing ${selT.symbol.owner}/${selT.symbol} with ${methSyms.size} possible targets instead of precise target of ${clsT.symbol}/${selT.symbol}")
+
+                  // Do Set(preciseMethSym).map to get the original behaviour.
+                  // We probably want to do something here if LHS is a real AP or not.
+                  //
+                  // We probably want a real AP on the left (and to use the precise type) when
+                  //
+                  //  1) It's a value that can escape
+                  //  2) It's a value which contains a value which can escape.
+                  // It's worth noting that this analysis is a little too cautious on the existing virtual method test.
+                  val analyzed = methSyms.map(doAccumulate)
+                  analyzed.reduce((x, y) => mergeAlt(x, y))
+                }
+
+                def doAccumulate(methSym: Symbol): MutRes = {
                   val methDef = methSym.defTree.asInstanceOf[DefDef]
 
                   val (newStore1: Store, abstractArgs: List[AV], _) =
@@ -490,8 +502,10 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                       MutRes(heap, MRValue.Proper(AV.Empty), Map.empty)
                     }
                   )(using ctx, newStack)
-                })
-                analyzed.reduce((x, y) => mergeAlt(x, y))
+                }
+
+                main()
+
 
               case AP.Sym(sym) =>
                 val info = ctx.atPhase(ctx.postTyperPhase) { sym.denot.info }
