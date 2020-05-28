@@ -17,6 +17,8 @@ object DottyPlugin extends AutoPlugin {
   object autoImport {
     val isDotty = settingKey[Boolean]("Is this project compiled with Dotty?")
 
+    val oldZincAPI = false
+
     // NOTE:
     // - this is a def to support `scalaVersion := dottyLatestNightlyBuild`
     // - if this was a taskKey, then you couldn't do `scalaVersion := dottyLatestNightlyBuild`

@@ -36,9 +36,9 @@ public final class CompilerInterface {
       throw new RuntimeException(e);
     } catch (InvocationTargetException ite) {
       if (ite.getCause() != null) {
-        throw new RuntimeException(ite.getCause().getMessage(), ite.getCause());
+        throw new RuntimeException("Error in reflective call: " + ite.getCause().toString(), ite.getCause());
       } else {
-        throw new RuntimeException(ite.getMessage());
+        throw new RuntimeException("Error in reflective call: " + ite.getMessage(), ite);
       }
     }
   }

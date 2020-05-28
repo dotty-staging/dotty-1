@@ -62,7 +62,7 @@ object MyScalaJSPlugin extends AutoPlugin {
 }
 
 object Build {
-  val referenceVersion = "0.25.0-RC2"
+  val referenceVersion = if (oldZincAPI) "0.25.0-RC2" else "0.26.0-bin-SNAPSHOT-pre-zinc"
 
   val baseVersion = "0.26.0"
   val baseSbtDottyVersion = "0.4.2"
@@ -88,17 +88,18 @@ object Build {
   val dottyOrganization = "ch.epfl.lamp"
   val dottyGithubUrl = "https://github.com/lampepfl/dotty"
 
+  val zincBootstrap = if (oldZincAPI) "-pre-zinc" else ""
 
   val isRelease = sys.env.get("RELEASEBUILD") == Some("yes")
 
   val dottyVersion = {
     def isNightly = sys.env.get("NIGHTLYBUILD") == Some("yes")
-    if (isRelease)
+    (if (isRelease)
       baseVersion
     else if (isNightly)
       baseVersion + "-bin-" + VersionUtil.commitDate + "-" + VersionUtil.gitHash + "-NIGHTLY"
     else
-      baseVersion + "-bin-SNAPSHOT"
+      baseVersion + "-bin-SNAPSHOT") + zincBootstrap
   }
   val dottyNonBootstrappedVersion = dottyVersion + "-nonbootstrapped"
 
@@ -286,7 +287,7 @@ object Build {
     scalaVersion := dottyNonBootstrappedVersion,
 
     scalaCompilerBridgeBinaryJar := {
-      Some((packageBin in (`dotty-sbt-bridge`, Compile)).value)
+      Some((packageBin in (dottySbtBridgeProject, Compile)).value)
     },
 
     // Use the same name as the non-bootstrapped projects for the artifacts
@@ -832,6 +833,8 @@ object Build {
       javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value
     )
 
+  def dottySbtBridgeProject: Project = if (oldZincAPI) `dotty-sbt-bridge` else `dotty-sbt-bridge-new`
+
   lazy val `dotty-sbt-bridge` = project.in(file("sbt-bridge/src")).
     // We cannot depend on any bootstrapped project to compile the bridge, since the
     // bridge is needed to compile these projects.
@@ -1167,7 +1170,7 @@ object Build {
       },
       scriptedBufferLog := true,
       scripted := scripted.dependsOn(
-        publishLocal in `dotty-sbt-bridge`,
+        publishLocal in dottySbtBridgeProject,
         publishLocal in `dotty-interfaces`,
         publishLocal in `dotty-interfaces-incremental`,
         publishLocal in `dotty-compiler-bootstrapped`,
@@ -1257,7 +1260,7 @@ object Build {
     settings(commonBootstrappedSettings).
     settings(
       prepareCommunityBuild := {
-        (publishLocal in `dotty-sbt-bridge`).value
+        (publishLocal in dottySbtBridgeProject).value
         (publishLocal in `dotty-interfaces`).value
         (publishLocal in `dotty-interfaces-incremental`).value
         (publishLocal in `scala-library`).value
@@ -1391,7 +1394,7 @@ object Build {
 
     // FIXME: we do not aggregate `bin` because its tests delete jars, thus breaking other tests
     def asDottyRoot(implicit mode: Mode): Project = project.withCommonSettings.
-      aggregate(`dotty-interfaces`, `dotty-interfaces-incremental`, dottyLibrary, dottyCompiler, tastyCore, dottyDoc, `dotty-sbt-bridge`).
+      aggregate(`dotty-interfaces`, `dotty-interfaces-incremental`, dottyLibrary, dottyCompiler, tastyCore, dottyDoc, dottySbtBridgeProject).
       bootstrappedAggregate(`scala-library`, `scala-compiler`, `scala-reflect`, scalap,
         `dotty-language-server`, `dotty-staging`, `dotty-tasty-inspector`, `dotty-tastydoc`).
       dependsOn(tastyCore).
