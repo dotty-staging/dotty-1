@@ -39,7 +39,7 @@ object ScriptSourceFile {
   }
 }
 
-class SourceFile(val file: AbstractFile, computeContent: => Array[Char], _charset: Charset) extends interfaces.SourceFile {
+class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends interfaces.SourceFile with interfaces.incremental.SourceHandle {
   import SourceFile._
 
   private var myContent: Array[Char] = null
@@ -48,8 +48,6 @@ class SourceFile(val file: AbstractFile, computeContent: => Array[Char], _charse
     if (myContent == null) myContent = computeContent
     myContent
   }
-
-  def charset(): Charset = _charset
 
   private var _maybeInComplete: Boolean = false
 
@@ -64,16 +62,20 @@ class SourceFile(val file: AbstractFile, computeContent: => Array[Char], _charse
       try new String(file.toByteArray, codec.charSet).toCharArray
       catch
         case _: java.nio.file.NoSuchFileException => Array[Char]()
-        case e if e.getCause.isInstanceOf[java.nio.file.NoSuchFileException] => Array[Char](), codec.charSet)
-
-  def this(file: AbstractFile, computeContent: => Array[Char]) = this(file, computeContent, Codec.UTF8.charSet)
+        case e if e.getCause.isInstanceOf[java.nio.file.NoSuchFileException] => Array[Char]())
 
   /** Tab increment; can be overridden */
   def tabInc: Int = 8
 
+  override def id: String = file.id
   override def name: String = file.name
+  override def names: Array[String] = file.names
   override def path: String = file.path
   override def jfile: Optional[JFile] = Optional.ofNullable(file.file)
+  override def jfileOrNull: JFile = file.file
+
+  override def input: java.io.InputStream = file.input
+  override def contentHash: Long = file.contentHash
 
   override def equals(that: Any): Boolean =
     (this `eq` that.asInstanceOf[AnyRef]) || {

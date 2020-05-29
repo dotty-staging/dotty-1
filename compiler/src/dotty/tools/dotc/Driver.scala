@@ -32,10 +32,16 @@ class Driver {
   protected def emptyReporter: Reporter = new StoreReporter(null)
 
   protected def doCompile(compiler: Compiler, fileNames: List[String])(implicit ctx: Context): Reporter =
+    doCompile(compiler, fileNames, _.compile(fileNames))
+
+  protected def doCompileVirtual(compiler: Compiler, virtualFiles: List[interfaces.incremental.SourceHandle])(implicit ctx: Context): Reporter =
+    doCompile(compiler, virtualFiles.map(_.id), _.compileVirtual(virtualFiles))
+
+  private def doCompile(compiler: Compiler, fileNames: List[String], compileOp: Run => Unit)(implicit ctx: Context): Reporter =
     if (fileNames.nonEmpty)
       try
         val run = compiler.newRun
-        run.compile(fileNames)
+        compileOp(run)
 
         def finish(run: Run): Unit =
           run.printSummary()
@@ -79,6 +85,25 @@ class Driver {
         ctx.warning("-language:Scala2Compat will go away; use -source 3.0-migration instead")
       val fileNames = CompilerCommand.checkUsage(summary, sourcesRequired)
       fromTastySetup(fileNames, ctx)
+    }
+  }
+
+  def setupVirtual(args: Array[String], rootCtx: Context): Context = {
+    val ictx = rootCtx.fresh
+    val summary = CompilerCommand.distill(args)(ictx)
+    ictx.setSettings(summary.sstate)
+    MacroClassLoader.init(ictx)
+    Positioned.updateDebugPos(ictx)
+
+    inContext(ictx) {
+      if !ctx.settings.YdropComments.value || ctx.mode.is(Mode.ReadComments) then
+        ictx.setProperty(ContextDoc, new ContextDocstrings)
+      if Feature.enabledBySetting(nme.Scala2Compat) && false then // TODO: enable
+        ctx.warning("-language:Scala2Compat will go away; use -source 3.0-migration instead")
+      val fileNames = CompilerCommand.checkUsage(summary, false)
+      assert(fileNames.isEmpty)
+      assert(!ctx.settings.fromTasty.value(ctx))
+      ctx
     }
   }
 
@@ -190,9 +215,13 @@ class Driver {
    *                    if compilation succeeded.
    */
   def process(args: Array[String], rootCtx: Context): Reporter = {
-    // TODO should duplicate this to allow for virtual files of some kind
     val (fileNames, ctx) = setup(args, rootCtx)
     doCompile(newCompiler(ctx), fileNames)(ctx)
+  }
+
+  def process(args: Array[String], srcs: Array[interfaces.incremental.SourceHandle], rootCtx: Context): Reporter = {
+    val ctx = setupVirtual(args, rootCtx)
+    doCompileVirtual(newCompiler(ctx), srcs.toList)(ctx)
   }
 
   def main(args: Array[String]): Unit = {

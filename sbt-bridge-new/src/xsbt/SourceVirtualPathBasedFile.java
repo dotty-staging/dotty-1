@@ -13,6 +13,6 @@ public class SourceVirtualPathBasedFile extends SourceVirtualFile implements Pat
   }
 
   public Path toPath() {
-    return delegate().jfile().toPath();
+    return delegate().jfileOrNull().toPath();
   }
 }

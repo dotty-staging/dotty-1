@@ -12,6 +12,7 @@ import java.util.Optional;
  * objects of this type.
  */
 public interface AbstractFile {
+
   /**
    * @return The name of this file, note that two files may have the same name.
    */

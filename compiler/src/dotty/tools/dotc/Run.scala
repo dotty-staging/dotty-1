@@ -119,9 +119,14 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
   /** Actions that need to be performed at the end of the current compilation run */
   private var finalizeActions = mutable.ListBuffer[() => Unit]()
 
-  def compile(fileNames: List[String]): Unit = try {
-    val sources = fileNames.map(runContext.getSource(_))
-    compileSources(sources)
+  def compile(fileNames: List[String]): Unit =
+    compile0(() => fileNames.map(runContext.getSource(_)))
+
+  def compileVirtual(virtualFiles: List[interfaces.incremental.SourceHandle]): Unit =
+    compile0(() => virtualFiles.map(runContext.getSource(_)))
+
+  private def compile0(sources: () => List[SourceFile]): Unit = try {
+    compileSources(sources())
   }
   catch {
     case NonFatal(ex) =>

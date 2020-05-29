@@ -18,7 +18,6 @@ import transform.ValueClasses
 import transform.SymUtils._
 import dotty.tools.io.File
 import java.io.PrintWriter
-import interfaces.incremental.SourceFileWrapper
 
 import xsbti.api.DefinitionType
 
@@ -59,7 +58,7 @@ class ExtractAPI extends Phase {
 
   override def run(implicit ctx: Context): Unit = {
     val unit = ctx.compilationUnit
-    val sourceHandle = new SourceFileWrapper(unit.source)
+    val sourceHandle = unit.source
     val sourceFile = unit.source.file
     if (ctx.incCallback != null)
       ctx.incCallback.startSource(sourceHandle)

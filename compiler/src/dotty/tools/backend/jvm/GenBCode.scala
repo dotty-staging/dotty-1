@@ -9,7 +9,6 @@ import scala.collection.mutable
 import scala.collection.JavaConverters._
 import dotty.tools.dotc.transform.SymUtils._
 import dotty.tools.dotc.interfaces
-import interfaces.incremental.SourceFileWrapper
 import dotty.tools.dotc.util.SourceFile
 import java.util.Optional
 
@@ -280,9 +279,9 @@ class GenBCodePipeline(val int: DottyBackendInterface)(implicit ctx: Context) ex
             ctx.compilerCallback.onClassGenerated(sourceFile, convertAbstractFile(clsFile), className)
           if (ctx.incCallback != null) {
             if (isLocal)
-              ctx.incCallback.generatedLocalClass(new SourceFileWrapper(sourceFile), clsFile.jpath)
+              ctx.incCallback.generatedLocalClass(sourceFile, clsFile.jpath)
             else {
-              ctx.incCallback.generatedNonLocalClass(new SourceFileWrapper(sourceFile), clsFile.jpath,
+              ctx.incCallback.generatedNonLocalClass(sourceFile, clsFile.jpath,
                 className, fullClassName)
             }
           }

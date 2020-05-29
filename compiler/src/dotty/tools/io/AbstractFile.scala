@@ -53,6 +53,10 @@ object AbstractFile {
     else new PlainFile(new Path(Paths.get(url.toURI)))
 
   def getResources(url: URL): AbstractFile = ZipArchive fromManifestURL url
+
+  def defaultId(name: String, path: String): String =
+    if "" == path || path == null then name
+    else path + java.io.File.separatorChar + name
 }
 
 /**
@@ -83,8 +87,19 @@ object AbstractFile {
  */
 abstract class AbstractFile extends Iterable[AbstractFile] {
 
+  /** Returns the unique identifier of this file, is meant for efficient equality testing */
+  def id: String = AbstractFile.defaultId(name, path)
+
   /** Returns the name of this abstract file. */
   def name: String
+
+  /** Returns the combination of the parts of the path and the name. */
+  def names: Array[String] =
+    if path == "" || path == null then Array(name)
+    else path.split(java.io.File.separatorChar).filter(_.nonEmpty) :+ name
+
+  /** Returns a distributed hash of the contents, 0 means no hash is available */
+  def contentHash: Long = 0L
 
   /** Returns the path of this abstract file. */
   def path: String

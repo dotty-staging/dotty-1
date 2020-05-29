@@ -16,7 +16,6 @@ import dotty.tools.dotc.core.StdNames._
 import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.transform.SymUtils._
-import dotty.tools.dotc.interfaces.incremental.SourceFileWrapper
 import dotty.tools.io
 import dotty.tools.io.{AbstractFile, PlainFile, ZipArchive}
 import xsbti.UseScope
@@ -108,7 +107,7 @@ class ExtractDependencies extends Phase {
    */
   def recordDependency(dep: ClassDependency)(implicit ctx: Context): Unit = {
     val fromClassName = classNameAsString(dep.from)
-    val sourceHandle = new SourceFileWrapper(ctx.compilationUnit.source)
+    val sourceHandle = ctx.compilationUnit.source
     val sourceFile = ctx.compilationUnit.source.file.file
 
     def binaryDependency(file: File, binaryClassName: String) =

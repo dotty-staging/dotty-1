@@ -21,7 +21,5 @@ public interface SourceHandle {
   public String id();
   public String name();
   public String[] names();
-
-  /** Nullable if virtual */
-  public File jfile();
+  public File jfileOrNull();
 }

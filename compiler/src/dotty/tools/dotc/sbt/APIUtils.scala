@@ -11,7 +11,6 @@ import Phases._
 import Types._
 import Symbols._
 import NameOps._
-import interfaces.incremental.SourceFileWrapper
 
 import xsbti.api
 import xsbti.api.SafeLazy.strict
@@ -41,7 +40,7 @@ object APIUtils {
   def registerDummyClass(classSym: ClassSymbol)(implicit ctx: Context): Unit = {
     if (ctx.incCallback != null) {
       val classLike = emptyClassLike(classSym)
-      ctx.incCallback.api(new SourceFileWrapper(ctx.compilationUnit.source), classLike)
+      ctx.incCallback.api(ctx.compilationUnit.source, classLike)
     }
   }
 

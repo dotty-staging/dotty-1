@@ -1,6 +1,7 @@
 package xsbt;
 
 import xsbti.VirtualFile;
+import xsbti.VirtualFileRef;
 
 import java.io.InputStream;
 
@@ -36,5 +37,24 @@ public class SourceVirtualFile implements VirtualFile {
   public String[] names() {
     return _source.names();
   }
+
+  // public boolean equals(Object obj) {
+  //   if (this == obj) {
+  //     return true;
+  //   } else if (!(obj instanceof VirtualFileRef)) {
+  //     return false;
+  //   } else {
+  //     VirtualFileRef o = (VirtualFileRef) obj;
+  //     return this.id().equals(o.id());
+  //   }
+  // }
+
+  // public int hashCode() {
+  //   return 37 * (37 * (17 + "xsbt.SourceVirtualFile".hashCode()) + id().hashCode());
+  // }
+
+  // public String toString() {
+  //   return id();
+  // }
 
 }
