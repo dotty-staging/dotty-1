@@ -398,19 +398,19 @@ class EscapeAnalysisEngine(_ctx: Context) extends EscapeAnalysisEngineBase()(_ct
                   val envSyms = vparams.take(envSz).map(_.symbol)
                   val envAVs = new Array[AV | Null](envSz)
 
-                  objAV.iterator.foreach { kv =>
-                    val (ap, sp) = kv
+                  objAV.iterator.foreach { case (ap, sp1) =>
                     envSyms.zipWithIndex.foreach { case (sym, idx) =>
-                      if sp.labels.weak.contains(sym.name) then
+                      if sp1.labels.weak.contains(sym.name) then {
+                        // !!! CAREFUL !!!
+                        // We remove the name of the env param from the labels,
+                        // as even though we think of env params as closure "fields"
+                        // they are accessed directly in the closure body.
+                        val sp0 = sp1 remove sym.name
                         envAVs(idx) = envAVs(idx) match {
-                          case av: AV =>
-                            // !!! CAREFUL !!!
-                            // We remove the name of the env param from the labels,
-                            // as even though we think of env params as closure "fields"
-                            // they are accessed directly in the closure body.
-                            av.merge(ap, sp remove sym.name)
-                          case null => AV(kv)
+                          case av: AV => av.merge(ap, sp0)
+                          case null => AV((ap, sp0))
                         }
+                      }
                     }
                   }
 
