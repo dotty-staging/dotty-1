@@ -16,7 +16,7 @@ public final class IncrementalCallbackImpl implements IncrementalCallback {
   private final AnalysisCallback delegate;
 
   private VirtualFile fromHandle(SourceHandle source) {
-    return (source.jfileOrNull() != null) ? new SourceVirtualPathBasedFile(source) : new SourceVirtualFile(source);
+    return ((VirtualSourceHandle) source).virtualFile();
   }
 
   public IncrementalCallbackImpl(AnalysisCallback delegate) {

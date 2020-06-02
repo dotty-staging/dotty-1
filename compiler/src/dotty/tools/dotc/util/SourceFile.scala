@@ -39,7 +39,7 @@ object ScriptSourceFile {
   }
 }
 
-class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends interfaces.SourceFile with interfaces.incremental.SourceHandle {
+class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends interfaces.SourceFile {
   import SourceFile._
 
   private var myContent: Array[Char] = null
@@ -67,15 +67,17 @@ class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends
   /** Tab increment; can be overridden */
   def tabInc: Int = 8
 
-  override def id: String = file.id
+  def handle: interfaces.incremental.SourceHandle = file match
+    case file: DelegatingFile => file.handle
+    case _ => new {
+      override def id: String = path
+      override def pathOrNull: JPath = file.jpath
+      override def input: java.io.InputStream = file.input
+    }
+
   override def name: String = file.name
-  override def names: Array[String] = file.names
   override def path: String = file.path
   override def jfile: Optional[JFile] = Optional.ofNullable(file.file)
-  override def jfileOrNull: JFile = file.file
-
-  override def input: java.io.InputStream = file.input
-  override def contentHash: Long = file.contentHash
 
   override def equals(that: Any): Boolean =
     (this `eq` that.asInstanceOf[AnyRef]) || {

@@ -4,7 +4,7 @@ import xsbti.VirtualFile;
 import xsbti.PathBasedFile;
 
 import java.io.InputStream;
-import java.io.File;
+import java.nio.file.Path;
 
 import dotty.tools.dotc.interfaces.incremental.SourceHandle;
 
@@ -15,12 +15,8 @@ public class VirtualSourceHandle implements SourceHandle {
     this._source = source;
   }
 
-  public VirtualFile delegate() {
+  public VirtualFile virtualFile() {
     return _source;
-  }
-
-  public long contentHash() {
-    return _source.contentHash();
   }
 
   public InputStream input() {
@@ -31,17 +27,9 @@ public class VirtualSourceHandle implements SourceHandle {
     return _source.id();
   }
 
-  public String name() {
-    return _source.name();
-  }
-
-  public String[] names() {
-    return _source.names();
-  }
-
-  public File jfileOrNull() {
+  public Path pathOrNull() {
     if (_source instanceof PathBasedFile) {
-      return ((PathBasedFile) _source).toPath().toFile();
+      return ((PathBasedFile) _source).toPath();
     }
     else {
       return null;

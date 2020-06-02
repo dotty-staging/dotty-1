@@ -40,7 +40,7 @@ object APIUtils {
   def registerDummyClass(classSym: ClassSymbol)(implicit ctx: Context): Unit = {
     if (ctx.incCallback != null) {
       val classLike = emptyClassLike(classSym)
-      ctx.incCallback.api(ctx.compilationUnit.source, classLike)
+      ctx.incCallback.api(ctx.compilationUnit.source.handle, classLike)
     }
   }
 

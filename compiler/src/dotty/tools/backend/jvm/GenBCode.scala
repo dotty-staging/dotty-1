@@ -279,9 +279,9 @@ class GenBCodePipeline(val int: DottyBackendInterface)(implicit ctx: Context) ex
             ctx.compilerCallback.onClassGenerated(sourceFile, convertAbstractFile(clsFile), className)
           if (ctx.incCallback != null) {
             if (isLocal)
-              ctx.incCallback.generatedLocalClass(sourceFile, clsFile.jpath)
+              ctx.incCallback.generatedLocalClass(sourceFile.handle, clsFile.jpath)
             else {
-              ctx.incCallback.generatedNonLocalClass(sourceFile, clsFile.jpath,
+              ctx.incCallback.generatedNonLocalClass(sourceFile.handle, clsFile.jpath,
                 className, fullClassName)
             }
           }

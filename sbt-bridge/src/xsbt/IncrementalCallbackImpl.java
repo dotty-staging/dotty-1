@@ -4,6 +4,7 @@ import xsbti.AnalysisCallback;
 import xsbti.UseScope;
 import xsbti.api.DependencyContext;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.EnumSet;
 
@@ -14,12 +15,16 @@ public final class IncrementalCallbackImpl implements IncrementalCallback {
 
   private final AnalysisCallback delegate;
 
+  private File fromHandle(SourceHandle source) {
+    return source.pathOrNull().toFile();
+  }
+
   public IncrementalCallbackImpl(AnalysisCallback delegate) {
     this.delegate = delegate;
   }
 
   public void startSource(SourceHandle source) {
-    delegate.startSource(source.jfileOrNull());
+    delegate.startSource(fromHandle(source));
   }
 
   public void classDependency(String onClassName, String sourceClassName, DependencyContext context) {
@@ -28,23 +33,23 @@ public final class IncrementalCallbackImpl implements IncrementalCallback {
 
   public void binaryDependency(Path onBinaryEntry, String onBinaryClassName, String fromClassName, SourceHandle fromSourceFile,
       DependencyContext context) {
-    delegate.binaryDependency(onBinaryEntry.toFile(), onBinaryClassName, fromClassName, fromSourceFile.jfileOrNull(), context);
+    delegate.binaryDependency(onBinaryEntry.toFile(), onBinaryClassName, fromClassName, fromHandle(fromSourceFile), context);
   }
 
   public void generatedNonLocalClass(SourceHandle source, Path classFile, String binaryClassName, String srcClassName) {
-    delegate.generatedNonLocalClass(source.jfileOrNull(), classFile.toFile(), binaryClassName, srcClassName);
+    delegate.generatedNonLocalClass(fromHandle(source), classFile.toFile(), binaryClassName, srcClassName);
   }
 
   public void generatedLocalClass(SourceHandle source, Path classFile) {
-    delegate.generatedLocalClass(source.jfileOrNull(), classFile.toFile());
+    delegate.generatedLocalClass(fromHandle(source), classFile.toFile());
   }
 
   public void api(SourceHandle sourceFile, xsbti.api.ClassLike classApi) {
-    delegate.api(sourceFile.jfileOrNull(), classApi);
+    delegate.api(fromHandle(sourceFile), classApi);
   }
 
   public void mainClass(SourceHandle sourceFile, String className) {
-    delegate.mainClass(sourceFile.jfileOrNull(), className);
+    delegate.mainClass(fromHandle(sourceFile), className);
   }
 
   public void usedName(String className, String name, EnumSet<UseScope> useScopes) {

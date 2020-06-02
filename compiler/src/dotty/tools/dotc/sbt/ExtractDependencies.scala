@@ -1,7 +1,7 @@
 package dotty.tools.dotc
 package sbt
 
-import java.io.File
+import java.nio.file.Path
 import java.util.{Arrays, EnumSet}
 
 import dotty.tools.dotc.ast.Trees._
@@ -107,11 +107,11 @@ class ExtractDependencies extends Phase {
    */
   def recordDependency(dep: ClassDependency)(implicit ctx: Context): Unit = {
     val fromClassName = classNameAsString(dep.from)
-    val sourceHandle = ctx.compilationUnit.source
+    val sourceHandle = ctx.compilationUnit.source.handle
     val sourceFile = ctx.compilationUnit.source.file.file
 
-    def binaryDependency(file: File, binaryClassName: String) =
-      ctx.incCallback.binaryDependency(file.toPath, binaryClassName, fromClassName, sourceHandle, dep.context)
+    def binaryDependency(path: Path, binaryClassName: String) =
+      ctx.incCallback.binaryDependency(path, binaryClassName, fromClassName, sourceHandle, dep.context)
 
     def processExternalDependency(depFile: AbstractFile) = {
       def binaryClassName(classSegments: List[String]) =
@@ -119,7 +119,7 @@ class ExtractDependencies extends Phase {
 
       depFile match {
         case ze: ZipArchive#Entry => // The dependency comes from a JAR
-          for (zip <- ze.underlyingSource; zipFile <- Option(zip.file)) {
+          for (zip <- ze.underlyingSource; zipFile <- Option(zip.jpath)) {
             val classSegments = io.File(ze.path).segments
             binaryDependency(zipFile, binaryClassName(classSegments))
           }
@@ -136,8 +136,8 @@ class ExtractDependencies extends Phase {
           // java.io.File, this means that we cannot record dependencies coming
           // from the modulepath. For now this isn't a big deal since we only
           // support having the standard Java library on the modulepath.
-          if (pf.file != null)
-            binaryDependency(pf.file, binaryClassName(classSegments))
+          if (pf.jpath != null)
+            binaryDependency(pf.jpath, binaryClassName(classSegments))
 
         case _ =>
           ctx.warning(s"sbt-deps: Ignoring dependency $depFile of class ${depFile.getClass}}")

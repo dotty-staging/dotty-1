@@ -21,7 +21,7 @@ import Implicits.ContextualImplicits
 import config.Settings._
 import config.Config
 import reporting._
-import io.{AbstractFile, NoAbstractFile, PlainFile, Path, VirtualFile}
+import io.{AbstractFile, NoAbstractFile, PlainFile, Path, DelegatingFile}
 import scala.io.Codec
 import collection.mutable
 import printing._
@@ -246,11 +246,11 @@ object Contexts {
     }
 
     /** Sourcefile with given path name, memoized */
-    def getSource(path: TermName): SourceFile = base.sourceNamed.get(path) match {
+    private def getSource(path: TermName, getFile: => AbstractFile): SourceFile = base.sourceNamed.get(path) match {
       case Some(source) =>
         source
       case None => try {
-        val f = new PlainFile(Path(path.toString))
+        val f = getFile
         val src = getSource(f)
         base.sourceNamed(path) = src
         src
@@ -261,40 +261,15 @@ object Contexts {
       }
     }
 
+    /** Sourcefile with given path name, memoized */
+    def getSource(path: TermName): SourceFile = getSource(path, new PlainFile(Path(path.toString)))
+
     /** Sourcefile with given path, memoized */
     def getSource(path: String): SourceFile = getSource(path.toTermName)
 
     /** Sourcefile with given path, memoized */
     def getSource(virtualFile: interfaces.incremental.SourceHandle): SourceFile =
-      val id = virtualFile.id.toTermName
-      def pathFromNames(virtualFile: interfaces.incremental.SourceHandle): String =
-        val ns = virtualFile.names
-        if ns.length == 0 then ""
-        else ns.init.mkString("", java.io.File.separator, java.io.File.separator)
-      base.sourceNamed.get(id) match {
-        case Some(source) =>
-          source
-        case None =>
-          val backingFile = virtualFile.jfileOrNull
-          val f =
-            if (backingFile == null)
-              new VirtualFile(virtualFile.name, pathFromNames(virtualFile)) {
-                override final def id: String = virtualFile.id
-                override final def names: Array[String] = virtualFile.names
-                override final def input: java.io.InputStream = virtualFile.input
-                override final def contentHash: Long = virtualFile.contentHash
-              }
-            else
-              new PlainFile(Path(backingFile.toString)) {
-                override final def id: String = virtualFile.id
-                override final def names: Array[String] = virtualFile.names
-                override final def input: java.io.InputStream = virtualFile.input
-                override final def contentHash: Long = virtualFile.contentHash
-              }
-          val src = getSource(f)
-          base.sourceNamed(id) = src
-          src
-      }
+      getSource(virtualFile.id.toTermName, new DelegatingFile(virtualFile))
 
     /** Those fields are used to cache phases created in withPhase.
       * phasedCtx is first phase with altered phase ever requested.

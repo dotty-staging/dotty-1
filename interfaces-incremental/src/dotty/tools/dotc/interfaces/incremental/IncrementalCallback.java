@@ -17,6 +17,8 @@ import java.io.File;
 import java.nio.file.Path;
 import java.util.EnumSet;
 
+/** The minimum interface the compiler requires to interact with incremental compilation
+ */
 public interface IncrementalCallback {
 
   void startSource(SourceHandle source);

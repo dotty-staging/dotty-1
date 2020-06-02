@@ -15,10 +15,15 @@ import dotty.tools.dotc.core.Contexts.Context;
 import dotty.tools.dotc.core.Contexts.ContextBase;
 import dotty.tools.dotc.Main;
 import dotty.tools.dotc.interfaces.*;
+import dotty.tools.dotc.interfaces.incremental.SourceHandle;
 
 import java.net.URLClassLoader;
 
 public class CachedCompilerImpl implements CachedCompiler {
+
+  private static final File[] emptyFiles = new File[0];
+  private static final String[] emptySources = new String[0];
+
   private final String[] args;
   private final Output output;
   private final String[] outputArgs;
@@ -35,11 +40,12 @@ public class CachedCompilerImpl implements CachedCompiler {
   }
 
   public String[] commandArguments(File[] sources) {
-    String[] sortedSourcesAbsolute = new String[sources.length];
-    for (int i = 0; i < sources.length; i++)
-      sortedSourcesAbsolute[i] = sources[i].getAbsolutePath();
-    java.util.Arrays.sort(sortedSourcesAbsolute);
-
+    String[] sortedSourcesAbsolute = sources.length == 0 ? CachedCompilerImpl.emptySources : new String[sources.length];
+    if (sources.length != 0) {
+      for (int i = 0; i < sources.length; i++)
+        sortedSourcesAbsolute[i] = sources[i].getAbsolutePath();
+      java.util.Arrays.sort(sortedSourcesAbsolute);
+    }
     // Concatenate outputArgs, args and sortedSourcesAbsolute
     String[] result = new String[outputArgs.length + args.length + sortedSourcesAbsolute.length];
     int j = 0;
@@ -65,7 +71,13 @@ public class CachedCompilerImpl implements CachedCompiler {
     Context ctx = new ContextBase().initialCtx().fresh().setIncCallback(new IncrementalCallbackImpl(callback))
         .setReporter(new DelegatingReporter(delegate));
 
-    dotty.tools.dotc.reporting.Reporter reporter = Main.process(commandArguments(sources), ctx);
+    SourceHandle[] sourceHandles = new SourceHandle[sources.length];
+    for (int i = 0; i < sources.length; i++) {
+      sourceHandles[i] = new FileBasedSourceHandle(sources[i]);
+    }
+
+    dotty.tools.dotc.reporting.Reporter reporter = Main.process(commandArguments(CachedCompilerImpl.emptyFiles),
+        sourceHandles, ctx);
     if (reporter.hasErrors()) {
       throw new InterfaceCompileFailed(args, new Problem[0]);
     }

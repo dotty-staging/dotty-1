@@ -58,7 +58,7 @@ class ExtractAPI extends Phase {
 
   override def run(implicit ctx: Context): Unit = {
     val unit = ctx.compilationUnit
-    val sourceHandle = unit.source
+    val sourceHandle = unit.source.handle
     val sourceFile = unit.source.file
     if (ctx.incCallback != null)
       ctx.incCallback.startSource(sourceHandle)
