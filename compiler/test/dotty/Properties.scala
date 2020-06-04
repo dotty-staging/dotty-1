@@ -45,6 +45,9 @@ object Properties {
   /** dotty-interfaces jar */
   def dottyInterfaces: String = sys.props("dotty.tests.classes.dottyInterfaces")
 
+  /** dotty-interfaces-incremental jar */
+  def dottyInterfacesIncremental: String = sys.props("dotty.tests.classes.dottyInterfacesIncremental")
+
   /** dotty-library jar */
   def dottyLibrary: String = sys.props("dotty.tests.classes.dottyLibrary")
 

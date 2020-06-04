@@ -32,6 +32,7 @@ object TestConfiguration {
     Properties.jlineReader,
     Properties.compilerInterface,
     Properties.dottyInterfaces,
+    Properties.dottyInterfacesIncremental,
     Properties.dottyLibrary,
     Properties.tastyCore,
     Properties.dottyCompiler

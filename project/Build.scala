@@ -379,10 +379,9 @@ object Build {
     settings(commonJavaSettings)
 
   lazy val `dotty-interfaces-incremental` = project.in(file("interfaces-incremental")).
-    dependsOn(`dotty-interfaces`).
     settings(commonJavaSettings).
     settings(
-      libraryDependencies += Dependencies.`compiler-interface`
+      libraryDependencies += Dependencies.`compiler-interface` % Provided
     )
 
   private lazy val dottydocClasspath = Def.task {
@@ -542,6 +541,7 @@ object Build {
         Seq(
           "-Ddotty.tests.dottyCompilerManagedSources=" + managedSrcDir,
           "-Ddotty.tests.classes.dottyInterfaces=" + jars("dotty-interfaces"),
+          "-Ddotty.tests.classes.dottyInterfacesIncremental=" + jars("dotty-interfaces-incremental"),
           "-Ddotty.tests.classes.dottyLibrary=" + jars("dotty-library"),
           "-Ddotty.tests.classes.dottyCompiler=" + jars("dotty-compiler"),
           "-Ddotty.tests.classes.tastyCore=" + jars("tasty-core"),
@@ -611,8 +611,9 @@ object Build {
           val dottyStaging = jars("dotty-staging")
           val dottyTastyInspector = jars("dotty-tasty-inspector")
           val dottyInterfaces = jars("dotty-interfaces")
+          val dottyInterfacesIncremental = jars("dotty-interfaces-incremental")
           val tastyCore = jars("tasty-core")
-          run(insertClasspathInArgs(args1, List(dottyCompiler, dottyInterfaces, asm, dottyStaging, dottyTastyInspector, tastyCore).mkString(File.pathSeparator)))
+          run(insertClasspathInArgs(args1, List(dottyCompiler, dottyInterfaces, dottyInterfacesIncremental, asm, dottyStaging, dottyTastyInspector, tastyCore).mkString(File.pathSeparator)))
         } else run(args)
       },
 
@@ -685,11 +686,12 @@ object Build {
         log.error("-with-compiler should only be used with a bootstrapped compiler")
       }
       val dottyInterfaces = jars("dotty-interfaces")
+      val dottyInterfacesIncremental = jars("dotty-interfaces-incremental")
       val dottyStaging = jars("dotty-staging")
       val dottyTastyInspector = jars("dotty-tasty-inspector")
       val tastyCore = jars("tasty-core")
       val asm = findArtifactPath(externalDeps, "scala-asm")
-      extraClasspath ++= Seq(dottyCompiler, dottyInterfaces, asm, dottyStaging, dottyTastyInspector, tastyCore)
+      extraClasspath ++= Seq(dottyCompiler, dottyInterfaces, dottyInterfacesIncremental, asm, dottyStaging, dottyTastyInspector, tastyCore)
     }
 
     val fullArgs = main :: insertClasspathInArgs(args, extraClasspath.mkString(File.pathSeparator))

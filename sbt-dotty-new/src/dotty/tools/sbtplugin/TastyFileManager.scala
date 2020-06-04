@@ -31,14 +31,14 @@ final class TastyFileManager extends ClassFileManager {
   private[this] val generatedTastyFiles = new mutable.HashSet[File]
   private[this] val movedTastyFiles = new mutable.HashMap[File, File]
 
-  private def toFile(vf: VirtualFile): File =
+  private def toFile(vf: VirtualFile): Option[File] =
     vf match {
-      case x: PathBasedFile => x.toPath.toFile
-      case x                => sys.error(s"${x.id} is not path-based")
+      case x: PathBasedFile => Some(x.toPath.toFile)
+      case x                => None
     }
 
   override def delete(classes: Array[VirtualFile]): Unit = {
-    val tasties = tastyFiles(classes.map(toFile))
+    val tasties = tastyFiles(classes.flatMap(toFile))
     val toBeBackedUp = tasties
       .filter(t => t.exists && !movedTastyFiles.contains(t) && !generatedTastyFiles(t))
     for (c <- toBeBackedUp)
@@ -47,7 +47,7 @@ final class TastyFileManager extends ClassFileManager {
   }
 
   override def generated(classes: Array[VirtualFile]): Unit =
-    generatedTastyFiles ++= tastyFiles(classes.map(toFile))
+    generatedTastyFiles ++= tastyFiles(classes.flatMap(toFile))
 
   override def complete(success: Boolean): Unit = {
     if (!success) {
