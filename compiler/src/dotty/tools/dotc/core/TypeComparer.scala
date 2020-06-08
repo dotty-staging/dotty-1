@@ -148,13 +148,12 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
    */
   private [this] var leftRoot: Type = _
 
-  /** Are we forbidden from recording GADT constraints? */
+  /** Are we forbidden from recording GADT constraints?
+   *
+   *  This flag is set when we're already in [[Mode.GadtConstraintInference]],
+   *  to signify that we temporarily cannot record any GADT constraints.
+   */
   private var frozenGadt = false
-  private inline def inFrozenGadt[T](op: => T): T = {
-    val savedFrozenGadt = frozenGadt
-    frozenGadt = true
-    try op finally frozenGadt = savedFrozenGadt
-  }
 
   protected def isSubType(tp1: Type, tp2: Type, a: ApproxState): Boolean = {
     val savedApprox = approx
@@ -875,33 +874,30 @@ class TypeComparer(initctx: Context) extends ConstraintHandling[AbsentContext] w
                   val tycon2sym = tycon2.symbol
 
                   var touchedGADTs = false
-                  var gadtIsInstantiated = false
-                  def byGadtBounds(sym: Symbol, tp: Type, fromAbove: Boolean): Boolean = {
+                  def gadtBoundsContain(sym: Symbol, tp: Type): Boolean = {
                     touchedGADTs = true
                     val b = gadtBounds(sym)
-                    def boundsDescr = if b == null then "null" else b.show
-                    b != null && inFrozenGadt {
-                      if fromAbove then isSubType(b.hi, tp) else isSubType(tp, b.lo)
-                    } && {
-                      gadtIsInstantiated = b.isInstanceOf[TypeAlias]
-                      true
+                    b != null && inFrozenConstraint {
+                      (b.lo =:= tp) && (b.hi =:= tp)
                     }
                   }
 
                   val res = (
-                    tycon1sym == tycon2sym
-                      && isSubPrefix(tycon1.prefix, tycon2.prefix)
-                      || byGadtBounds(tycon1sym, tycon2, fromAbove = true)
-                      || byGadtBounds(tycon2sym, tycon1, fromAbove = false)
-                  ) && {
+                    tycon1sym == tycon2sym ||
+                    gadtBoundsContain(tycon1sym, tycon2) ||
+                    gadtBoundsContain(tycon2sym, tycon1)
+                  ) &&
+                  isSubPrefix(tycon1.prefix, tycon2.prefix) && {
                     // check both tycons to deal with the case when they are equal b/c of GADT constraint
-                    val tyconIsInjective =
-                      (tycon1sym.isClass || tycon2sym.isClass)
-                        && (if touchedGADTs then gadtIsInstantiated else true)
+                    val tyconIsInjective = tycon1sym.isClass || tycon2sym.isClass
                     def checkSubArgs() = isSubArgs(args1, args2, tp1, tparams)
-                    // we only record GADT constraints if *both* tycons are effectively injective
+                    // we only record GADT constraints if tycon is guaranteed to be injective
                     if (tyconIsInjective) checkSubArgs()
-                    else inFrozenGadt { checkSubArgs() }
+                    else {
+                      val savedFrozenGadt = frozenGadt
+                      frozenGadt = true
+                      try checkSubArgs() finally frozenGadt = savedFrozenGadt
+                    }
                   }
                   if (res && touchedGADTs) GADTused = true
                   res
