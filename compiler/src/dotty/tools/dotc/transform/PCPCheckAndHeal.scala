@@ -70,8 +70,10 @@ class PCPCheckAndHeal(@constructorOnly ictx: Context) extends TreeMapWithStages(
 
       case _: TypeTree | _: RefTree if tree.isType  =>
         val healedType = healType(tree.sourcePos)(tree.tpe)
-        if healedType == tree.tpe then tree
-        else TypeTree(healedType).withSpan(tree.span)
+        val tree1 =
+          if healedType == tree.tpe then tree
+          else TypeTree(healedType).withSpan(tree.span)
+        expandedPath(tree1)
       case _: AppliedTypeTree =>
         super.transform(tree) match
           case tree1: AppliedTypeTree if tree1 ne tree =>
@@ -98,6 +100,11 @@ class PCPCheckAndHeal(@constructorOnly ictx: Context) extends TreeMapWithStages(
       case _ =>
         super.transform(tree)
     }
+
+  /** Makes staged path dependent types explicit */
+  private def expandedPath(tree: Tree)(implicit ctx: Context): Tree = tree.tpe match
+    case tpe @ TypeRef(prefix: TermRef, name) if level >= 1 => Select(Ident(prefix), tpe).withSpan(tree.span)
+    case tpe => tree
 
   /** Transform quoted trees while maintaining phase correctness */
   override protected def transformQuotation(body: Tree, quote: Tree)(implicit ctx: Context): Tree = {

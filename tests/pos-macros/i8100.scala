@@ -14,8 +14,8 @@ def f[T: Type](using QuoteContext) =
         ${ g[m.E](using '[ME]) }
         ${ g[ME](using '[m.E]) }
         ${ g[m.E](using '[m.E]) }
-        // ${ g[ME] } // FIXME: issue seems to be in ReifyQuotes
-        // ${ g[m.E] } // FIXME: issue seems to be in ReifyQuotes
+        ${ g[ME] }
+        ${ g[m.E] }
       }
 
 def g[T](using Type[T]) = ???
