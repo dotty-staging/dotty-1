@@ -125,15 +125,13 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
   def compileVirtual(virtualFiles: List[interfaces.incremental.SourceHandle]): Unit =
     compile0(() => virtualFiles.map(runContext.getSource(_)))
 
-  private def compile0(sources: () => List[SourceFile]): Unit = try {
-    compileSources(sources())
-  }
-  catch {
-    case NonFatal(ex) =>
+  private def compile0(sources: () => List[SourceFile]): Unit =
+    val srcs = sources()
+    try compileSources(srcs)
+    catch case NonFatal(ex) =>
       if units != null then runContext.echo(i"exception occurred while compiling $units%, %")
-      else runContext.echo(s"exception occurred while compiling ${fileNames.mkString(", ")}")
+      else runContext.echo(s"exception occurred while compiling ${srcs.mkString(", ")}")
       throw ex
-  }
 
   /** TODO: There's a fundamental design problem here: We assemble phases using `squash`
    *  when we first build the compiler. But we modify them with -Yskip, -Ystop

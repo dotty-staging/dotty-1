@@ -6,10 +6,10 @@ libraryDependencies += "org.eclipse.jgit" % "org.eclipse.jgit" % "4.11.0.2018030
 // in our build instead of a released version.
 
 unmanagedSourceDirectories in Compile += {
-  val newPluginRequired = ">=1.4.0-SNAPSHOT"
+  val newPluginRequired = ">=1.4.0-A"
   val root = baseDirectory.value
   val useNew = VersionNumber(sbtVersion.value).matchesSemVer(SemanticSelector(newPluginRequired))
-  val dir = if (useNew) "sbt-dotty-new" else "sbt-dotty"
+  val dir = if (useNew) "sbt-dotty-zinc-preview" else "sbt-dotty"
   root / s"../$dir/src"
 }
 

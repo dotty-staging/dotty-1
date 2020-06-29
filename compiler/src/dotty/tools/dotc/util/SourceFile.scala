@@ -60,9 +60,7 @@ class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends
     // this is significant enough to show up in our benchmarks.
     this(file,
       try new String(file.toByteArray, codec.charSet).toCharArray
-      catch
-        case _: java.nio.file.NoSuchFileException => Array[Char]()
-        case e if e.getCause.isInstanceOf[java.nio.file.NoSuchFileException] => Array[Char]())
+      catch case SourceFile.CouldNotFindFile() => Array.emptyCharArray)
 
   /** Tab increment; can be overridden */
   def tabInc: Int = 8
@@ -216,6 +214,12 @@ class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends
   }
 }
 object SourceFile {
+
+  object CouldNotFindFile:
+    def unapply(err: Throwable): Boolean = err match
+      case _: (java.nio.file.NoSuchFileException | java.io.FileNotFoundException) => true
+      case err => err.getCause.isInstanceOf[java.nio.file.NoSuchFileException | java.io.FileNotFoundException]
+
   implicit def eqSource: Eql[SourceFile, SourceFile] = Eql.derived
 
   implicit def fromContext(implicit ctx: Context): SourceFile = ctx.source

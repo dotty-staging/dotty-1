@@ -62,7 +62,7 @@ object MyScalaJSPlugin extends AutoPlugin {
 }
 
 object Build {
-  val referenceVersion = if (oldZincAPI) "0.25.0-RC2" else "0.26.0-bin-SNAPSHOT-pre-zinc"
+  val referenceVersion = if (oldZincAPI) "0.25.0-RC2" else "0.26.0-bin-SNAPSHOT" // TODO: remove condition after rebootstrapping
 
   val baseVersion = "0.26.0"
   val baseSbtDottyVersion = "0.4.2"
@@ -88,18 +88,16 @@ object Build {
   val dottyOrganization = "ch.epfl.lamp"
   val dottyGithubUrl = "https://github.com/lampepfl/dotty"
 
-  val zincBootstrap = if (oldZincAPI) "-pre-zinc" else ""
-
   val isRelease = sys.env.get("RELEASEBUILD") == Some("yes")
 
   val dottyVersion = {
     def isNightly = sys.env.get("NIGHTLYBUILD") == Some("yes")
-    (if (isRelease)
+    if (isRelease)
       baseVersion
     else if (isNightly)
       baseVersion + "-bin-" + VersionUtil.commitDate + "-" + VersionUtil.gitHash + "-NIGHTLY"
     else
-      baseVersion + "-bin-SNAPSHOT") + zincBootstrap
+      baseVersion + "-bin-SNAPSHOT"
   }
   val dottyNonBootstrappedVersion = dottyVersion + "-nonbootstrapped"
 
@@ -835,7 +833,7 @@ object Build {
       javaOptions := (javaOptions in `dotty-compiler-bootstrapped`).value
     )
 
-  def dottySbtBridgeProject: Project = if (oldZincAPI) `dotty-sbt-bridge` else `dotty-sbt-bridge-new`
+  def dottySbtBridgeProject: Project = if (oldZincAPI) `dotty-sbt-bridge` else `dotty-sbt-bridge-zinc-preview`
 
   lazy val `dotty-sbt-bridge` = project.in(file("sbt-bridge/src")).
     // We cannot depend on any bootstrapped project to compile the bridge, since the
@@ -858,7 +856,7 @@ object Build {
     )
 
   // uses compiler-interface 1.4.x +
-  lazy val `dotty-sbt-bridge-new` = project.in(file("sbt-bridge-new/src")).
+  lazy val `dotty-sbt-bridge-zinc-preview` = project.in(file("sbt-bridge-zinc-preview/src")).
     // We cannot depend on any bootstrapped project to compile the bridge, since the
     // bridge is needed to compile these projects.
     dependsOn(dottyDoc(NonBootstrapped) % Provided).
@@ -866,7 +864,7 @@ object Build {
     settings(
       description := "sbt compiler bridge for Dotty",
       name := dottySbtBridgeName,
-      version ~= (_ + "-new"),
+      version ~= (_ + "-zinc-preview"),
 
       sources in Test := Seq(),
       scalaSource in Compile := baseDirectory.value,
@@ -1145,7 +1143,7 @@ object Build {
 
   // sbt plugin to use Dotty in your own build, see
   // https://github.com/lampepfl/dotty-example-project for usage.
-  lazy val `sbt-dotty` = project.in(file("sbt-dotty")). // TODO: when rebootstrap on sbt 1.4.0 merge with `sbt-dotty-new`
+  lazy val `sbt-dotty` = project.in(file("sbt-dotty")). // TODO: when rebootstrap on sbt 1.4.0 merge with `sbt-dotty-zinc-preview`
     enablePlugins(SbtPlugin).
     settings(commonSettings).
     settings(
@@ -1187,12 +1185,12 @@ object Build {
       ).evaluated
     )
 
-  lazy val `sbt-dotty-new` = project.in(file("sbt-dotty-new")). // TODO: when rebootstrap on sbt 1.4.0 delete this proj
+  lazy val `sbt-dotty-zinc-preview` = project.in(file("sbt-dotty-zinc-preview")). // TODO: when rebootstrap on sbt 1.4.0 delete this proj
     enablePlugins(SbtPlugin).
     settings(commonSettings).
     settings(
       name := sbtDottyName,
-      version := sbtDottyVersion + "-new",
+      version := sbtDottyVersion + "-zinc-preview",
       // Keep in sync with inject-sbt-dotty.sbt
       libraryDependencies ++= Seq(
         Dependencies.`jackson-databind`,
@@ -1200,6 +1198,33 @@ object Build {
       ),
       unmanagedSourceDirectories in Compile +=
         baseDirectory.value / "../language-server/src/dotty/tools/languageserver/config",
+      sbtTestDirectory := baseDirectory.value / "sbt-test",
+      scriptedLaunchOpts ++= Seq(
+        "-Dplugin.version=" + version.value,
+        "-Dplugin.scalaVersion=" + dottyVersion,
+        "-Dsbt.boot.directory=" + ((baseDirectory in ThisBuild).value / ".sbt-scripted").getAbsolutePath // Workaround sbt/sbt#3469
+      ),
+      // Pass along ivy home and repositories settings to sbt instances run from the tests
+      scriptedLaunchOpts ++= {
+        val repositoryPath = (io.Path.userHome / ".sbt" / "repositories").absolutePath
+        s"-Dsbt.repository.config=$repositoryPath" ::
+        ivyPaths.value.ivyHome.map("-Dsbt.ivy.home=" + _.getAbsolutePath).toList
+      },
+      scriptedBufferLog := true,
+      scripted := scripted.dependsOn(
+        publishLocal in dottySbtBridgeProject,
+        publishLocal in `dotty-interfaces`,
+        publishLocal in `dotty-interfaces-incremental`,
+        publishLocal in `dotty-compiler-bootstrapped`,
+        publishLocal in `dotty-library-bootstrapped`,
+        publishLocal in `tasty-core-bootstrapped`,
+        publishLocal in `dotty-staging`,
+        publishLocal in `dotty-tasty-inspector`,
+        publishLocal in `scala-library`,
+        publishLocal in `scala-reflect`,
+        publishLocal in `dotty-doc-bootstrapped`,
+        publishLocal in `dotty-bootstrapped` // Needed because sbt currently hardcodes the dotty artifact
+      ).evaluated
     )
 
   lazy val `vscode-dotty` = project.in(file("vscode-dotty")).
