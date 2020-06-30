@@ -8,6 +8,13 @@ import java.io.InputStream;
  * on recieving this same SourceHandle in the IncrementalCallback.
  */
 public interface SourceHandle {
+  static boolean exists(SourceHandle source) {
+    try (InputStream input = source.input()) {
+      return input != null;
+    } catch (Exception e) {
+      return false;
+    }
+  }
   InputStream input();
   String id();
   Path pathOrNull();

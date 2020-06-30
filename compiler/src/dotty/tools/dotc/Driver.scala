@@ -108,36 +108,39 @@ class Driver {
   }
 
   /** Setup extra classpath and figure out class names for tasty file inputs */
-  protected def fromTastySetup(fileNames0: List[String], ctx0: Context): (List[String], Context) =
-    if (ctx0.settings.fromTasty.value(ctx0)) {
-      // Resolve classpath and class names of tasty files
-      val (classPaths, classNames) = fileNames0.flatMap { name =>
-        val path = Paths.get(name)
-        if (name.endsWith(".jar"))
-          new dotty.tools.io.Jar(File(name)).toList.collect {
-            case e if e.getName.endsWith(".tasty") =>
-              (name, e.getName.stripSuffix(".tasty").replace("/", "."))
-          }
-        else if (!name.endsWith(".tasty"))
-          ("", name) :: Nil
-        else if (Files.exists(path))
-          TastyFileUtil.getClassName(path) match {
-            case Some(res) => res:: Nil
-            case _ =>
-              ctx0.error(s"Could not load classname from $name.")
-              ("", name) :: Nil
-          }
-        else {
-          ctx0.error(s"File $name does not exist.")
-          ("", name) :: Nil
+  protected def extractClassesFromTasty(fileNames0: List[String], ctx0: Context): (List[String], Context) =
+    // Resolve classpath and class names of tasty files
+    val (classPaths, classNames) = fileNames0.flatMap { name =>
+      val path = Paths.get(name)
+      if (name.endsWith(".jar"))
+        new dotty.tools.io.Jar(File(name)).toList.collect {
+          case e if e.getName.endsWith(".tasty") =>
+            (name, e.getName.stripSuffix(".tasty").replace("/", "."))
         }
-      }.unzip
-      val ctx1 = ctx0.fresh
-      val classPaths1 = classPaths.distinct.filter(_ != "")
-      val fullClassPath = (classPaths1 :+ ctx1.settings.classpath.value(ctx1)).mkString(java.io.File.pathSeparator)
-      ctx1.setSetting(ctx1.settings.classpath, fullClassPath)
-      (classNames, ctx1)
-    }
+      else if (!name.endsWith(".tasty"))
+        ("", name) :: Nil
+      else if (Files.exists(path))
+        TastyFileUtil.getClassName(path) match {
+          case Some(res) => res:: Nil
+          case _ =>
+            ctx0.error(s"Could not load classname from $name.")
+            ("", name) :: Nil
+        }
+      else {
+        ctx0.error(s"File $name does not exist.")
+        ("", name) :: Nil
+      }
+    }.unzip
+    val ctx1 = ctx0.fresh
+    val classPaths1 = classPaths.distinct.filter(_ != "")
+    val fullClassPath = (classPaths1 :+ ctx1.settings.classpath.value(ctx1)).mkString(java.io.File.pathSeparator)
+    ctx1.setSetting(ctx1.settings.classpath, fullClassPath)
+    (classNames, ctx1)
+  end extractClassesFromTasty
+
+  /** Setup extra classpath and figure out class names for tasty file inputs */
+  protected def fromTastySetup(fileNames0: List[String], ctx0: Context): (List[String], Context) =
+    if (ctx0.settings.fromTasty.value(ctx0)) extractClassesFromTasty(fileNames0, ctx0)
     else (fileNames0, ctx0)
 
   /** Entry point to the compiler that can be conveniently used with Java reflection.
