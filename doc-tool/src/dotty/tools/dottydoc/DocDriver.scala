@@ -20,7 +20,7 @@ class DocDriver extends Driver {
   import java.util.{ Map => JMap }
   import model.JavaConverters._
 
-  private def setupCommon[T](args: Array[String], rootCtx: Context): (Settings.ArgsSummary, Context) =
+  override def initialSetup(args: Array[String], rootCtx: Context): (Settings.ArgsSummary, Context) =
     val ctx     = rootCtx.fresh
     val summary = CompilerCommand.distill(args)(ctx)
     ctx.setSettings(summary.sstate)
@@ -28,26 +28,7 @@ class DocDriver extends Driver {
     ctx.setSetting(ctx.settings.YnoInline, true)
     ctx.setProperty(ContextDoc, new ContextDottydoc)
     (summary, ctx)
-  end setupCommon
-
-  override def setupVirtual(args: Array[String], rootCtx: Context): Context =
-    val (summary, ictx) = setupCommon(args, rootCtx)
-
-    implicit val ctx: Context = ictx
-
-    val fileNames = CompilerCommand.checkUsage(summary, false)
-    assert(fileNames.isEmpty)
-    ctx
-  end setupVirtual
-
-  override def setup(args: Array[String], rootCtx: Context): (List[String], Context) =
-    val (summary, ictx) = setupCommon(args, rootCtx)
-
-    implicit val ctx: Context = ictx
-
-    val fileNames = CompilerCommand.checkUsage(summary, sourcesRequired)(ctx)
-    fromTastySetup(fileNames, ctx)
-  end setup
+  end initialSetup
 
   override def newCompiler(implicit ctx: Context): Compiler = new DocCompiler
 
@@ -86,28 +67,18 @@ class DocDriver extends Driver {
   }
 
   override def process(args: Array[String], rootCtx: Context): Reporter = {
-    val (filesToDocument, ictx) = setup(args, initCtx.fresh)
-
-    implicit val ctx: Context = ictx
-    val reporter = doCompile(newCompiler, filesToDocument)
-
-    processFinal(reporter)
+    val (filesToDocument, ictx) = setup(args, rootCtx)
+    inContext(ictx) {
+      processFinal(doCompile(newCompiler, filesToDocument))
+    }
   }
 
   override def process(args: Array[String], srcs: Array[interfaces.incremental.SourceHandle], rootCtx: Context): Reporter =
-    implicit val ictx: Context = setupVirtual(args, initCtx.fresh)
-    if (ctx.settings.fromTasty.value)
-      val (virtual, real) = srcs.partitionMap { src =>
-        val p = src.pathOrNull
-        if p == null then Left(src)
-        else Right(p.toString)
-      }
-      if virtual.nonEmpty then // TODO: we should be able to adapt fromTastySetup to work with just InputStream and name
-        ctx.error(s"-from-tasty can only be used with real files, the following sources are virtual:\n${virtual.mkString(", ")}")
-        ctx.reporter
-      else
-        val (srcs0, ictx) = fromTastySetup(real.toList, ctx)
-        processFinal(doCompile(newCompiler, srcs0)(ictx))
-    else
-      processFinal(doCompileVirtual(newCompiler, srcs.toList))
+    val (filesToDocument, ictx) = setupVirtual(args, srcs, rootCtx)
+    inContext(ictx) {
+      val reporter = filesToDocument match
+        case Left(classNames)   => doCompile(newCompiler, classNames)
+        case Right(virtualSrcs) => doCompileVirtual(newCompiler, virtualSrcs)
+      processFinal(reporter)
+    }
 }

@@ -64,7 +64,7 @@ object CompilerCommand {
    *  are already applied in context.
    *  @return  The list of files to compile.
    */
-  def checkUsage(summary: ArgsSummary, sourcesRequired: Boolean)(implicit ctx: Context): List[String] = {
+  def checkUsage(summary: ArgsSummary, showMissingSourcesHelp: ArgsSummary => Boolean)(implicit ctx: Context): List[String] = {
     val settings = ctx.settings
 
     /** Creates a help message for a subset of options based on cond */
@@ -149,7 +149,7 @@ object CompilerCommand {
       Nil
     }
     else {
-      if (sourcesRequired && summary.arguments.isEmpty) ctx.echo(usageMessage)
+      if (showMissingSourcesHelp(summary)) ctx.echo(usageMessage)
       summary.arguments
     }
   }

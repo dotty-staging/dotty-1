@@ -3,6 +3,7 @@ package dotty.tools.dotc.decompiler
 import java.nio.file.Files
 
 import dotty.tools.dotc
+import dotc.config.Settings
 import dotty.tools.dotc.core.Contexts._
 
 /** Main class of the `dotc -decompiler` decompiler.
@@ -17,10 +18,10 @@ object Main extends dotc.Driver {
     new TASTYDecompiler
   }
 
-  override def setup(args0: Array[String], rootCtx: Context): (List[String], Context) = {
+  override def initialSetup(args0: Array[String], rootCtx: Context): (Settings.ArgsSummary, Context) = {
     var args = args0.filter(a => a != "-decompile")
     if (!args.contains("-from-tasty")) args = "-from-tasty" +: args
     if (args.contains("-d")) args = "-color:never" +: args
-    super.setup(args, rootCtx)
+    super.initialSetup(args, rootCtx)
   }
 }

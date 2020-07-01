@@ -3,7 +3,7 @@ package dotty.tools.dotc
 import java.nio.file.{Files, Paths}
 
 import dotty.tools.FatalError
-import config.CompilerCommand
+import config.{CompilerCommand, Settings}
 import core.Comments.{ContextDoc, ContextDocstrings}
 import core.Contexts.{Context, ContextBase, inContext, ctx}
 import core.{MacroClassLoader, Mode, TypeError}
@@ -71,7 +71,7 @@ class Driver {
 
   protected def sourcesRequired: Boolean = true
 
-  def setup(args: Array[String], rootCtx: Context): (List[String], Context) = {
+  def initialSetup(args: Array[String], rootCtx: Context): (Settings.ArgsSummary, Context) = {
     val ictx = rootCtx.fresh
     val summary = CompilerCommand.distill(args)(ictx)
     ictx.setSettings(summary.sstate)
@@ -83,27 +83,29 @@ class Driver {
         ictx.setProperty(ContextDoc, new ContextDocstrings)
       if Feature.enabledBySetting(nme.Scala2Compat) && false then // TODO: enable
         ctx.warning("-language:Scala2Compat will go away; use -source 3.0-migration instead")
-      val fileNames = CompilerCommand.checkUsage(summary, sourcesRequired)
+      (summary, ctx)
+    }
+  }
+
+  final def setup(args: Array[String], rootCtx: Context): (List[String], Context) = {
+    val (summary, ictx) = initialSetup(args, rootCtx)
+    inContext(ictx) {
+      val fileNames = CompilerCommand.checkUsage(summary, summary => sourcesRequired && summary.arguments.isEmpty)
       fromTastySetup(fileNames, ctx)
     }
   }
 
-  def setupVirtual(args: Array[String], rootCtx: Context): Context = {
-    val ictx = rootCtx.fresh
-    val summary = CompilerCommand.distill(args)(ictx)
-    ictx.setSettings(summary.sstate)
-    MacroClassLoader.init(ictx)
-    Positioned.updateDebugPos(ictx)
+  type VirtualSources = Either[List[String], List[interfaces.incremental.SourceHandle]]
 
+  final def setupVirtual(args: Array[String], srcs: Array[interfaces.incremental.SourceHandle], rootCtx: Context): (VirtualSources, Context) = {
+    val (summary, ictx) = initialSetup(args, rootCtx)
     inContext(ictx) {
-      if !ctx.settings.YdropComments.value || ctx.mode.is(Mode.ReadComments) then
-        ictx.setProperty(ContextDoc, new ContextDocstrings)
-      if Feature.enabledBySetting(nme.Scala2Compat) && false then // TODO: enable
-        ctx.warning("-language:Scala2Compat will go away; use -source 3.0-migration instead")
-      val fileNames = CompilerCommand.checkUsage(summary, false)
-      assert(fileNames.isEmpty)
-      assert(!ctx.settings.fromTasty.value(ctx))
-      ctx
+      val fileNames = CompilerCommand.checkUsage(summary, _ => sourcesRequired && srcs.isEmpty)
+      if fileNames.nonEmpty then
+        ctx.error("mixing of path-based and virtual sources")
+        (Left(Nil), ctx)
+      else
+        fromTastyVirtualSetup(srcs, ctx)
     }
   }
 
@@ -137,6 +139,27 @@ class Driver {
     ctx1.setSetting(ctx1.settings.classpath, fullClassPath)
     (classNames, ctx1)
   end extractClassesFromTasty
+
+  /** Setup extra classpath and figure out class names for tasty file inputs */
+  protected def fromTastyVirtualSetup(fileNames0: Array[interfaces.incremental.SourceHandle], ctx0: Context): (VirtualSources, Context) =
+    if ctx0.settings.fromTasty.value(ctx0) then
+      inContext(ctx0) {
+        val (virtual, real) = fileNames0.partitionMap { src =>
+          val p = src.pathOrNull
+          if p == null then Left(src)
+          else Right(p.toString)
+        }
+        if virtual.nonEmpty then
+          // TODO: if we adapt extractClassesFromTasty to work with virtual files then we need to be able to
+          // request a new virtual file with a different path so that it can be used as a classpath source.
+          ctx.error(s"The ${ctx.settings.fromTasty.name} compiler flag can only be used with real files, the following sources are virtual:\n${virtual.mkString(", ")}")
+          (Left(Nil), ctx)
+        else
+          val (classes, ctx1) = extractClassesFromTasty(real.toList, ctx)
+          (Left(classes), ctx1)
+      }
+    else
+      (Right(fileNames0.toList), ctx0)
 
   /** Setup extra classpath and figure out class names for tasty file inputs */
   protected def fromTastySetup(fileNames0: List[String], ctx0: Context): (List[String], Context) =
@@ -218,14 +241,35 @@ class Driver {
    *                    if compilation succeeded.
    */
   def process(args: Array[String], rootCtx: Context): Reporter = {
-    val (fileNames, ctx) = setup(args, rootCtx)
-    doCompile(newCompiler(ctx), fileNames)(ctx)
+    val (fileNames, ictx) = setup(args, rootCtx)
+    inContext(ictx) {
+      doCompile(newCompiler, fileNames)
+    }
   }
 
-  def process(args: Array[String], srcs: Array[interfaces.incremental.SourceHandle], rootCtx: Context): Reporter = {
-    val ctx = setupVirtual(args, rootCtx)
-    doCompileVirtual(newCompiler(ctx), srcs.toList)(ctx)
-  }
+  def process(args: Array[String], srcs: Array[interfaces.incremental.SourceHandle], rootCtx: Context): Reporter =
+
+    def doWarnIfIncremental()(using Context) =
+      val addendum =
+        if ctx.settings.fromTasty.value then
+          s" Perhaps you did not mean to use the ${ctx.settings.fromTasty.name} compiler flag."
+        else
+          ""
+      if ctx.incCallback != null then
+        ctx.warning(s"Invoking the compiler in a state where incremental compilation will not receive back the files it injected.$addendum")
+
+    val (fileNames, ictx) = setupVirtual(args, srcs, rootCtx)
+
+    inContext(ictx) {
+      fileNames match
+        case Left(classNames) =>
+          doWarnIfIncremental()
+          doCompile(newCompiler, classNames)
+        case Right(srcs1) =>
+          doCompileVirtual(newCompiler, srcs1)
+    }
+
+  end process
 
   def main(args: Array[String]): Unit = {
     // Preload scala.util.control.NonFatal. Otherwise, when trying to catch a StackOverflowError,
@@ -234,4 +278,5 @@ class Driver {
     val _ = NonFatal
     sys.exit(if (process(args).hasErrors) 1 else 0)
   }
+
 }
