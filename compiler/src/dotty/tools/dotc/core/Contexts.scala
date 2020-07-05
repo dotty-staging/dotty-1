@@ -516,6 +516,21 @@ object Contexts {
       (outersIterator.map(ctx => s"  owner = ${ctx.owner}, scope = ${ctx.scope}, import = ${iinfo(using ctx)}").mkString("\n"))
     }
 
+    def disable() =
+      _outer = null
+      _period = InvalidPeriod
+      _owner = null
+      _scope = null
+      _typerState = null
+      _typeAssigner = null
+      _importInfo = null
+      _gadt = null
+      _searchHistory = null
+      _typeComparer = null
+      _source = null
+      _moreProperties = null
+      _store = Store(null)
+
     def settings: ScalaSettings            = base.settings
     def definitions: Definitions           = base.definitions
     def platform: Platform                 = base.platform
