@@ -41,3 +41,12 @@ class StoreReporter(outer: Reporter) extends Reporter {
 
   override def errorsReported: Boolean = hasErrors || (outer != null && outer.errorsReported)
 }
+
+object StoreReporter:
+  class TestReporter extends StoreReporter(null):
+    infos = new mutable.ListBuffer[Diagnostic]
+    override def hasUnreportedErrors: Boolean = infos.exists(_.isInstanceOf[Error])
+    def reset(): Unit = infos.clear()
+end StoreReporter
+
+

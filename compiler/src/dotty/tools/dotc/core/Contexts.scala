@@ -286,7 +286,7 @@ object Contexts {
       * contexts are created only on request and cached in this array
       */
     private var phasedCtx: Context = this
-    private var phasedCtxs: Array[Context] = _
+    private var phasedCtxs: Array[Context] = null
 
     /** This context at given phase.
      *  This method will always return a phase period equal to phaseId, thus will never return squashed phases
@@ -343,7 +343,7 @@ object Contexts {
     /** Run `op` as if it was run in a fresh explore typer state, but possibly
      *  optimized to re-use the current typer state.
      */
-    final def test[T](op: Context ?=> T): T = typerState.test(op)(using this)
+    final def testOLD[T](op: Context ?=> T): T = typerState.test(op)(this)
 
     /** Is this a context for the members of a class definition? */
     def isClassDefContext: Boolean =
@@ -453,7 +453,11 @@ object Contexts {
     /** Is the explicit nulls option set? */
     def explicitNulls: Boolean = base.settings.YexplicitNulls.value
 
-    protected def init(outer: Context, origin: Context): this.type = {
+    /** Initialize all context fields, except typerState, which has to be set separately
+     *  @param  outer   The outer context
+     *  @param  origin  The context from which fields are copied
+     */
+    private[core] def init(outer: Context, origin: Context): this.type = {
       util.Stats.record("Context.fresh")
       _outer = outer
       _period = origin.period
@@ -461,7 +465,6 @@ object Contexts {
       _owner = origin.owner
       _tree = origin.tree
       _scope = origin.scope
-      _typerState = origin.typerState
       _typeAssigner = origin.typeAssigner
       _gadt = origin.gadt
       _searchHistory = origin.searchHistory
@@ -472,11 +475,18 @@ object Contexts {
       this
     }
 
+    def reuseIn(outer: Context): this.type =
+      implicitsCache = null
+      phasedCtxs = null
+      sourceCtx = null
+      init(outer, outer)
+
     /** A fresh clone of this context embedded in this context. */
     def fresh: FreshContext = freshOver(this)
 
     /** A fresh clone of this context embedded in the specified `outer` context. */
-    def freshOver(outer: Context): FreshContext = new FreshContext(base).init(outer, this)
+    def freshOver(outer: Context): FreshContext =
+      FreshContext(base).init(outer, this).setTyperState(this.typerState)
 
     final def withOwner(owner: Symbol): Context =
       if (owner ne this.owner) fresh.setOwner(owner) else this
@@ -510,6 +520,29 @@ object Contexts {
         case Some(v) => fresh.setProperty(key, v)
         case None => fresh.dropProperty(key)
       }
+
+    final def test[T](op: Context ?=> T)(implicit ctx: Context): T =
+      util.Stats.record("Context.test")
+      import base._
+      val nestedCtx =
+        if testsInUse < testContexts.size then
+          testContexts(testsInUse).reuseIn(this)
+        else
+          val ts = TyperState()
+            .setReporter(StoreReporter.TestReporter())
+            .setCommittable(false)
+          val c = FreshContext(ctx.base).init(this, this).setTyperState(ts)
+          testContexts += c
+          c
+      testsInUse += 1
+      val nestedTS = nestedCtx.typerState
+      nestedTS.init(typerState, typerState.constraint)
+      val result =
+        try op(using nestedCtx)
+        finally
+          nestedTS.reporter.asInstanceOf[StoreReporter.TestReporter].reset()
+          testsInUse -= 1
+      result
 
     override def toString: String = {
       def iinfo(using Context) = if (ctx.importInfo == null) "" else i"${ctx.importInfo.selectors}%, %"
@@ -572,10 +605,7 @@ object Contexts {
       this
     def setScope(scope: Scope): this.type = { this.scope = scope; this }
     def setNewScope: this.type = { this.scope = newScope; this }
-    def setTyperState(typerState: TyperState): this.type =
-      util.Stats.record("Context.setTyperState")
-      this.typerState = typerState
-      this
+    def setTyperState(typerState: TyperState): this.type = { this.typerState = typerState; this }
     def setNewTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(true))
     def setExploreTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(false))
     def setReporter(reporter: Reporter): this.type = setTyperState(typerState.fresh().setReporter(reporter))

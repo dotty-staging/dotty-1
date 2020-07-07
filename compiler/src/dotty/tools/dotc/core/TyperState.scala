@@ -83,7 +83,7 @@ class TyperState() {
   /** Initializes all fields except reporter, isCommittable, which need to be
    *  set separately.
    */
-  private def init(previous: TyperState, constraint: Constraint): this.type =
+  private[core] def init(previous: TyperState, constraint: Constraint): this.type =
     this.myId = TyperState.nextId
     TyperState.nextId += 1
     this.previous = previous
@@ -118,7 +118,29 @@ class TyperState() {
    */
   def test[T](op: Context ?=> T)(using Context): T =
     if (isShared)
-      op(using ctx.fresh.setExploreTyperState())
+      util.Stats.record("TyperState.test")
+      val base = ctx.base
+      import base._
+      val nestedCtx =
+        if testsInUse < testContexts.size then
+          testContexts(testsInUse).init(ctx, ctx)
+        else
+          val ts = TyperState()
+          ts.myReporter = new TestReporter()
+          ts.myIsCommittable = false
+          val c = FreshContext(ctx.base).init(ctx, ctx).setTyperState(ts)
+          testContexts += c
+          c
+      testsInUse += 1
+      val nestedTS = nestedCtx.typerState
+      nestedTS.init(this, this.constraint)
+      val result = op(using nestedCtx)
+      assert(!nestedTS.isShared)
+      assert(!nestedTS.isCommittable)
+      assert(!nestedTS.isCommitted)
+      nestedTS.reporter.asInstanceOf[TestReporter].reset()
+      testsInUse -= 1
+      result
     else {
       val savedConstraint = myConstraint
       val savedReporter = myReporter
@@ -223,8 +245,13 @@ class TyperState() {
 
 /** Temporary, reusable reporter used in TyperState#test */
 private class TestReporter() extends StoreReporter(null) {
+  import Diagnostic._
+
   /** Is this reporter currently used in a test? */
   var inUse: Boolean = false
+
+  override def hasUnreportedErrors: Boolean =
+    infos != null && infos.exists(_.isInstanceOf[Error])
 
   def reset(): Unit = {
     assert(!inUse, s"Cannot reset reporter currently in use: $this")
