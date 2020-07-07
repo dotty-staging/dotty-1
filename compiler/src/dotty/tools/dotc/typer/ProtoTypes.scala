@@ -82,7 +82,7 @@ object ProtoTypes {
           case _ =>
             true
         }
-        if (!res) ctx.typerState.resetConstraintTo(savedConstraint)
+        if !res then ctx.typerState.constraint = savedConstraint
         res
       }
 

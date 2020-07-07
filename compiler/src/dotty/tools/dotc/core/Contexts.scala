@@ -452,7 +452,7 @@ object Contexts {
      *  @param  outer   The outer context
      *  @param  origin  The context from which fields are copied
      */
-    private[core] def init(outer: Context, origin: Context): this.type = {
+    protected def init(outer: Context, origin: Context): this.type = {
       util.Stats.record("Context.fresh")
       _outer = outer
       _period = origin.period

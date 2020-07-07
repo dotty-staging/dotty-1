@@ -46,12 +46,6 @@ class TyperState() {
     myConstraint = c
   }
 
-  /** Reset constraint to `c` and mark current constraint as retracted if it differs from `c` */
-  def resetConstraintTo(c: Constraint): Unit = {
-    if (c `ne` myConstraint) myConstraint.markRetracted()
-    myConstraint = c
-  }
-
   private var previousConstraint: Constraint = _
 
   private var myIsCommittable: Boolean = _
@@ -84,6 +78,15 @@ class TyperState() {
     this.myOwnedVars = SimpleIdentitySet.empty
     this.isCommitted = false
     this
+
+  def disable() =
+    previous = null
+    myConstraint = null
+    previousConstraint = null
+    myOwnedVars = null
+    isCommitted = false
+    myReporter = null
+    myIsCommittable = true
 
   /** A fresh typer state with the same constraint as this one. */
   def fresh(reporter: Reporter = StoreReporter(this.reporter)): TyperState =
@@ -157,14 +160,6 @@ class TyperState() {
     for (poly <- toCollect)
       constraint = constraint.remove(poly)
   }
-
-  def disable() =
-    myReporter = null
-    myConstraint = null
-    previousConstraint = null
-    myIsCommittable = true
-    isCommitted = false
-    myOwnedVars = null
 
   override def toString: String = {
     def ids(state: TyperState): List[String] =
