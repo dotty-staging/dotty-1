@@ -65,14 +65,6 @@ class TyperState() {
   def isGlobalCommittable: Boolean =
     isCommittable && (previous == null || previous.isGlobalCommittable)
 
-  private var isShared: Boolean = _
-
-  /** Mark typer state as shared (typically because it is the typer state of
-   *  the creation context of a source definition that potentially still needs
-   *  to be completed). Members of shared typer states are never overwritten in `test`.
-   */
-  def markShared(): Unit = isShared = true
-
   private var isCommitted: Boolean = _
 
   /** The set of uninstantiated type variables which have this state as their owning state */
@@ -90,8 +82,6 @@ class TyperState() {
     this.myConstraint = constraint
     this.previousConstraint = constraint
     this.myOwnedVars = SimpleIdentitySet.empty
-    this.testReporter = null
-    this.isShared = false
     this.isCommitted = false
     this
 
@@ -109,61 +99,6 @@ class TyperState() {
    */
   def uncommittedAncestor: TyperState =
     if (isCommitted) previous.uncommittedAncestor else this
-
-  private var testReporter: TestReporter = _
-
-  /** Test using `op`. If current typerstate is shared, run `op` in a fresh exploration
-   *  typerstate. If it is unshared, run `op` in current typerState, restoring typerState
-   *  to previous state afterwards.
-   */
-  def test[T](op: Context ?=> T)(using Context): T =
-    if (isShared)
-      util.Stats.record("TyperState.test")
-      val base = ctx.base
-      import base._
-      val nestedCtx =
-        if testsInUse < testContexts.size then
-          testContexts(testsInUse).init(ctx, ctx)
-        else
-          val ts = TyperState()
-          ts.myReporter = new TestReporter()
-          ts.myIsCommittable = false
-          val c = FreshContext(ctx.base).init(ctx, ctx).setTyperState(ts)
-          testContexts += c
-          c
-      testsInUse += 1
-      val nestedTS = nestedCtx.typerState
-      nestedTS.init(this, this.constraint)
-      val result = op(using nestedCtx)
-      assert(!nestedTS.isShared)
-      assert(!nestedTS.isCommittable)
-      assert(!nestedTS.isCommitted)
-      nestedTS.reporter.asInstanceOf[TestReporter].reset()
-      testsInUse -= 1
-      result
-    else {
-      val savedConstraint = myConstraint
-      val savedReporter = myReporter
-      val savedCommittable = myIsCommittable
-      val savedCommitted = isCommitted
-      myIsCommittable = false
-      myReporter = {
-        if (testReporter == null || testReporter.inUse)
-          testReporter = new TestReporter()
-        else
-          testReporter.reset()
-        testReporter.inUse = true
-        testReporter
-      }
-      try op
-      finally {
-        testReporter.inUse = false
-        resetConstraintTo(savedConstraint)
-        myReporter = savedReporter
-        myIsCommittable = savedCommittable
-        isCommitted = savedCommitted
-      }
-    }
 
   /** Commit typer state so that its information is copied into current typer state
    *  In addition (1) the owning state of undetermined or temporarily instantiated
@@ -228,10 +163,8 @@ class TyperState() {
     myConstraint = null
     previousConstraint = null
     myIsCommittable = true
-    isShared = false
     isCommitted = false
     myOwnedVars = null
-    testReporter = null
 
   override def toString: String = {
     def ids(state: TyperState): List[String] =
@@ -241,20 +174,4 @@ class TyperState() {
   }
 
   def stateChainStr: String = s"$this${if (previous == null) "" else previous.stateChainStr}"
-}
-
-/** Temporary, reusable reporter used in TyperState#test */
-private class TestReporter() extends StoreReporter(null) {
-  import Diagnostic._
-
-  /** Is this reporter currently used in a test? */
-  var inUse: Boolean = false
-
-  override def hasUnreportedErrors: Boolean =
-    infos != null && infos.exists(_.isInstanceOf[Error])
-
-  def reset(): Unit = {
-    assert(!inUse, s"Cannot reset reporter currently in use: $this")
-    infos = null
-  }
 }

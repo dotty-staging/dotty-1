@@ -340,11 +340,6 @@ object Contexts {
     /** The current reporter */
     def reporter: Reporter = typerState.reporter
 
-    /** Run `op` as if it was run in a fresh explore typer state, but possibly
-     *  optimized to re-use the current typer state.
-     */
-    final def testOLD[T](op: Context ?=> T): T = typerState.test(op)(this)
-
     /** Is this a context for the members of a class definition? */
     def isClassDefContext: Boolean =
       owner.isClass && (owner ne outer.owner)
@@ -521,6 +516,9 @@ object Contexts {
         case None => fresh.dropProperty(key)
       }
 
+    /** Test `op` in a fresh context with a typerstate that is not committable.
+     *  The passed context may not survive the operation.
+     */
     final def test[T](op: Context ?=> T)(implicit ctx: Context): T =
       util.Stats.record("Context.test")
       import base._
@@ -529,7 +527,7 @@ object Contexts {
           testContexts(testsInUse).reuseIn(this)
         else
           val ts = TyperState()
-            .setReporter(StoreReporter.TestReporter())
+            .setReporter(TestingReporter())
             .setCommittable(false)
           val c = FreshContext(ctx.base).init(this, this).setTyperState(ts)
           testContexts += c
@@ -540,9 +538,10 @@ object Contexts {
       val result =
         try op(using nestedCtx)
         finally
-          nestedTS.reporter.asInstanceOf[StoreReporter.TestReporter].reset()
+          nestedTS.reporter.asInstanceOf[TestingReporter].reset()
           testsInUse -= 1
       result
+    end test
 
     override def toString: String = {
       def iinfo(using Context) = if (ctx.importInfo == null) "" else i"${ctx.importInfo.selectors}%, %"
