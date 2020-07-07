@@ -107,7 +107,7 @@ class TyperState(private val previous: TyperState /* | Null */) {
       myIsCommittable = false
       myReporter = {
         if (testReporter == null || testReporter.inUse)
-          testReporter = new TestReporter(reporter)
+          testReporter = new TestReporter()
         else
           testReporter.reset()
         testReporter.inUse = true
@@ -192,7 +192,7 @@ class TyperState(private val previous: TyperState /* | Null */) {
 }
 
 /** Temporary, reusable reporter used in TyperState#test */
-private class TestReporter(outer: Reporter) extends StoreReporter(outer) {
+private class TestReporter() extends StoreReporter(null) {
   /** Is this reporter currently used in a test? */
   var inUse: Boolean = false
 
