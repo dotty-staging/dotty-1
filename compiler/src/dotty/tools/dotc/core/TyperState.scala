@@ -90,6 +90,7 @@ class TyperState() {
 
   /** A fresh typer state with the same constraint as this one. */
   def fresh(reporter: Reporter = StoreReporter(this.reporter)): TyperState =
+    util.Stats.record("TyperState.fresh")
     TyperState().init(this, this.constraint)
       .setReporter(reporter)
       .setCommittable(this.isCommittable)

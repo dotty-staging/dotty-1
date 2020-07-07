@@ -453,7 +453,6 @@ object Contexts {
      *  @param  origin  The context from which fields are copied
      */
     protected def init(outer: Context, origin: Context): this.type = {
-      util.Stats.record("Context.fresh")
       _outer = outer
       _period = origin.period
       _mode = origin.mode
@@ -481,6 +480,7 @@ object Contexts {
 
     /** A fresh clone of this context embedded in the specified `outer` context. */
     def freshOver(outer: Context): FreshContext =
+      util.Stats.record("Context.fresh")
       FreshContext(base).init(outer, this).setTyperState(this.typerState)
 
     final def withOwner(owner: Symbol): Context =
@@ -603,7 +603,10 @@ object Contexts {
       this.tree = tree
       this
     def setScope(scope: Scope): this.type = { this.scope = scope; this }
-    def setNewScope: this.type = { this.scope = newScope; this }
+    def setNewScope: this.type =
+      util.Stats.record("Context.setScope")
+      this.scope = newScope
+      this
     def setTyperState(typerState: TyperState): this.type = { this.typerState = typerState; this }
     def setNewTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(true))
     def setExploreTyperState(): this.type = setTyperState(typerState.fresh().setCommittable(false))
