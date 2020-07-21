@@ -448,7 +448,7 @@ object Implicits {
             case t: TypeParamRef =>
               constraint.entry(t) match {
                 case NoType => t
-                case bounds: TypeBounds => mapCtx.typeComparer.fullBounds(t)
+                case bounds: TypeBounds => TypeComparer.fullBounds(t)
                 case t1 => t1
               }
             case t: TypeVar =>
@@ -764,7 +764,7 @@ trait Implicits { self: Typer =>
         case ex: AssertionError =>
           implicits.println(s"view $from ==> $to")
           implicits.println(ctx.typerState.constraint.show)
-          implicits.println(TypeComparer.explained(from.tpe <:< to))
+          implicits.println(TypeComparer.explained(_.isSubType(from.tpe, to)))
           throw ex
       }
     }

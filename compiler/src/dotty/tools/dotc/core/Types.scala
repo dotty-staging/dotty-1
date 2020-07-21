@@ -907,13 +907,13 @@ object Types {
     /** Is this type a subtype of that type? */
     final def <:<(that: Type)(using Context): Boolean = {
       record("<:<")
-      ctx.typeComparer.topLevelSubType(this, that)
+      TypeComparer.topLevelSubType(this, that)
     }
 
     /** Is this type a subtype of that type? */
     final def frozen_<:<(that: Type)(using Context): Boolean = {
       record("frozen_<:<")
-      ctx.typeComparer.isSubTypeWhenFrozen(this, that)
+      TypeComparer.isSubTypeWhenFrozen(this, that)
     }
 
     /** Is this type the same as that type?
@@ -921,11 +921,11 @@ object Types {
      */
     final def =:=(that: Type)(using Context): Boolean = {
       record("=:=")
-      ctx.typeComparer.isSameType(this, that)
+      TypeComparer.isSameType(this, that)
     }
 
     final def frozen_=:=(that: Type)(using Context): Boolean =
-      ctx.typeComparer.isSameTypeWhenFrozen(this, that)
+      TypeComparer.isSameTypeWhenFrozen(this, that)
 
     /** Is this type a primitive value type which can be widened to the primitive value type `that`? */
     def isValueSubType(that: Type)(using Context): Boolean = widen match {
@@ -980,7 +980,7 @@ object Types {
      */
     def matches(that: Type)(using Context): Boolean = {
       record("matches")
-      ctx.typeComparer.matchesType(this, that, relaxed = !ctx.phase.erasedTypes)
+      TypeComparer.matchesType(this, that, relaxed = !ctx.phase.erasedTypes)
     }
 
     /** This is the same as `matches` except that it also matches => T with T and
@@ -1004,7 +1004,7 @@ object Types {
 
     def & (that: Type)(using Context): Type = {
       record("&")
-      ctx.typeComparer.glb(this, that)
+      TypeComparer.glb(this, that)
     }
 
     /** Safer version of `&`.
@@ -1035,7 +1035,7 @@ object Types {
 
     def | (that: Type)(using Context): Type = {
       record("|")
-      ctx.typeComparer.lub(this, that)
+      TypeComparer.lub(this, that)
     }
 
 // ----- Unwrapping types -----------------------------------------------
@@ -1145,7 +1145,7 @@ object Types {
 
     def widenUnionWithoutNull(using Context): Type = widen match {
       case tp @ OrType(lhs, rhs) =>
-        ctx.typeComparer.lub(lhs.widenUnionWithoutNull, rhs.widenUnionWithoutNull, canConstrain = true) match {
+        TypeComparer.lub(lhs.widenUnionWithoutNull, rhs.widenUnionWithoutNull, canConstrain = true) match {
           case union: OrType => union.join
           case res => res
         }
@@ -4163,7 +4163,7 @@ object Types {
      *  uninstantiated
      */
     def instanceOpt(using Context): Type =
-      if (inst.exists) inst else ctx.typeComparer.instType(this)
+      if (inst.exists) inst else TypeComparer.instType(this)
 
     /** Is the variable already instantiated? */
     def isInstantiated(using Context): Boolean = instanceOpt.exists
@@ -4187,7 +4187,7 @@ object Types {
         val atp = TypeOps.avoid(tp, problems.toList)
         def msg = i"Inaccessible variables captured in instantation of type variable $this.\n$tp was fixed to $atp"
         typr.println(msg)
-        val bound = ctx.typeComparer.fullUpperBound(origin)
+        val bound = TypeComparer.fullUpperBound(origin)
         if !(atp <:< bound) then
           throw new TypeError(s"$msg,\nbut the latter type does not conform to the upper bound $bound")
         atp
@@ -4202,7 +4202,7 @@ object Types {
     def instantiateWith(tp: Type)(using Context): Type = {
       assert(tp ne this, s"self instantiation of ${tp.show}, constraint = ${ctx.typerState.constraint.show}")
       typr.println(s"instantiating ${this.show} with ${tp.show}")
-      if ((ctx.typerState eq owningState.get) && !ctx.typeComparer.subtypeCheckInProgress)
+      if ((ctx.typerState eq owningState.get) && !TypeComparer.subtypeCheckInProgress)
         inst = tp
       ctx.typerState.constraint = ctx.typerState.constraint.replace(origin, tp)
       tp
@@ -4216,7 +4216,7 @@ object Types {
      *  is also a singleton type.
      */
     def instantiate(fromBelow: Boolean)(using Context): Type =
-      instantiateWith(avoidCaptures(ctx.typeComparer.instanceType(origin, fromBelow)))
+      instantiateWith(avoidCaptures(TypeComparer.instanceType(origin, fromBelow)))
 
     /** For uninstantiated type variables: Is the lower bound different from Nothing? */
     def hasLowerBound(using Context): Boolean =
@@ -4283,13 +4283,11 @@ object Types {
     override def tryNormalize(using Context): Type = reduced.normalized
 
     def reduced(using Context): Type = {
-      val trackingCtx = ctx.fresh.setTypeComparerFn(new TrackingTypeComparer(using _))
-      val typeComparer = trackingCtx.typeComparer.asInstanceOf[TrackingTypeComparer]
 
       def contextInfo(tp: Type): Type = tp match {
         case tp: TypeParamRef =>
           val constraint = ctx.typerState.constraint
-          if (constraint.entry(tp).exists) ctx.typeComparer.fullBounds(tp)
+          if (constraint.entry(tp).exists) TypeComparer.fullBounds(tp)
           else NoType
         case tp: TypeRef =>
           val bounds = ctx.gadt.fullBounds(tp.symbol)
@@ -4298,12 +4296,11 @@ object Types {
           tp.underlying
       }
 
-      def updateReductionContext(): Unit = {
+      def updateReductionContext(footprint: collection.Set[Type]): Unit =
         reductionContext = new mutable.HashMap
-        for (tp <- typeComparer.footprint)
+        for (tp <- footprint)
           reductionContext(tp) = contextInfo(tp)
-        typr.println(i"footprint for $this $hashCode: ${typeComparer.footprint.toList.map(x => (x, contextInfo(x)))}%, %")
-      }
+        typr.println(i"footprint for $this $hashCode: ${footprint.toList.map(x => (x, contextInfo(x)))}%, %")
 
       def isUpToDate: Boolean =
         reductionContext.keysIterator.forall { tp =>
@@ -4316,14 +4313,13 @@ object Types {
         if (myReduced != null) record("MatchType.reduce cache miss")
         myReduced =
           trace(i"reduce match type $this $hashCode", typr, show = true) {
-            try
-              typeComparer.matchCases(scrutinee.normalized, cases)(using trackingCtx)
-            catch {
-              case ex: Throwable =>
+            def matchCases(cmp: TrackingTypeComparer): Type =
+              try cmp.matchCases(scrutinee.normalized, cases)
+              catch case ex: Throwable =>
                 handleRecursive("reduce type ", i"$scrutinee match ...", ex)
-            }
+              finally updateReductionContext(cmp.footprint)
+            TypeComparer.tracked(matchCases)
           }
-        updateReductionContext()
       }
       myReduced
     }
@@ -5532,7 +5528,7 @@ object Types {
           case tp: TypeRef if tp.info.isTypeAlias =>
             apply(n, tp.superType)
           case tp: TypeParamRef =>
-            apply(n, ctx.typeComparer.bounds(tp))
+            apply(n, TypeComparer.bounds(tp))
           case _ =>
             foldOver(n, tp)
         }
@@ -5560,7 +5556,7 @@ object Types {
             val tsym = if (tp.termSymbol.is(Param)) tp.underlying.typeSymbol else tp.termSymbol
             foldOver(cs + tsym, tp)
           case tp: TypeParamRef =>
-            apply(cs, ctx.typeComparer.bounds(tp))
+            apply(cs, TypeComparer.bounds(tp))
           case other =>
             foldOver(cs, tp)
         }
