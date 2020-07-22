@@ -329,12 +329,6 @@ object Contexts {
           related = related.updated(source, ctx2)
         ctx1
 
-    inline def evalAt[T](phase: Phase)(inline op: Context ?=> T): T =
-      val saved = period
-      this.asInstanceOf[FreshContext].period = Period(runId, phase.id)
-      try op(using this)
-      finally period = saved
-
     // `creationTrace`-related code. To enable, uncomment the code below and the
     // call to `setCreationTrace()` in this file.
     /*
