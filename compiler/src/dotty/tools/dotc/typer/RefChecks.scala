@@ -828,13 +828,11 @@ object RefChecks {
    * in either a deprecated member or a scala bridge method, issue a warning.
    */
   private def checkDeprecated(sym: Symbol, pos: SourcePosition)(using Context): Unit =
-    for
-      annot <- sym.getAnnotation(defn.DeprecatedAnnot)
-      if !ctx.owner.ownersIterator.exists(_.isDeprecated)
-    do
-      val msg = annot.argumentConstant(0).map(": " + _.stringValue).getOrElse("")
-      val since = annot.argumentConstant(1).map(" since " + _.stringValue).getOrElse("")
-      report.deprecationWarning(s"${sym.showLocated} is deprecated${since}${msg}", pos)
+    for annot <- sym.getAnnotation(defn.DeprecatedAnnot) do
+      if !ctx.owner.ownersIterator.exists(_.isDeprecated) then
+        val msg = annot.argumentConstant(0).map(": " + _.stringValue).getOrElse("")
+        val since = annot.argumentConstant(1).map(" since " + _.stringValue).getOrElse("")
+        report.deprecationWarning(s"${sym.showLocated} is deprecated${since}${msg}", pos)
 
   /** If @migration is present (indicating that the symbol has changed semantics between versions),
    *  emit a warning.
