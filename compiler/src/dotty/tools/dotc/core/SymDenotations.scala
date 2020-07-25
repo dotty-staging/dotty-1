@@ -2639,7 +2639,8 @@ object SymDenotations {
     private var locked = false
     private var provisional = false
 
-    final def isValid(using Context): Boolean = valid && isValidAt(ctx.phase)
+    final def isValid(using Context): Boolean =
+      valid && createdAt.runId == ctx.runId
 
     def invalidate(): Unit =
       if (valid && !locked) {
