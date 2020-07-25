@@ -1580,6 +1580,7 @@ object SymDenotations {
 
     private def baseTypeCache(using Context): BaseTypeMap = {
       if !currentHasSameBaseTypesAs(myBaseTypeCachePeriod) then
+        util.Stats.record(s"${if myBaseTypeCache == null then "first" else "recompute"} BaseTypeMap")
         myBaseTypeCache = new BaseTypeMap
         myBaseTypeCachePeriod = ctx.period
       myBaseTypeCache
@@ -2052,7 +2053,8 @@ object SymDenotations {
       if (this.is(PackageClass) || !Config.cacheMemberNames)
         computeMemberNames(keepOnly) // don't cache package member names; they might change
       else {
-        if (!memberNamesCache.isValid) memberNamesCache = MemberNames.newCache()
+        if (!memberNamesCache.isValid)
+          memberNamesCache = MemberNames.newCache()
         memberNamesCache(keepOnly, this)
       }
 
@@ -2641,6 +2643,9 @@ object SymDenotations {
 
     final def isValid(using Context): Boolean =
       valid && createdAt.runId == ctx.runId
+        // Note: We rely on the fact that whenever base types of classes change,
+        // the affected classes will get new denotations with new basedata caches.
+        // So basedata caches can become invalid only if the run changes.
 
     def invalidate(): Unit =
       if (valid && !locked) {
