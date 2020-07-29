@@ -3851,8 +3851,8 @@ object Types {
           case _ =>
             NoType
         }
-
-        tryCompiletimeConstantFold.orElse(tryMatchAlias)
+        val tycon1 = tryCompiletimeConstantFold
+        if tycon1.exists then tycon1 else tryMatchAlias
 
       case _ =>
         NoType
