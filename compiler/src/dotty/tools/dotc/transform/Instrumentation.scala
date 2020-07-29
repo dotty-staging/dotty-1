@@ -49,8 +49,8 @@ class Instrumentation extends MiniPhase { thisPhase =>
   override def transformApply(tree: Apply)(using Context): Tree = tree.fun match {
     case Select(nu: New, _) =>
       cpy.Block(tree)(record(i"alloc/${nu.tpe}", tree) :: Nil, tree)
-    case Select(_, name) if namesToRecord.contains(name) =>
-      cpy.Block(tree)(record(i"call/$name", tree) :: Nil, tree)
+    case ref: RefTree if namesToRecord.contains(ref.name) =>
+      cpy.Block(tree)(record(i"call/${ref.name}", tree) :: Nil, tree)
     case _ =>
       tree
   }
