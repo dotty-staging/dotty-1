@@ -62,8 +62,8 @@ class Pickler extends Phase {
         picklers(cls) = pickler
       val treePkl = pickler.treePkl
       treePkl.pickle(tree :: Nil)
+      treePkl.compactify()
       val pickledF = Future {
-        treePkl.compactify()
         if tree.span.exists then
           new PositionPickler(pickler, treePkl.buf.addrOfTree).picklePositions(tree :: Nil)
 
