@@ -47,42 +47,6 @@ class Pickler extends Phase {
     clss.filterNot(companionModuleClasses.contains)
   }
 
-  class PickleCompleter:
-    private var pickled: Array[Byte] = null
-
-    def complete(pickler: TastyPickler, cls: ClassSymbol, tree: Tree)(using Context): Unit =
-      val treePkl = pickler.treePkl
-      if tree.span.exists then
-        new PositionPickler(pickler, treePkl.buf.addrOfTree).picklePositions(tree :: Nil)
-
-      if !ctx.settings.YdropComments.value then
-        new CommentPickler(pickler, treePkl.buf.addrOfTree).pickleComment(tree)
-
-      val pickled = pickler.assembleParts()
-
-      def rawBytes = // not needed right now, but useful to print raw format.
-        pickled.iterator.grouped(10).toList.zipWithIndex.map {
-          case (row, i) => s"${i}0: ${row.mkString(" ")}"
-        }
-
-      synchronized {
-        this.pickled = pickled
-        // println(i"rawBytes = \n$rawBytes%\n%") // DEBUG
-        if pickling ne noPrinter then
-          pickling.synchronized {
-            println(i"**** pickled info of $cls")
-            println(new TastyPrinter(pickled).printContents())
-          }
-        notifyAll()
-      }
-    end complete
-
-    def bytes: Array[Byte] = synchronized {
-      if pickled == null then wait()
-      pickled
-    }
-  end PickleCompleter
-
   override def run(using Context): Unit = {
     val unit = ctx.compilationUnit
     pickling.println(i"unpickling in run ${ctx.runId}")
@@ -100,8 +64,6 @@ class Pickler extends Phase {
       treePkl.pickle(tree :: Nil)
       val pickledF = Future {
         treePkl.compactify()
-        pickler.addrOfTree = treePkl.buf.addrOfTree
-        pickler.addrOfSym = treePkl.addrOfSym
         if tree.span.exists then
           new PositionPickler(pickler, treePkl.buf.addrOfTree).picklePositions(tree :: Nil)
 
