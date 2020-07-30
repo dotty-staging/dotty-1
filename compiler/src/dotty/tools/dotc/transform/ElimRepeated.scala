@@ -185,7 +185,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
                     |  - there must be a single repeated parameter
                     |  - it must be the last argument in the last parameter list
                     |""".stripMargin,
-            sym.sourcePos)
+            sym.srcPos)
           tree
         else
           // non-overrides cannot be synthetic otherwise javac refuses to call them
@@ -194,7 +194,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
         tree
     else
       if hasAnnotation then
-        report.error("A method without repeated parameters cannot be annotated with @varargs", sym.sourcePos)
+        report.error("A method without repeated parameters cannot be annotated with @varargs", sym.srcPos)
       tree
 
   /** Is there a repeated parameter in some parameter list? */
@@ -257,7 +257,7 @@ class ElimRepeated extends MiniPhase with InfoTransformer { thisPhase =>
 
     conflict match
       case Some(conflict) =>
-        report.error(s"@varargs produces a forwarder method that conflicts with ${conflict.showDcl}", original.sourcePos)
+        report.error(s"@varargs produces a forwarder method that conflicts with ${conflict.showDcl}", original.srcPos)
         ddef
       case None =>
         val bridgeDef = polyDefDef(sym.enteredAfter(thisPhase), trefs => vrefss => {
