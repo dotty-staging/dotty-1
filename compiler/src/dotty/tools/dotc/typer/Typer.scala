@@ -191,23 +191,26 @@ class Typer extends Namer
         if found eq previous then checkNewOrShadowed(found, prevPrec)
         else found
 
-      def selection(imp: ImportInfo, name: Name, checkBounds: Boolean) =
-        if imp.sym.isCompleting then
-          report.warning(i"cyclic ${imp.sym}, ignored", pos)
-          NoType
-        else if unimported.nonEmpty && unimported.contains(imp.site.termSymbol) then
-          NoType
-        else
-          val pre = imp.site
-          var denot = pre.memberBasedOnFlags(name, required, EmptyFlags)
-            .accessibleFrom(pre)(using refctx)
+      def selection(imp: ImportInfo, name: Name, checkBounds: Boolean): Type =
+        imp.sym.info match
+          case ImportType(expr) =>
+            val pre = expr.tpe
+            var denot = pre.memberBasedOnFlags(name, required, EmptyFlags)
+              .accessibleFrom(pre)(using refctx)
             // Pass refctx so that any errors are reported in the context of the
             // reference instead of the context of the import scope
-          if checkBounds && denot.exists then
-            denot = denot.filterWithPredicate { mbr =>
-              mbr.matchesImportBound(if mbr.symbol.is(Given) then imp.givenBound else imp.wildcardBound)
-            }
-          if reallyExists(denot) then pre.select(name, denot) else NoType
+            if denot.exists then
+              if checkBounds then
+                denot = denot.filterWithPredicate { mbr =>
+                  mbr.matchesImportBound(if mbr.symbol.is(Given) then imp.givenBound else imp.wildcardBound)
+                }
+              if reallyExists(denot) then
+                if unimported.isEmpty || !unimported.contains(pre.termSymbol) then
+                  return pre.select(name, denot)
+          case _ =>
+            if imp.sym.isCompleting then
+              report.warning(i"cyclic ${imp.sym}, ignored", pos)
+        NoType
 
       /** The type representing a named import with enclosing name when imported
        *  from given `site` and `selectors`.
@@ -276,7 +279,7 @@ class Typer extends Namer
         else {
           var result: Type = NoType
 
-          val curOwner = ctx.owner
+          val curOwner = ctx.owner.denot
 
           /** Is curOwner a package object that should be skipped?
            *  A package object should always be skipped if we look for a term.
@@ -305,9 +308,9 @@ class Typer extends Namer
           // with the exact list of files given).
           val isNewDefScope =
             if curOwner.is(Package) && !curOwner.isRoot then
-              curOwner ne ctx.outer.owner
+              curOwner.symbol ne ctx.outer.owner
             else
-              ((ctx.scope ne lastCtx.scope) || (curOwner ne lastCtx.owner))
+              ((ctx.scope ne lastCtx.scope) || (curOwner.symbol ne lastCtx.owner))
               && !isTransparentPackageObject
 
           // Does reference `tp` refer only to inherited symbols?
@@ -348,7 +351,7 @@ class Typer extends Namer
                     if (curOwner.isTerm && defDenot.symbol.maybeOwner.isType)
                       // Don't mix NoPrefix and thisType prefixes, since type comparer
                       // would not detect types to be compatible.
-                      defDenot.symbol.owner
+                      defDenot.symbol.owner.denot
                     else
                       curOwner
                   effectiveOwner.thisType.select(name, defDenot)
@@ -356,7 +359,7 @@ class Typer extends Namer
               if !curOwner.is(Package) || isDefinedInCurrentUnit(defDenot) then
                 result = checkNewOrShadowed(found, Definition) // no need to go further out, we found highest prec entry
                 found match
-                  case found: NamedType if ctx.owner.isClass && isInherited(found.denot) =>
+                  case found: NamedType if curOwner.isClass && isInherited(found.denot) =>
                     checkNoOuterDefs(found.denot, ctx, ctx)
                   case _ =>
               else
@@ -373,8 +376,8 @@ class Typer extends Namer
             val outer = ctx.outer
             val curImport = ctx.importInfo
             def updateUnimported() =
-              if (curImport.unimported.exists) unimported += curImport.unimported
-            if (ctx.owner.is(Package) && curImport != null && curImport.isRootImport && previous.exists)
+              if (curImport.unimported ne NoSymbol) unimported += curImport.unimported
+            if (curOwner.is(Package) && curImport != null && curImport.isRootImport && previous.exists)
               previous // no more conflicts possible in this case
             else if (isPossibleImport(NamedImport) && (curImport ne outer.importInfo)) {
               val namedImp = namedImportRef(curImport)
