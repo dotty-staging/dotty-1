@@ -5,7 +5,7 @@ package core
 import Types._
 import Contexts._
 import Symbols._
-import SymDenotations.LazyType
+import SymDenotations._
 import Decorators._
 import util.Stats._
 import Names._
@@ -145,7 +145,7 @@ class TypeApplications(val self: Type) extends AnyVal {
    */
   final def typeParams(using Context): List[TypeParamInfo] = {
     record("typeParams")
-    def isTrivial(prefix: Type, tycon: Symbol) = prefix match {
+    def isTrivial(prefix: Type, tycon: SymDenotation) = prefix match {
       case prefix: ThisType =>
         prefix.cls eq tycon.owner
       case prefix: TermRef =>
@@ -156,10 +156,10 @@ class TypeApplications(val self: Type) extends AnyVal {
     }
     try self match {
       case self: TypeRef =>
-        val tsym = self.symbol
+        val tsym = self.symbol.denot
         if (tsym.isClass) tsym.typeParams
         else tsym.infoOrCompleter match {
-          case info: LazyType if isTrivial(self.prefix, tsym) => info.completerTypeParams(tsym)
+          case info: LazyType if isTrivial(self.prefix, tsym) => info.completerTypeParams(tsym.symbol)
           case _ => self.info.typeParams
         }
       case self: AppliedType =>

@@ -97,8 +97,8 @@ object TypeOps:
         // TODO: generalize the inlining trick?
         tp match {
           case tp: NamedType =>
-            val sym = tp.symbol
-            if (sym.isStatic && !sym.maybeOwner.seesOpaques || (tp.prefix `eq` NoPrefix)) tp
+            val symd = tp.symbol.denot
+            if (symd.isStatic && !symd.maybeOwner.seesOpaques || (tp.prefix `eq` NoPrefix)) tp
             else derivedSelect(tp, atVariance(variance max 0)(this(tp.prefix)))
           case tp: LambdaType =>
             mapOverLambda(tp) // special cased common case
