@@ -1111,7 +1111,7 @@ object Types {
     /** Widen type if it is unstable (i.e. an ExprType, or TermRef to unstable symbol */
     final def widenIfUnstable(using Context): Type = stripTypeVar match {
       case tp: ExprType => tp.resultType.widenIfUnstable
-      case tp: TermRef if tp.symbol.exists && !tp.symbol.isStableMember => tp.underlying.widenIfUnstable
+      case tp: TermRef if tp.symbol.denot.isUnstableTermMember => tp.underlying.widenIfUnstable
       case _ => this
     }
 

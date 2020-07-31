@@ -690,6 +690,12 @@ object SymDenotations {
       isType || is(StableRealizable) || exists && !isUnstableValue
     }
 
+    /** The opposite of isStableMember for term symbols, except that
+     *  NoSymbol is neither stable nor unstable.
+     */
+    final def isUnstableTermMember(using Context): Boolean =
+      (isOneOf(UnstableValueFlags) || info.isInstanceOf[ExprType]) && !is(StableRealizable)
+
     /** Is this a denotation of a class that does not have - either direct or inherited -
      *  initialization code?
      */
