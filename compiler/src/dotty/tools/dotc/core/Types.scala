@@ -226,8 +226,9 @@ object Types {
     final def derivesFrom(cls: Symbol)(using Context): Boolean = {
       def loop(tp: Type): Boolean = tp match {
         case tp: TypeRef =>
-          val sym = tp.symbol
-          if (sym.isClass) sym.derivesFrom(cls) else loop(tp.superType)
+          tp.symbol.denot match
+            case subcls: ClassDenotation => subcls.derivesFrom(cls)
+            case _ => loop(tp.superType)
         case tp: AppliedType =>
           tp.superType.derivesFrom(cls)
         case tp: MatchType =>
@@ -2504,13 +2505,14 @@ object Types {
    *  a reference with a name as designator so that the denotation will be correctly updated in
    *  the future. See also NamedType#withDenot. Test case is neg/opaque-self-encoding.scala.
    */
-  private def designatorFor(prefix: Type, name: Name, denot: Denotation)(using Context): Designator = {
-    val sym = denot.symbol
-    if (sym.exists && (prefix.eq(NoPrefix) || prefix.ne(sym.owner.thisType)))
-      sym
-    else
-      name
-  }
+  private def designatorFor(prefix: Type, name: Name, denot: Denotation)(using Context): Designator =
+    util.Stats.record(s"designatorFor/${prefix.getClass}")
+    denot match
+      case symd: SymDenotation =>
+        if symd.exists && ((prefix eq NoPrefix) || (prefix ne symd.owner.thisType)) then symd.symbol
+        else name
+      case _ =>
+        designatorFor(prefix, name, denot.symbol.denot)
 
   object NamedType {
     def isType(desig: Designator)(using Context): Boolean = desig match {

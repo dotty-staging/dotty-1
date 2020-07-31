@@ -1329,7 +1329,7 @@ object SymDenotations {
     final def accessBoundary(base: Symbol)(using Context): Symbol =
       if (this.is(Private)) owner
       else if (this.isAllOf(StaticProtected)) defn.RootClass
-      else if (privateWithin.exists && !ctx.phase.erasedTypes) privateWithin
+      else if ((privateWithin ne NoSymbol) && !ctx.phase.erasedTypes) privateWithin
       else if (this.is(Protected)) base
       else defn.RootClass
 
@@ -1495,6 +1495,9 @@ object SymDenotations {
      */
     override def transformAfter(phase: DenotTransformer, f: SymDenotation => SymDenotation)(using Context): Unit =
       super.transformAfter(phase, f)
+
+    final override def accessibleFrom(pre: Type, superAccess: Boolean)(using Context): Denotation =
+      if (!exists || isAccessibleFrom(pre, superAccess)) this else NoDenotation
 
     /** Set flag `flags` in current phase and in all phases that follow */
     def setFlagFrom(phase: DenotTransformer, flags: FlagSet)(using Context): Unit =
