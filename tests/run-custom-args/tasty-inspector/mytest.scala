@@ -71,6 +71,12 @@ class TestInspector() extends TastyInspector:
     import reflect.{given _, _}
     tree match {
       case t: reflect.PackageClause =>
+        t.symbol.tree match {
+          case d: reflect.PackageDef =>
+            println(s"${t.symbol.show}[${t.symbol.flags.show}] == packagedef")
+            assert(t.symbol.flags.is(Flags.JavaDefined))
+            assert(d.members.isEmpty)
+        }
         def hackMembersOf(using r: Reflection)(rsym: r.Symbol) = {
           import dotty.tools.dotc
           given dotc.core.Contexts.Context = r.rootContext.asInstanceOf
@@ -84,7 +90,7 @@ class TestInspector() extends TastyInspector:
           println(s">>> ${s.show}")
           println(s">>> ${s.pos}")
           println(s">>> [${s.flags.show}]")
-          s.tree
+          // s.tree
         }
         t.stats.map( m => inspectClass(reflect)(m) )
       case x =>
