@@ -1,0 +1,180 @@
+>>> Gen
+>>> ?
+>>> [/**/]
+>>> Gen
+>>> compiler/test/debug/Gen.scala:<733..733>
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$
+>>> compiler/test/debug/Gen.scala:<740..740>
+>>> [/*final object moduleClass*/]
+>>> Test
+>>> ?
+>>> [/**/]
+>>> Test
+>>> tests/run-custom-args/tasty-inspector/mytest.scala:<1066..1066>
+>>> [/*final lazy object stableRealizable*/]
+>>> Test$
+>>> tests/run-custom-args/tasty-inspector/mytest.scala:<1073..1073>
+>>> [/*final object moduleClass*/]
+>>> TestInspector
+>>> ?
+>>> [/**/]
+>>> TestInspector
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> TestInspector$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$Break
+>>> ?
+>>> [/**/]
+>>> Gen$Break
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$Break$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$Command
+>>> ?
+>>> [/**/]
+>>> Gen$Command
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$Command$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$Expect
+>>> ?
+>>> [/**/]
+>>> Gen$Expect
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$Expect$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$LitExpect
+>>> ?
+>>> [/**/]
+>>> Gen$LitExpect
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$LitExpect$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$PatExpect
+>>> ?
+>>> [/**/]
+>>> Gen$PatExpect
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$PatExpect$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$Program
+>>> ?
+>>> [/**/]
+>>> Gen$Program
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$Program$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$Tree
+>>> ?
+>>> [/**/]
+>>> Gen$Tree
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$Tree$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Gen$EmptyExpect$
+>>> ?
+>>> [/**/]
+>>> Gen$EmptyExpect$
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Gen$EmptyExpect$$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> tests.A
+>>> tests/run-custom-args/tasty-inspector/mytest.scala:<85..85>
+>>> [/**/]
+>>> tests.A
+>>> tests/run-custom-args/tasty-inspector/mytest.scala:<220..220>
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.A$
+>>> tests/run-custom-args/tasty-inspector/mytest.scala:<227..227>
+>>> [/*final object moduleClass*/]
+>>> tests.B
+>>> ?
+>>> [/**/]
+>>> tests.B
+>>> tests/run-custom-args/tasty-inspector/mytest.scala:<333..333>
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.B$
+>>> tests/run-custom-args/tasty-inspector/mytest.scala:<340..340>
+>>> [/*final object moduleClass*/]
+>>> tests.C
+>>> ?
+>>> [/**/]
+>>> tests.C
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.C$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> tests.Constructors
+>>> ?
+>>> [/**/]
+>>> tests.Constructors
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.Constructors$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> tests.D
+>>> ?
+>>> [/**/]
+>>> tests.D
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.D$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> tests.E
+>>> ?
+>>> [/**/]
+>>> tests.E
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.E$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> tests.Methods
+>>> ?
+>>> [/**/]
+>>> tests.Methods
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.Methods$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> tests.A$AA
+>>> ?
+>>> [/**/]
+>>> tests.A$AA
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.A$AA$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> tests.B$BB
+>>> ?
+>>> [/**/]
+>>> tests.B$BB
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> tests.B$BB$
+>>> ?
+>>> [/*final object moduleClass*/]
