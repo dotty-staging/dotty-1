@@ -84,6 +84,7 @@ class TestInspector() extends TastyInspector:
           println(s">>> ${s.show}")
           println(s">>> ${s.pos}")
           println(s">>> [${s.flags.show}]")
+          s.tree
         }
         t.stats.map( m => inspectClass(reflect)(m) )
       case x =>
