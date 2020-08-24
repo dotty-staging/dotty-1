@@ -1,3 +1,4 @@
+<empty>[/*final lazy javaDefined object stableRealizable package*/] == packagedef
 >>> Gen
 >>> ?
 >>> [/**/]
@@ -88,6 +89,42 @@
 >>> Gen$Tree$
 >>> ?
 >>> [/*final object moduleClass*/]
+>>> Test$InspectorDriver$1
+>>> ?
+>>> [/**/]
+>>> Test$InspectorDriver$1
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Test$InspectorDriver$1$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Test$TastyFromClass$1
+>>> ?
+>>> [/**/]
+>>> Test$TastyFromClass$1
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Test$TastyFromClass$1$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Test$TastyInspectorPhase$1
+>>> ?
+>>> [/**/]
+>>> Test$TastyInspectorPhase$1
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Test$TastyInspectorPhase$1$
+>>> ?
+>>> [/*final object moduleClass*/]
+>>> Test$hack$TastyInspector
+>>> ?
+>>> [/**/]
+>>> Test$hack$TastyInspector
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Test$hack$TastyInspector$
+>>> ?
+>>> [/*final object moduleClass*/]
 >>> Gen$EmptyExpect$
 >>> ?
 >>> [/**/]
@@ -97,6 +134,16 @@
 >>> Gen$EmptyExpect$$
 >>> ?
 >>> [/*final object moduleClass*/]
+>>> Test$hack$
+>>> ?
+>>> [/**/]
+>>> Test$hack$
+>>> ?
+>>> [/*final lazy object stableRealizable*/]
+>>> Test$hack$$
+>>> ?
+>>> [/*final object moduleClass*/]
+tests[/*final lazy javaDefined object stableRealizable package*/] == packagedef
 >>> tests.A
 >>> tests/run-custom-args/tasty-inspector/mytest.scala:<85..85>
 >>> [/**/]
