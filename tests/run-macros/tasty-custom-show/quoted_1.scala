@@ -39,7 +39,6 @@ object Macros {
 
   def dummyShow(using qctx: QuoteContext) : scala.tasty.reflect.Printer[qctx.tasty.type] = {
     new scala.tasty.reflect.Printer {
-      val tasty = qctx.tasty
       import qctx.tasty._
       def showTree(tree: Tree): String = "Tree"
       def showType(tpe: Type): String = "Type"

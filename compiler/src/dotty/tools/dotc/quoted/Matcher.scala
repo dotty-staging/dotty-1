@@ -179,7 +179,7 @@ object Matcher {
           /* Term hole */
           // Match a scala.internal.Quoted.patternHole typed as a repeated argument and return the scrutinee tree
           case (scrutinee @ Typed(s, tpt1), Typed(TypeApply(patternHole, tpt :: Nil), tpt2))
-              if patternHole.symbol == qctx.tasty.Definitions_InternalQuotedPatterns_patternHole &&
+              if patternHole.symbol == qctx.internal.Definitions_InternalQuotedPatterns_patternHole &&
                  s.tpe <:< tpt.tpe &&
                  tpt2.tpe.derivesFrom(defn.RepeatedParamClass) =>
             matched(scrutinee.seal)
@@ -187,14 +187,14 @@ object Matcher {
           /* Term hole */
           // Match a scala.internal.Quoted.patternHole and return the scrutinee tree
           case (ClosedPatternTerm(scrutinee), TypeApply(patternHole, tpt :: Nil))
-              if patternHole.symbol == qctx.tasty.Definitions_InternalQuotedPatterns_patternHole &&
+              if patternHole.symbol == qctx.internal.Definitions_InternalQuotedPatterns_patternHole &&
                  scrutinee.tpe <:< tpt.tpe =>
             matched(scrutinee.seal)
 
           /* Higher order term hole */
           // Matches an open term and wraps it into a lambda that provides the free variables
           case (scrutinee, pattern @ Apply(TypeApply(Ident("higherOrderHole"), List(Inferred())), Repeated(args, _) :: Nil))
-              if pattern.symbol == qctx.tasty.Definitions_InternalQuotedPatterns_higherOrderHole =>
+              if pattern.symbol == qctx.internal.Definitions_InternalQuotedPatterns_higherOrderHole =>
 
             def bodyFn(lambdaArgs: List[Tree]): Tree = {
               val argsMap = args.map(_.symbol).zip(lambdaArgs.asInstanceOf[List[Term]]).toMap

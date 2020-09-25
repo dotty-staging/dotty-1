@@ -1,21 +1,23 @@
 package scala.tasty
 package reflect
 
+import scala.quoted._
+
 /** TASTy Reflect tree accumulator.
  *
  *  Usage:
  *  ```
- *  class MyTreeAccumulator[R <: scala.tasty.Reflection & Singleton](val reflect: R)
+ *  class MyTreeAccumulator[QCtx <: scala.quoted.QuoteContext & Singleton](val quoteContext: QCtx)
  *      extends scala.tasty.reflect.TreeAccumulator[X] {
- *    import reflect.{given _, _}
+ *    import quoteContext.tasty._
  *    def foldTree(x: X, tree: Tree)(using ctx: Context): X = ...
  *  }
  *  ```
  */
 trait TreeAccumulator[X] {
 
-  val reflect: Reflection
-  import reflect.{given _, _}
+  val quoteContext: QuoteContext
+  import quoteContext.tasty._
 
   // Ties the knot of the traversal: call `foldOver(x, tree))` to dive in the `tree` node.
   def foldTree(x: X, tree: Tree)(using ctx: Context): X

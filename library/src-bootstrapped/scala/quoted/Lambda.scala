@@ -21,8 +21,8 @@ object Lambda {
     import qctx.tasty._
     val argTypes = functionType.unseal.tpe match
       case AppliedType(_, functionArguments) => functionArguments.init.asInstanceOf[List[Type]]
-    val qctx2 = quoteContextWithCompilerInterface(qctx)
-    qctx2.tasty.lambdaExtractor(expr.unseal, argTypes).map { fn =>
+    val qctx2: qctx.type & scala.internal.tasty.CompilerInterface = quoteContextWithCompilerInterface(qctx)
+    qctx2.internal.lambdaExtractor(expr.unseal, argTypes).map { fn =>
       def f(args: Tuple.Map[Args, Expr]): Expr[Res] =
         fn(args.toArray.toList.map(_.asInstanceOf[Expr[Any]].unseal)).seal.asInstanceOf[Expr[Res]]
       tg.untupled(f)

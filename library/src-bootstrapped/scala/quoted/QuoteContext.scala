@@ -1,6 +1,8 @@
 package scala.quoted
 
 import scala.quoted.show.SyntaxHighlight
+import scala.tasty.QuoteContextReflection
+import scala.internal.tasty.CompilerInterface
 
 /** Quotation context provided by a macro expansion or in the scope of `scala.quoted.run`.
  *  Used to perform all operations on quoted `Expr` or `Type`.
@@ -10,12 +12,7 @@ import scala.quoted.show.SyntaxHighlight
  *
  *  @param tasty Typed AST API. Usage: `def f(qctx: QuoteContext) = { import qctx.tasty._; ... }`.
  */
-trait QuoteContext { self =>
-
-  /** Low-level Typed AST API `tasty` metaprogramming API.
-   *  This API does not have the static type guarantiees that `Expr` and `Type` provide.
-   */
-  val tasty: scala.tasty.Reflection
+trait QuoteContext extends QuoteContextReflection, CompilerInterface { self =>
 
   /** Type of a QuoteContext provided by a splice within a quote that took this context.
    *  It is only required if working with the reflection API.

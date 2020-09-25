@@ -14,15 +14,15 @@ object Unpickler {
    */
   def unpickleExpr[T](repr: PickledQuote, args: PickledArgs): QuoteContext ?=> Expr[T] =
     val qctx = quoteContextWithCompilerInterface(summon[QuoteContext])
-    val tree = qctx.tasty.unpickleExpr(repr, args)
-    new scala.internal.quoted.Expr(tree, qctx.tasty.compilerId).asInstanceOf[Expr[T]]
+    val tree = qctx.internal.unpickleExpr(repr, args)
+    new scala.internal.quoted.Expr(tree, qctx.internal.compilerId).asInstanceOf[Expr[T]]
 
   /** Unpickle `repr` which represents a pickled `Type` tree,
    *  replacing splice nodes with `args`
    */
   def unpickleType[T](repr: PickledQuote, args: PickledArgs): QuoteContext ?=> Type[T] =
     val qctx = quoteContextWithCompilerInterface(summon[QuoteContext])
-    val tree = qctx.tasty.unpickleType(repr, args)
-    new scala.internal.quoted.Type(tree, qctx.tasty.compilerId).asInstanceOf[Type[T]]
+    val tree = qctx.internal.unpickleType(repr, args)
+    new scala.internal.quoted.Type(tree, qctx.internal.compilerId).asInstanceOf[Type[T]]
 
 }

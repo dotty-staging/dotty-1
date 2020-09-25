@@ -78,7 +78,7 @@ object Expr {
    */
   def betaReduce[T](expr: Expr[T])(using qctx: QuoteContext): Expr[T] =
     val qctx2 = quoteContextWithCompilerInterface(qctx)
-    qctx2.tasty.betaReduce(expr.unseal) match
+    qctx2.internal.betaReduce(expr.unseal.asInstanceOf) match
       case Some(expr1) => expr1.seal.asInstanceOf[Expr[T]]
       case _ => expr
 

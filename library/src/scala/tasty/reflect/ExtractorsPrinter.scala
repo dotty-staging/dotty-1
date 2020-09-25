@@ -1,8 +1,10 @@
 package scala.tasty
 package reflect
 
-class ExtractorsPrinter[R <: Reflection & Singleton](val tasty: R) extends Printer[R] {
-  import tasty._
+import scala.quoted.QuoteContext
+
+class ExtractorsPrinter[QCtx <: QuoteContext & Singleton](val qctx: QCtx) extends Printer[QCtx] {
+  import qctx.tasty._
 
   def showTree(tree: Tree): String =
     new Buffer().visitTree(tree).result()

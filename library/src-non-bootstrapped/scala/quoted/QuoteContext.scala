@@ -1,8 +1,10 @@
 package scala.quoted
 
-trait QuoteContext { self =>
+import scala.tasty.QuoteContextReflection
+import scala.internal.tasty.CompilerInterface
 
-  val tasty: scala.tasty.Reflection
+
+trait QuoteContext extends QuoteContextReflection, CompilerInterface { self =>
 
   type Nested = QuoteContext {
     val tasty: self.tasty.type

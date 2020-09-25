@@ -1,21 +1,23 @@
 package scala.tasty
 package reflect
 
+import scala.quoted.QuoteContext
+
 /** TASTy Reflect tree map.
  *
  *  Usage:
  *  ```
- *  class MyTreeMap[R <: scala.tasty.Reflection & Singleton](val reflect: R)
+ *  class MyTreeMap[QCtx <: scala.quoted.QuoteContext & Singleton](val reflect: QCtx)
  *      extends scala.tasty.reflect.TreeMap {
- *    import reflect.{given _, _}
+ *    import qctx.tasty._
  *    override def transformTree(tree: Tree)(using ctx: Context): Tree = ...
  *  }
  *  ```
  */
 trait TreeMap {
 
-  val reflect: Reflection
-  import reflect.{given _, _}
+  val quoteContext: QuoteContext
+  import quoteContext.tasty._
 
   def transformTree(tree: Tree)(using ctx: Context): Tree = {
     tree match {

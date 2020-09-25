@@ -48,9 +48,9 @@ object QuoteContextImpl {
 
 }
 
-class QuoteContextImpl private (ctx: Context) extends QuoteContext:
+class QuoteContextImpl private (ctx: Context) extends QuoteContext, scala.internal.tasty.CompilerInterface:
 
-  object tasty extends scala.tasty.Reflection, scala.internal.tasty.CompilerInterface:
+  object tasty extends Reflection:
 
     def rootContext: Context = ctx
 
@@ -68,11 +68,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
         def pos: Position = self.sourcePos
         def symbol: Symbol = self.symbol
         def showExtractors: String =
-          new ExtractorsPrinter[tasty.type](tasty).showTree(self)
+          new ExtractorsPrinter[QuoteContextImpl.this.type](QuoteContextImpl.this).showTree(self)
         def show: String =
           self.showWith(SyntaxHighlight.plain)
         def showWith(syntaxHighlight: SyntaxHighlight): String =
-          new SourceCodePrinter[tasty.type](tasty)(syntaxHighlight).showTree(self)
+          new SourceCodePrinter[QuoteContextImpl.this.type](QuoteContextImpl.this)(syntaxHighlight).showTree(self)
         def isExpr: Boolean =
           self match
             case TermTypeTest(self) =>
@@ -85,7 +85,7 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
       extension [T](tree: Tree)
         def asExprOf(using scala.quoted.Type[T])(using QuoteContext): scala.quoted.Expr[T] =
           if tree.isExpr then
-            new scala.internal.quoted.Expr(tree, compilerId).asExprOf[T]
+            new scala.internal.quoted.Expr(tree, internal.compilerId).asExprOf[T]
           else tree match
             case TermTypeTest(tree) => throw new Exception("Expected an expression. This is a partially applied Term. Try eta-expanding the term first.")
             case _ => throw new Exception("Expected a Term but was: " + tree)
@@ -300,11 +300,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
     object TermMethodsImpl extends TermMethods:
       extension (self: Term):
         def seal: scala.quoted.Expr[Any] =
-          if self.isExpr then new scala.internal.quoted.Expr(self, compilerId)
+          if self.isExpr then new scala.internal.quoted.Expr(self, internal.compilerId)
           else throw new Exception("Cannot seal a partially applied Term. Try eta-expanding the term first.")
 
         def sealOpt: Option[scala.quoted.Expr[Any]] =
-          if self.isExpr then Some(new scala.internal.quoted.Expr(self, compilerId))
+          if self.isExpr then Some(new scala.internal.quoted.Expr(self, internal.compilerId))
           else None
 
         def tpe: Type = self.tpe
@@ -1572,16 +1572,16 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
     object TypeMethodsImpl extends TypeMethods:
       extension (self: Type):
         def showExtractors: String =
-          new ExtractorsPrinter[tasty.type](tasty).showType(self)
+          new ExtractorsPrinter[QuoteContextImpl.this.type](QuoteContextImpl.this).showType(self)
 
         def show: String =
           self.showWith(SyntaxHighlight.plain)
 
         def showWith(syntaxHighlight: SyntaxHighlight): String =
-          new SourceCodePrinter[tasty.type](tasty)(syntaxHighlight).showType(self)
+          new SourceCodePrinter[QuoteContextImpl.this.type](QuoteContextImpl.this)(syntaxHighlight).showType(self)
 
         def seal: scala.quoted.Type[_] =
-          new scala.internal.quoted.Type(Inferred(self), compilerId)
+          new scala.internal.quoted.Type(Inferred(self), internal.compilerId)
 
         def =:=(that: Type): Boolean = self =:= that
         def <:<(that: Type): Boolean = self <:< that
@@ -2077,11 +2077,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
       extension (self: Constant):
         def value: Any = self.value
         def showExtractors: String =
-          new ExtractorsPrinter[tasty.type](tasty).showConstant(self)
+          new ExtractorsPrinter[QuoteContextImpl.this.type](QuoteContextImpl.this).showConstant(self)
         def show: String =
           self.showWith(SyntaxHighlight.plain)
         def showWith(syntaxHighlight: SyntaxHighlight): String =
-          new SourceCodePrinter[tasty.type](tasty)(syntaxHighlight).showConstant(self)
+          new SourceCodePrinter[QuoteContextImpl.this.type](QuoteContextImpl.this)(syntaxHighlight).showConstant(self)
       end extension
     end ConstantMethodsImpl
 
@@ -2298,11 +2298,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
         def children: List[Symbol] = self.denot.children
 
         def showExtractors: String =
-          new ExtractorsPrinter[tasty.type](tasty).showSymbol(self)
+          new ExtractorsPrinter[QuoteContextImpl.this.type](QuoteContextImpl.this).showSymbol(self)
         def show: String =
           self.showWith(SyntaxHighlight.plain)
         def showWith(syntaxHighlight: SyntaxHighlight): String =
-          new SourceCodePrinter[tasty.type](tasty)(syntaxHighlight).showSymbol(self)
+          new SourceCodePrinter[QuoteContextImpl.this.type](QuoteContextImpl.this)(syntaxHighlight).showSymbol(self)
 
       end extension
 
@@ -2434,11 +2434,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
         def |(that: Flags): Flags = dotc.core.Flags.extension_|(self)(that)
         def &(that: Flags): Flags = dotc.core.Flags.extension_&(self)(that)
         def showExtractors: String =
-          new ExtractorsPrinter[tasty.type](tasty).showFlags(self)
+          new ExtractorsPrinter[QuoteContextImpl.this.type](QuoteContextImpl.this).showFlags(self)
         def show: String =
           self.showWith(SyntaxHighlight.plain)
         def showWith(syntaxHighlight: SyntaxHighlight): String =
-          new SourceCodePrinter[tasty.type](tasty)(syntaxHighlight).showFlags(self)
+          new SourceCodePrinter[QuoteContextImpl.this.type](QuoteContextImpl.this)(syntaxHighlight).showFlags(self)
       end extension
     end FlagsMethodsImpl
 
@@ -2516,6 +2516,13 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
     private def withDefaultPos[T <: Tree](fn: Context ?=> T): T =
       fn(using ctx.withSource(rootPosition.source)).withSpan(rootPosition.span)
 
+  end tasty
+
+  object internal extends InternalModule:
+
+    import tasty._
+
+    private given ctx.type = ctx
 
     def unpickleExpr(repr: Unpickler.PickledQuote, args: Unpickler.PickledArgs): Term =
       PickledQuotes.unpickleExpr(repr, args)
@@ -2569,8 +2576,9 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
       else {
         // After matching and doing all subtype checks, we have to approximate all the type bindings
         // that we have found, seal them in a quoted.Type and add them to the result
-        def typeHoleApproximation(sym: Symbol) =
-          ctx1.gadt.approximation(sym, !sym.hasAnnotation(dotc.core.Symbols.defn.InternalQuotedPatterns_fromAboveAnnot)).seal
+        def typeHoleApproximation(sym: Symbol): Object =
+          import QuoteContextImpl.this.tasty.TypeMethods
+          ctx1.gadt.approximation(sym, !sym.hasAnnotation(dotc.core.Symbols.defn.InternalQuotedPatterns_fromAboveAnnot)).seal.asInstanceOf[Object]
         matchings.map { tup =>
           Tuple.fromIArray(typeHoles.map(typeHoleApproximation).toArray.asInstanceOf[IArray[Object]]) ++ tup
         }
@@ -2635,6 +2643,6 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext:
 
     def compilerId: Int = rootContext.outersIterator.toList.last.hashCode()
 
-  end tasty
+  end internal
 
 end QuoteContextImpl

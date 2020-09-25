@@ -14,7 +14,7 @@ package reflect
  */
 trait TreeTraverser extends TreeAccumulator[Unit] {
 
-  import reflect._
+  import quoteContext.tasty._
 
   def traverseTree(tree: Tree)(using ctx: Context): Unit = traverseTreeChildren(tree)
 
