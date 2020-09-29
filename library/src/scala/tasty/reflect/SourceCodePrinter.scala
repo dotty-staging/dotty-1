@@ -951,6 +951,7 @@ class SourceCodePrinter[R <: Reflection & Singleton](val tasty: R)(syntaxHighlig
       case Constant.ClassTag(v) =>
         this += "classOf"
         inSquare(printType(v))
+      case _ => this // FIXME support Constant(_: Symbol) for enums
     }
 
     def printTypeOrBoundsTree(tpt: Tree)(using elideThis: Option[Symbol] = None): Buffer = tpt match {
