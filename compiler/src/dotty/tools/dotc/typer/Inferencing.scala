@@ -66,12 +66,11 @@ object Inferencing {
       }
       if z then isHeadDefined(tvar, force) else z
     case AppliedType(tycon, args) =>
-      isHeadDefined(tycon, force)
-      // if isHeadDefined(tycon, force) then
-      //   // tycon.dealias can be class, abstract type, type lambda
-      //   // if class: stop here
-      //   // if abstract type: look at upper bound, could be class or type lambda
-      //   // if type lambda: reduce, check if head is defined on reduction
+      isHeadDefined(tycon, force) && tycon.dealias.match
+        case tc: TypeRef if tc.symbol.isClass =>
+          true
+        case _ =>
+          isHeadDefined(tp.superType, force)
     case tp: RefinedType =>
       isHeadDefined(tp.parent, force)
     case tl: TypeLambda =>
@@ -185,6 +184,16 @@ object Inferencing {
             toMaximize = tvar :: toMaximize
           foldOver(x, tvar)
         }
+      // class Foo[T] { type Bar <: T }
+      // Foo[?A]#Bar << prefix has variance = 0
+      // three positions: top-level, in-prefix, in-args
+      case AppliedType(tycon, args) if topLevel =>
+        apply(x, tycon) // topLevel should stay true in there
+        && (tycon.dealias match
+          case tc: TypeRef if tc.symbol.isClass =>
+            true // apply(x, args) but topLevel = false
+          case _ =>
+            apply(x, tp.superType)
       case tp =>
         foldOver(x, tp)
     }
