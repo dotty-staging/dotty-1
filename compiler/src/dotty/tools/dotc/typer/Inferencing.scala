@@ -65,10 +65,20 @@ object Inferencing {
           false
       }
       if z then isHeadDefined(tvar, force) else z
-    case AppliedType(tycon, _) =>
+    case AppliedType(tycon, args) =>
       isHeadDefined(tycon, force)
+      // if isHeadDefined(tycon, force) then
+      //   // tycon.dealias can be class, abstract type, type lambda
+      //   // if class: stop here
+      //   // if abstract type: look at upper bound, could be class or type lambda
+      //   // if type lambda: reduce, check if head is defined on reduction
+    case tp: RefinedType =>
+      isHeadDefined(tp.parent, force)
     case tl: TypeLambda =>
       isHeadDefined(tl.resType, force)
+    case tp: LazyRef =>
+      isHeadDefined(tp.ref, force)
+    // A & B => define both A and B
     case _ =>
       true
   }
