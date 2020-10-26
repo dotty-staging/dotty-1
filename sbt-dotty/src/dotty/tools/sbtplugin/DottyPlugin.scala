@@ -444,7 +444,7 @@ object DottyPlugin extends AutoPlugin {
     ) ++ inConfig(Compile)(docSettings) ++ inConfig(Test)(docSettings)
   }
 
-  private val docSettings = inTask(doc)(Seq(
+  val extendDocSourcesSettings0 = inTask(doc)(Seq(
     sources := Def.taskDyn {
       val old = sources.value
 
@@ -456,7 +456,11 @@ object DottyPlugin extends AutoPlugin {
         old
       }
     }.value,
+  ))
+  val extendDocSourcesSettings =
+    inConfig(Compile)(extendDocSourcesSettings0) ++ inConfig(Test)(extendDocSourcesSettings0)
 
+  private val docSettings = inTask(doc)(Seq(
     scalacOptions ++= {
       if (isDotty.value) {
         val projectName =

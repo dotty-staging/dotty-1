@@ -1407,6 +1407,13 @@ object Build {
     .settings(
       packResourceDir += (baseDirectory.value / "bin" -> "bin"),
     )
+  object Refs {
+    val tastyCore = LocalProject("tasty-core")
+    val scala3LibraryBootstrapped = LocalProject("scala3-library-bootstrapped")
+    val scala3Interfaces = LocalProject("scala3-interfaces")
+    val scala3CompilerBootstrapped = LocalProject("scala3-compiler-bootstrapped")
+    val scala3doc = LocalProject("scala3doc")
+  }
 
   implicit class ProjectDefinitions(val project: Project) extends AnyVal {
 
@@ -1442,7 +1449,44 @@ object Build {
       settings(
         libraryDependencies += "org.scala-lang" % "scala-library" % stdlibVersion
       ).
-      settings(dottyLibrarySettings)
+      settings(dottyLibrarySettings).
+      settings((mode match {
+        case NonBootstrapped => Seq.empty
+        case Bootstrapped =>
+          Seq(
+            Test/doc/sources := (Compile/sources).value,
+          ) ++
+          dotty.tools.sbtplugin.DottyPlugin.extendDocSourcesSettings ++
+          Seq(
+          doc/scalaInstance := {
+            val externalNonBootstrappedDeps = externalDependencyClasspath.in(Refs.scala3doc, Compile).value
+            val scalaLibrary = findArtifact(externalNonBootstrappedDeps, "scala-library")
+
+            // IMPORTANT: We need to use actual jars to form the ScalaInstance and not
+            // just directories containing classfiles because sbt maintains a cache of
+            // compiler instances. This cache is invalidated based on timestamps
+            // however this is only implemented on jars, directories are never
+            // invalidated.
+            val tastyCore = packageBin.in(Refs.tastyCore, Compile).value
+            val dottyLibrary = packageBin.in(Refs.scala3LibraryBootstrapped, Compile).value
+            val dottyInterfaces = packageBin.in(Refs.scala3Interfaces, Compile).value
+            val dottyCompiler = packageBin.in(Refs.scala3CompilerBootstrapped, Compile).value
+            val doctool = packageBin.in(Refs.scala3doc, Compile).value
+
+            val allJars = Seq(tastyCore, dottyLibrary, dottyInterfaces, dottyCompiler, doctool) ++
+            externalNonBootstrappedDeps.map(_.data)
+
+            makeScalaInstance(
+              state.value,
+              scalaVersion.value,
+              scalaLibrary,
+              dottyLibrary,
+              dottyCompiler,
+              allJars
+            )
+          },
+        )
+      }) : _*)
 
     def asTastyCore(implicit mode: Mode): Project = project.withCommonSettings.
       dependsOn(dottyLibrary).
