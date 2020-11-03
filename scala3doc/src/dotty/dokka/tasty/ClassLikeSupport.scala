@@ -139,14 +139,14 @@ trait ClassLikeSupport:
         .map(_.tree)
 
     def extractMembers: Seq[Member] = {
-      // val inherited = c.getNonTrivialInheritedMemberTrees.collect {
-      //     case dd: DefDef if !dd.symbol.isClassConstructor && !(dd.symbol.isSuperBridgeMethod || dd.symbol.isDefaultHelperMethod) => dd
-      //     case other => other
-      //   }
+      println(s"extracting members of: ${c.symbol.show}")
+      val inherited = c.getNonTrivialInheritedMemberTrees.collect {
+          case dd: DefDef if !dd.symbol.isClassConstructor && !(dd.symbol.isSuperBridgeMethod || dd.symbol.isDefaultHelperMethod) => dd
+          case other => other
+        }
 
-      c.membersToDocument.flatMap(parseMember)
-      // ++
-      //   inherited.flatMap(s => parseMember(s).map(_.withOrigin(Origin.InheritedFrom(s.symbol.owner.name, s.symbol.owner.dri))))
+      c.membersToDocument.flatMap(parseMember) ++
+        inherited.flatMap(s => parseMember(s).map(_.withOrigin(Origin.InheritedFrom(s.symbol.owner.name, s.symbol.owner.dri))))
     }
 
     def getParents: List[Tree] =
