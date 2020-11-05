@@ -110,7 +110,7 @@ object SourceCode {
         val stats1 = stats.collect {
           case stat: PackageClause => stat
           case stat: Definition if !(stat.symbol.flags.is(Flags.Object) && stat.symbol.flags.is(Flags.Lazy)) => stat
-          case stat @ Import(_, _) => stat
+          case stat @ (_:Import | _:Export) => stat
         }
         name match {
           case Ident("<empty>") =>
@@ -125,7 +125,13 @@ object SourceCode {
         this += "import "
         printTree(expr)
         this += "."
-        printImportSelectors(selectors)
+        printSelectors(selectors)
+
+      case Export(expr, selectors) =>
+        this += "export "
+        printTree(expr)
+        this += "."
+        printSelectors(selectors)
 
       case cdef @ ClassDef(name, DefDef(_, targs, argss, _, _), parents, derived, self, stats) =>
         printDefAnnotations(cdef)
@@ -215,7 +221,7 @@ object SourceCode {
         }
         val stats1 = stats.collect {
           case stat: Definition if keepDefinition(stat) => stat
-          case stat @ Import(_, _) => stat
+          case stat @ (_:Import | _:Export) => stat
           case stat: Term => stat
         }
 
@@ -665,12 +671,12 @@ object SourceCode {
       this
     }
 
-    private def printImportSelectors(selectors: List[ImportSelector]): this.type = {
-      def printSeparated(list: List[ImportSelector]): Unit = list match {
+    private def printSelectors(selectors: List[Selector]): this.type = {
+      def printSeparated(list: List[Selector]): Unit = list match {
         case Nil =>
-        case x :: Nil => printImportSelector(x)
+        case x :: Nil => printSelector(x)
         case x :: xs =>
-          printImportSelector(x)
+          printSelector(x)
           this += ", "
           printSeparated(xs)
       }
@@ -1229,7 +1235,7 @@ object SourceCode {
         throw new MatchError(tpe.showExtractors)
     }
 
-    private def printImportSelector(sel: ImportSelector): this.type = sel match {
+    private def printSelector(sel: Selector): this.type = sel match {
       case SimpleSelector(name) => this += name
       case OmitSelector(name) => this += name += " => _"
       case RenameSelector(name, newName) => this += name += " => " += newName

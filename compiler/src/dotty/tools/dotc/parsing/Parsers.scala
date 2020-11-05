@@ -3730,7 +3730,7 @@ object Parsers {
         else if (in.token == IMPORT)
           stats ++= importClause(IMPORT, mkImport(outermost))
         else if (in.token == EXPORT)
-          stats ++= importClause(EXPORT, Export.apply)
+          stats ++= importClause(EXPORT, Export(_,_))
         else if isIdent(nme.extension) && followingIsExtension() then
           stats += extension()
         else if isDefIntro(modifierTokens) then
@@ -3784,7 +3784,7 @@ object Parsers {
         if (in.token == IMPORT)
           stats ++= importClause(IMPORT, mkImport())
         else if (in.token == EXPORT)
-          stats ++= importClause(EXPORT, Export.apply)
+          stats ++= importClause(EXPORT, Export(_,_))
         else if isIdent(nme.extension) && followingIsExtension() then
           stats += extension()
         else if (isDefIntro(modifierTokensOrCase))
