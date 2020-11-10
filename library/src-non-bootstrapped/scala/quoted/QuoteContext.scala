@@ -1,6 +1,6 @@
 package scala.quoted
 
-trait QuoteContext { self =>
+trait QuoteContext { self: scala.internal.quoted.QuoteContextInternal =>
 
   val reflect: scala.tasty.Reflection
 
