@@ -18,38 +18,38 @@ class BootstrappedStdLibTASYyTest:
 
   /** Test that we can load trees from TASTy */
   @Test def testTastyInspector: Unit =
-    loadWithTastyInspector(loadBlacklisted)
+    loadWithTastyInspector0(loadBlacklisted)
 
-  /** Test that we can load and compile trees from TASTy in a Jar */
-  @Test def testFromTastyInJar: Unit =
-    compileFromTastyInJar(loadBlacklisted.union(compileBlacklisted))
+  // /** Test that we can load and compile trees from TASTy in a Jar */
+  // @Test def testFromTastyInJar: Unit =
+  //   compileFromTastyInJar(loadBlacklisted.union(compileBlacklisted))
 
-  /** Test that we can load and compile trees from TASTy */
-  @Test def testFromTasty: Unit =
-    compileFromTasty(loadBlacklisted.union(compileBlacklisted))
+  // /** Test that we can load and compile trees from TASTy */
+  // @Test def testFromTasty: Unit =
+  //   compileFromTasty(loadBlacklisted.union(compileBlacklisted))
 
-  @Test def blacklistNoDuplicates =
-    def testDup(name: String, list: List[String], set: Set[String]) =
-      assert(list.size == set.size,
-        list.diff(set.toSeq).mkString(s"`$name` has duplicate entries:\n  ", "\n  ", "\n\n"))
-    testDup("loadBlacklist", loadBlacklist, loadBlacklisted)
-    testDup("compileBlacklist", compileBlacklist, compileBlacklisted)
+  // @Test def blacklistNoDuplicates =
+  //   def testDup(name: String, list: List[String], set: Set[String]) =
+  //     assert(list.size == set.size,
+  //       list.diff(set.toSeq).mkString(s"`$name` has duplicate entries:\n  ", "\n  ", "\n\n"))
+  //   testDup("loadBlacklist", loadBlacklist, loadBlacklisted)
+  //   testDup("compileBlacklist", compileBlacklist, compileBlacklisted)
 
-  @Test def blacklistsNoIntersection =
-    val intersection = loadBlacklisted & compileBlacklisted
-    assert(intersection.isEmpty,
-      intersection.mkString(
-        "`compileBlacklist` contains names that are already in `loadBlacklist`: \n  ", "\n  ", "\n\n"))
+  // @Test def blacklistsNoIntersection =
+  //   val intersection = loadBlacklisted & compileBlacklisted
+  //   assert(intersection.isEmpty,
+  //     intersection.mkString(
+  //       "`compileBlacklist` contains names that are already in `loadBlacklist`: \n  ", "\n  ", "\n\n"))
 
-  @Test def blacklistsOnlyContainsClassesThatExist =
-    val scalaLibTastyPathsSet = scalaLibTastyPaths.toSet
-    val intersection = loadBlacklisted & compileBlacklisted
-    assert(loadBlacklisted.diff(scalaLibTastyPathsSet).isEmpty,
-      loadBlacklisted.diff(scalaLibTastyPathsSet).mkString(
-        "`loadBlacklisted` contains names that are not in `scalaLibTastyPaths`: \n  ", "\n  ", "\n\n"))
-    assert(compileBlacklisted.diff(scalaLibTastyPathsSet).isEmpty,
-      compileBlacklisted.diff(scalaLibTastyPathsSet).mkString(
-        "`loadBlacklisted` contains names that are not in `scalaLibTastyPaths`: \n  ", "\n  ", "\n\n"))
+  // @Test def blacklistsOnlyContainsClassesThatExist =
+  //   val scalaLibTastyPathsSet = scalaLibTastyPaths.toSet
+  //   val intersection = loadBlacklisted & compileBlacklisted
+  //   assert(loadBlacklisted.diff(scalaLibTastyPathsSet).isEmpty,
+  //     loadBlacklisted.diff(scalaLibTastyPathsSet).mkString(
+  //       "`loadBlacklisted` contains names that are not in `scalaLibTastyPaths`: \n  ", "\n  ", "\n\n"))
+  //   assert(compileBlacklisted.diff(scalaLibTastyPathsSet).isEmpty,
+  //     compileBlacklisted.diff(scalaLibTastyPathsSet).mkString(
+  //       "`loadBlacklisted` contains names that are not in `scalaLibTastyPaths`: \n  ", "\n  ", "\n\n"))
 
   @Ignore
   @Test def testLoadBacklistIsMinimal =
@@ -105,6 +105,32 @@ object BootstrappedStdLibTASYyTest:
       def processCompilationUnit(using QuoteContext)(root: qctx.reflect.Tree): Unit =
         root.showExtractors // Check that we can traverse the full tree
         ()
+    }
+    val tastyFiles = scalaLibTastyPaths.filterNot(blacklisted)
+    val hasErrors = inspector.inspectTastyFiles(tastyFiles.map(x => scalaLibClassesPath.resolve(x).toString))
+    assert(!hasErrors, "Errors reported while loading from TASTy")
+
+  def loadWithTastyInspector0(blacklisted: Set[String]): Unit =
+    val inspector = new scala.tasty.inspector.TastyInspector {
+      def processCompilationUnit(using QuoteContext)(root: qctx.reflect.Tree): Unit =
+        root.showExtractors // Check that we can traverse the full tree
+        import qctx.reflect._
+        val traverser = new TreeTraverser {
+          override def traverseTree(tree: Tree)(using ctx: Context): Unit = {
+            // qctx.reflect.Symbol.classSymbol("scala.Function").flags
+            if tree.symbol.show == "scala.Function" then {
+              println("this is function")
+              tree.symbol.flags
+            }
+            super.traverseTree(tree)
+          }
+        }
+        traverser.traverseTree(root)
+        ()
+
+      override def finishProcessingCompilationUnits(using QuoteContext): Unit = {
+        qctx.reflect.Symbol.classSymbol("scala.Function").flags
+      }
     }
     val tastyFiles = scalaLibTastyPaths.filterNot(blacklisted)
     val hasErrors = inspector.inspectTastyFiles(tastyFiles.map(x => scalaLibClassesPath.resolve(x).toString))

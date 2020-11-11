@@ -20,6 +20,9 @@ trait TastyInspector:
   /** Process a TASTy file using TASTy reflect */
   protected def processCompilationUnit(using QuoteContext)(root: qctx.reflect.Tree): Unit
 
+  /** Called after all compilation units are processed */
+  protected def finishProcessingCompilationUnits(using QuoteContext): Unit = ()
+
   /** Load and process TASTy files using TASTy reflect
    *
    *  @param tastyFiles List of paths of `.tasty` files
@@ -71,6 +74,7 @@ trait TastyInspector:
 
       override protected def backendPhases: List[List[Phase]] =
         List(new TastyInspectorPhase) ::  // Print all loaded classes
+        List(new TastyInspectorFinishPhase) :: // 
         Nil
 
       override def newRun(implicit ctx: Context): Run =
@@ -88,6 +92,19 @@ trait TastyInspector:
         self.processCompilationUnit(using qctx)(ctx.compilationUnit.tpdTree.asInstanceOf[qctx.reflect.Tree])
 
     end TastyInspectorPhase
+
+    class TastyInspectorFinishPhase extends Phase:
+
+      override def phaseName: String = "tastyInspectorFinish"
+
+      override def run(implicit ctx: Context): Unit =
+        if !alreadyRan then
+          val qctx = QuoteContextImpl()
+          self.finishProcessingCompilationUnits(using qctx)
+          alreadyRan = true
+
+      var alreadyRan = false
+    end TastyInspectorFinishPhase
 
     val currentClasspath = ClasspathFromClassloader(getClass.getClassLoader)
     val fullClasspath = (classpath :+ currentClasspath).mkString(pathSeparator)
