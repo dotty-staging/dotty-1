@@ -13,7 +13,7 @@ final class Type[Tree](val typeTree: Tree, val scopeId: Int) extends scala.quote
   }
 
   /** View this expression `quoted.Type[T]` as a `TypeTree` */
-  def unseal(using qctx: QuoteContext): qctx.reflect.TypeTree =
+  def unseal(using qctx: Quotes): quotes.reflect.TypeTree =
     throw new Exception("Non bootstrapped lib")
 
   def checkScopeId(scopeId: Int): Unit =
@@ -35,38 +35,38 @@ object Type {
    *  @param scrutineeType `Type[_]` on which we are pattern matching
    *  @param patternType `Type[_]` containing the pattern tree
    *  @param hasTypeSplices `Boolean` notify if the pattern has type splices (if so we use a GADT context)
-   *  @param qctx the current QuoteContext
+   *  @param qctx the current Quotes
    *  @return None if it did not match, `Some(tup)` if it matched where `tup` contains `Type[Ti]``
    */
   def unapply[TypeBindings <: Tuple, Tup <: Tuple](scrutineeType: scala.quoted.Type[_])(using patternType: scala.quoted.Type[_],
-        hasTypeSplices: Boolean, qctx: QuoteContext): Option[Tup] =
+        hasTypeSplices: Boolean, qctx: Quotes): Option[Tup] =
     throw new Exception("Non bootstrapped lib")
 
-  def Unit: QuoteContext ?=> quoted.Type[Unit] =
+  def Unit: Quotes ?=> quoted.Type[Unit] =
     throw new Exception("Non bootstrapped lib")
 
-  def Boolean: QuoteContext ?=> quoted.Type[Boolean] =
+  def Boolean: Quotes ?=> quoted.Type[Boolean] =
     throw new Exception("Non bootstrapped lib")
 
-  def Byte: QuoteContext ?=> quoted.Type[Byte] =
+  def Byte: Quotes ?=> quoted.Type[Byte] =
     throw new Exception("Non bootstrapped lib")
 
-  def Char: QuoteContext ?=> quoted.Type[Char] =
+  def Char: Quotes ?=> quoted.Type[Char] =
     throw new Exception("Non bootstrapped lib")
 
-  def Short: QuoteContext ?=> quoted.Type[Short] =
+  def Short: Quotes ?=> quoted.Type[Short] =
     throw new Exception("Non bootstrapped lib")
 
-  def Int: QuoteContext ?=> quoted.Type[Int] =
+  def Int: Quotes ?=> quoted.Type[Int] =
     throw new Exception("Non bootstrapped lib")
 
-  def Long: QuoteContext ?=> quoted.Type[Long] =
+  def Long: Quotes ?=> quoted.Type[Long] =
     throw new Exception("Non bootstrapped lib")
 
-  def Float: QuoteContext ?=> quoted.Type[Float] =
+  def Float: Quotes ?=> quoted.Type[Float] =
     throw new Exception("Non bootstrapped lib")
 
-  def Double: QuoteContext ?=> quoted.Type[Double] =
+  def Double: Quotes ?=> quoted.Type[Double] =
     throw new Exception("Non bootstrapped lib")
 
 }

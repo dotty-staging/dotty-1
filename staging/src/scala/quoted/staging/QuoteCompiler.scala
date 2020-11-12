@@ -68,7 +68,7 @@ private class QuoteCompiler extends Compiler:
 
           val quoted =
             given Context = unitCtx.withOwner(meth)
-            val qctx = dotty.tools.dotc.quoted.QuoteContextImpl()
+            val qctx = dotty.tools.dotc.quoted.QuotesImpl()
             val quoted = PickledQuotes.quotedExprToTree(exprUnit.exprBuilder.apply(qctx))
             checkEscapedVariables(quoted, meth)
           end quoted

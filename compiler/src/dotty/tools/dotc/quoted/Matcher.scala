@@ -97,14 +97,14 @@ import scala.quoted._
  */
 object Matcher {
 
-  abstract class QuoteMatcher[QCtx <: QuoteContext & Singleton](val qctx: QCtx) {
+  abstract class QuoteMatcher[Q <: Quotes & Singleton](val quotes: Q) {
 
     // TODO improve performance
 
-    // TODO use flag from qctx.reflect. Maybe -debug or add -debug-macros
+    // TODO use flag from quotes.reflect. Maybe -debug or add -debug-macros
     private final val debug = false
 
-    import qctx.reflect._
+    import quotes.reflect._
     import Matching._
 
     def patternHoleSymbol: Symbol

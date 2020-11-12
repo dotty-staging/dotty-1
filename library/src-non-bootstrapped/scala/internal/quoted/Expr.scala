@@ -18,7 +18,7 @@ import scala.quoted._
     case _ => false
   }
 
-  def unseal(using qctx: QuoteContext): qctx.reflect.Term =
+  def unseal(using qctx: Quotes): quotes.reflect.Term =
     throw new Exception("Non bootstrapped lib")
 
   def checkScopeId(scopeId: Int): Unit =
@@ -31,13 +31,13 @@ import scala.quoted._
 object Expr {
 
   def unapply[TypeBindings <: Tuple, Tup <: Tuple](scrutineeExpr: scala.quoted.Expr[Any])(using patternExpr: scala.quoted.Expr[Any],
-        hasTypeSplices: Boolean, qctx: QuoteContext): Option[Tup] =
+        hasTypeSplices: Boolean, qctx: Quotes): Option[Tup] =
     throw new Exception("Non bootstrapped lib")
 
-  def `null`: QuoteContext ?=> quoted.Expr[Null] =
+  def `null`: Quotes ?=> quoted.Expr[Null] =
     throw new Exception("Non bootstrapped lib")
 
-  def Unit: QuoteContext ?=> quoted.Expr[Unit] =
+  def Unit: Quotes ?=> quoted.Expr[Unit] =
     throw new Exception("Non bootstrapped lib")
 
 }

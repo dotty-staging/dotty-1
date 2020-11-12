@@ -54,7 +54,7 @@ import scala.annotation.constructorOnly
  *       typeHole = (idx: Int, args: List[Any]) => idx match {
  *         case 0 => ...
  *       },
- *       termHole = (idx: Int, args: List[Any], qctx: QuoteContext) => idx match {
+ *       termHole = (idx: Int, args: List[Any], qctx: Quotes) => idx match {
  *         case 0 => ...
  *         ...
  *         case <i> =>
@@ -151,15 +151,15 @@ class PickleQuotes extends MacroTransform {
        *
        *  Generate the code
        *  ```scala
-       *    qctx => qctx.reflect.TreeMethods.asExpr(
-       *      qctx.reflect.Literal.apply(x$1.reflect.Constant.<typeName>.apply(<literalValue>))
+       *    qctx => quotes.reflect.TreeMethods.asExpr(
+       *      quotes.reflect.Literal.apply(x$1.reflect.Constant.<typeName>.apply(<literalValue>))
        *    ).asInstanceOf[scala.quoted.Expr[<body.type>]]
        *  ```
        *  this closure is always applied directly to the actual context and the BetaReduce phase removes it.
        */
       def pickleAsLiteral(lit: Literal) = {
         val exprType = defn.QuotedExprClass.typeRef.appliedTo(body.tpe)
-        val lambdaTpe = MethodType(defn.QuoteContextClass.typeRef :: Nil, exprType)
+        val lambdaTpe = MethodType(defn.QuotesClass.typeRef :: Nil, exprType)
         def mkConst(ts: List[Tree]) = {
           val reflect = ts.head.select("reflect".toTermName)
           val typeName = body.tpe.typeSymbol.name
@@ -239,7 +239,7 @@ class PickleQuotes extends MacroTransform {
           else
             Lambda(
               MethodType(
-                List(defn.IntType, defn.SeqType.appliedTo(defn.AnyType), defn.QuoteContextClass.typeRef),
+                List(defn.IntType, defn.SeqType.appliedTo(defn.AnyType), defn.QuotesClass.typeRef),
                 defn.QuotedExprClass.typeRef.appliedTo(defn.AnyType)),
               args => {
                 val cases = termSplices.map { case (splice, idx) =>
@@ -253,7 +253,7 @@ class PickleQuotes extends MacroTransform {
 
         val quoteClass = if isType then defn.QuotedTypeClass else defn.QuotedExprClass
         val quotedType = quoteClass.typeRef.appliedTo(originalTp)
-        val lambdaTpe = MethodType(defn.QuoteContextClass.typeRef :: Nil, quotedType)
+        val lambdaTpe = MethodType(defn.QuotesClass.typeRef :: Nil, quotedType)
         def callUnpickle(ts: List[Tree]) = {
           val qctx = ts.head.asInstance(defn.QuoteUnpicklerClass.typeRef)
           val unpickleMeth = if isType then defn.QuoteUnpickler_unpickleType else defn.QuoteUnpickler_unpickleExpr
@@ -266,8 +266,8 @@ class PickleQuotes extends MacroTransform {
        *
        *  Generate the code
        *  ```scala
-       *    qctx => qctx.reflect.TypeReprMethods.asType(
-       *      qctx.reflect.TypeRepr.typeConstructorOf(classOf[<type>]])
+       *    qctx => quotes.reflect.TypeReprMethods.asType(
+       *      quotes.reflect.TypeRepr.typeConstructorOf(classOf[<type>]])
        *    ).asInstanceOf[scala.quoted.Type[<type>]]
        *  ```
        *  this closure is always applied directly to the actual context and the BetaReduce phase removes it.
@@ -275,7 +275,7 @@ class PickleQuotes extends MacroTransform {
       def taggedType() =
         val typeType = defn.QuotedTypeClass.typeRef.appliedTo(body.tpe)
         val classTree = TypeApply(ref(defn.Predef_classOf.termRef), body :: Nil)
-        val lambdaTpe = MethodType(defn.QuoteContextClass.typeRef :: Nil, typeType)
+        val lambdaTpe = MethodType(defn.QuotesClass.typeRef :: Nil, typeType)
         def callTypeConstructorOf(ts: List[Tree]) = {
           val reflect = ts.head.select("reflect".toTermName)
           val typeRepr = reflect.select("TypeRepr".toTermName).select("typeConstructorOf".toTermName).appliedTo(classTree)
@@ -370,7 +370,7 @@ class PickleQuotes extends MacroTransform {
                 assert(tpw.isInstanceOf[ValueType])
                 val argTpe =
                   if (tree.isType) defn.QuotedTypeClass.typeRef.appliedTo(tpw)
-                  else defn.FunctionType(1, isContextual = true).appliedTo(defn.QuoteContextClass.typeRef, defn.QuotedExprClass.typeRef.appliedTo(tpw))
+                  else defn.FunctionType(1, isContextual = true).appliedTo(defn.QuotesClass.typeRef, defn.QuotedExprClass.typeRef.appliedTo(tpw))
                 val selectArg = arg.select(nme.apply).appliedTo(Literal(Constant(i))).cast(argTpe)
                 val capturedArg = SyntheticValDef(UniqueName.fresh(tree.symbol.name.toTermName).toTermName, selectArg)
                 i += 1

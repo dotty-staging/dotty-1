@@ -13,25 +13,25 @@ import dotty.tools.dotc.quoted.reflect._
 import dotty.tools.dotc.quoted.QuoteUtils._
 import dotty.tools.dotc.core.Decorators._
 
-import scala.quoted.QuoteContext
+import scala.quoted.Quotes
 import scala.quoted.internal.{QuoteUnpickler, QuoteMatching}
 import dotty.tools.dotc.quoted.printers.{Extractors, SourceCode, SyntaxHighlight}
 
 import scala.tasty.reflect._
 
-object QuoteContextImpl {
+object QuotesImpl {
 
   type ScopeId = Int
 
-  def apply()(using Context): QuoteContext =
-    new QuoteContextImpl(ctx)
+  def apply()(using Context): Quotes =
+    new QuotesImpl(ctx)
 
   def showDecompiledTree(tree: tpd.Tree)(using Context): String = {
-    val qctx: QuoteContextImpl = new QuoteContextImpl(MacroExpansion.context(tree))
+    val quotes: QuotesImpl = new QuotesImpl(MacroExpansion.context(tree))
     if ctx.settings.color.value == "always" then
-      qctx.reflect.TreeMethodsImpl.temporaryShowAnsiColored(tree)
+      quotes.reflect.TreeMethodsImpl.temporaryShowAnsiColored(tree)
     else
-      qctx.reflect.TreeMethodsImpl.temporaryShow(tree)
+      quotes.reflect.TreeMethodsImpl.temporaryShow(tree)
   }
 
   // TODO Explore more fine grained scope ids.
@@ -41,7 +41,7 @@ object QuoteContextImpl {
 
 }
 
-class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickler, QuoteMatching:
+class QuotesImpl private (ctx: Context) extends Quotes, QuoteUnpickler, QuoteMatching:
 
   extension [T](self: scala.quoted.Expr[T]):
     def show: String =
@@ -55,7 +55,7 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
 
     def asReflectTree: reflect.Term =
       val expr = self.asInstanceOf[ExprImpl]
-      expr.checkScopeId(QuoteContextImpl.this.hashCode)
+      expr.checkScopeId(QuotesImpl.this.hashCode)
       expr.tree
 
   end extension
@@ -94,11 +94,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
         def pos: Position = self.sourcePos
         def symbol: Symbol = self.symbol
         def showExtractors: String =
-          Extractors.showTree(using QuoteContextImpl.this)(self)
+          Extractors.showTree(using QuotesImpl.this)(self)
         def show: String =
-          SourceCode.showTree(using QuoteContextImpl.this)(self)(SyntaxHighlight.plain)
+          SourceCode.showTree(using QuotesImpl.this)(self)(SyntaxHighlight.plain)
         def showAnsiColored: String =
-          SourceCode.showTree(using QuoteContextImpl.this)(self)(SyntaxHighlight.ANSI)
+          SourceCode.showTree(using QuotesImpl.this)(self)(SyntaxHighlight.ANSI)
         def isExpr: Boolean =
           self match
             case TermTypeTest(self) =>
@@ -108,7 +108,7 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
             case _ => false
         def asExpr: scala.quoted.Expr[Any] =
           if self.isExpr then
-            new ExprImpl(self, QuoteContextImpl.this.hashCode)
+            new ExprImpl(self, QuotesImpl.this.hashCode)
           else self match
             case TermTypeTest(self) => throw new Exception("Expected an expression. This is a partially applied Term. Try eta-expanding the term first.")
             case _ => throw new Exception("Expected a Term but was: " + self)
@@ -116,7 +116,7 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
 
       extension [T](self: Tree)
         def asExprOf(using tp: scala.quoted.Type[T]): scala.quoted.Expr[T] =
-          QuoteContextImpl.this.asExprOf[T](self.asExpr)(using tp)
+          QuotesImpl.this.asExprOf[T](self.asExpr)(using tp)
       end extension
 
     end TreeMethodsImpl
@@ -352,11 +352,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
     object TermMethodsImpl extends TermMethods:
       extension (self: Term):
         def seal: scala.quoted.Expr[Any] =
-          if self.isExpr then new ExprImpl(self, QuoteContextImpl.this.hashCode)
+          if self.isExpr then new ExprImpl(self, QuotesImpl.this.hashCode)
           else throw new Exception("Cannot seal a partially applied Term. Try eta-expanding the term first.")
 
         def sealOpt: Option[scala.quoted.Expr[Any]] =
-          if self.isExpr then Some(new ExprImpl(self, QuoteContextImpl.this.hashCode))
+          if self.isExpr then Some(new ExprImpl(self, QuotesImpl.this.hashCode))
           else None
 
         def tpe: TypeRepr = self.tpe
@@ -1634,18 +1634,18 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
     object TypeReprMethodsImpl extends TypeReprMethods:
       extension (self: TypeRepr):
         def showExtractors: String =
-          Extractors.showType(using QuoteContextImpl.this)(self)
+          Extractors.showType(using QuotesImpl.this)(self)
 
         def show: String =
-          SourceCode.showType(using QuoteContextImpl.this)(self)(SyntaxHighlight.plain)
+          SourceCode.showType(using QuotesImpl.this)(self)(SyntaxHighlight.plain)
 
         def showAnsiColored: String =
-          SourceCode.showType(using QuoteContextImpl.this)(self)(SyntaxHighlight.ANSI)
+          SourceCode.showType(using QuotesImpl.this)(self)(SyntaxHighlight.ANSI)
 
         def seal: scala.quoted.Type[_] = self.asType
 
         def asType: scala.quoted.Type[?] =
-          new TypeImpl(Inferred(self), QuoteContextImpl.this.hashCode)
+          new TypeImpl(Inferred(self), QuotesImpl.this.hashCode)
 
         def =:=(that: TypeRepr): Boolean = self =:= that
         def <:<(that: TypeRepr): Boolean = self <:< that
@@ -2219,11 +2219,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
       extension (self: Constant):
         def value: Any = self.value
         def showExtractors: String =
-          Extractors.showConstant(using QuoteContextImpl.this)(self)
+          Extractors.showConstant(using QuotesImpl.this)(self)
         def show: String =
-          SourceCode.showConstant(using QuoteContextImpl.this)(self)(SyntaxHighlight.plain)
+          SourceCode.showConstant(using QuotesImpl.this)(self)(SyntaxHighlight.plain)
         def showAnsiColored: String =
-          SourceCode.showConstant(using QuoteContextImpl.this)(self)(SyntaxHighlight.ANSI)
+          SourceCode.showConstant(using QuotesImpl.this)(self)(SyntaxHighlight.ANSI)
       end extension
     end ConstantMethodsImpl
 
@@ -2442,11 +2442,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
         def children: List[Symbol] = self.denot.children
 
         def showExtractors: String =
-          Extractors.showSymbol(using QuoteContextImpl.this)(self)
+          Extractors.showSymbol(using QuotesImpl.this)(self)
         def show: String =
-          SourceCode.showSymbol(using QuoteContextImpl.this)(self)(SyntaxHighlight.plain)
+          SourceCode.showSymbol(using QuotesImpl.this)(self)(SyntaxHighlight.plain)
         def showAnsiColored: String =
-          SourceCode.showSymbol(using QuoteContextImpl.this)(self)(SyntaxHighlight.ANSI)
+          SourceCode.showSymbol(using QuotesImpl.this)(self)(SyntaxHighlight.ANSI)
 
       end extension
 
@@ -2578,11 +2578,11 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
         def |(that: Flags): Flags = dotc.core.Flags.or(self, that) // TODO: Replace with dotc.core.Flags.|(self)(that)  once extension names have stabilized
         def &(that: Flags): Flags = dotc.core.Flags.and(self, that)// TODO: Replace with dotc.core.Flags.&(self)(that)  once extension names have stabilized
         def showExtractors: String =
-          Extractors.showFlags(using QuoteContextImpl.this)(self)
+          Extractors.showFlags(using QuotesImpl.this)(self)
         def show: String =
-          SourceCode.showFlags(using QuoteContextImpl.this)(self)(SyntaxHighlight.plain)
+          SourceCode.showFlags(using QuotesImpl.this)(self)(SyntaxHighlight.plain)
         def showAnsiColored: String =
-          SourceCode.showFlags(using QuoteContextImpl.this)(self)(SyntaxHighlight.ANSI)
+          SourceCode.showFlags(using QuotesImpl.this)(self)(SyntaxHighlight.ANSI)
       end extension
     end FlagsMethodsImpl
 
@@ -2658,18 +2658,18 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
 
   end reflect
 
-  def unpickleExpr[T](pickled: String | List[String], typeHole: (Int, Seq[Any]) => scala.quoted.Type[?], termHole: (Int, Seq[Any], scala.quoted.QuoteContext) => scala.quoted.Expr[?]): scala.quoted.Expr[T] =
+  def unpickleExpr[T](pickled: String | List[String], typeHole: (Int, Seq[Any]) => scala.quoted.Type[?], termHole: (Int, Seq[Any], scala.quoted.Quotes) => scala.quoted.Expr[?]): scala.quoted.Expr[T] =
     val tree = PickledQuotes.unpickleTerm(pickled, typeHole, termHole)(using reflect.rootContext)
     new ExprImpl(tree, hash).asInstanceOf[scala.quoted.Expr[T]]
 
-  def unpickleType[T <: AnyKind](pickled: String | List[String], typeHole: (Int, Seq[Any]) => scala.quoted.Type[?], termHole: (Int, Seq[Any], scala.quoted.QuoteContext) => scala.quoted.Expr[?]): scala.quoted.Type[T] =
+  def unpickleType[T <: AnyKind](pickled: String | List[String], typeHole: (Int, Seq[Any]) => scala.quoted.Type[?], termHole: (Int, Seq[Any], scala.quoted.Quotes) => scala.quoted.Expr[?]): scala.quoted.Type[T] =
     val tree = PickledQuotes.unpickleTypeTree(pickled, typeHole, termHole)(using reflect.rootContext)
     new TypeImpl(tree, hash).asInstanceOf[scala.quoted.Type[T]]
 
   object ExprMatch extends ExprMatchModule:
     def unapply[TypeBindings <: Tuple, Tup <: Tuple](scrutinee: scala.quoted.Expr[Any])(using pattern: scala.quoted.Expr[Any]): Option[Tup] =
-      val scrutineeTree = QuoteContextImpl.this.asReflectTree(scrutinee)
-      val patternTree = QuoteContextImpl.this.asReflectTree(pattern)
+      val scrutineeTree = QuotesImpl.this.asReflectTree(scrutinee)
+      val patternTree = QuotesImpl.this.asReflectTree(pattern)
       treeMatch(scrutineeTree, patternTree).asInstanceOf[Option[Tup]]
   end ExprMatch
 
@@ -2708,7 +2708,7 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
         ctx1.gadt.addToConstraint(typeHoles)
         ctx1
 
-    val qctx1 = dotty.tools.dotc.quoted.QuoteContextImpl()(using ctx1)
+    val qctx1 = dotty.tools.dotc.quoted.QuotesImpl()(using ctx1)
 
     val matcher = new Matcher.QuoteMatcher[qctx1.type](qctx1) {
       def patternHoleSymbol: qctx1.reflect.Symbol = dotc.core.Symbols.defn.InternalQuotedPatterns_patternHole.asInstanceOf
@@ -2716,8 +2716,8 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
     }
 
     val matchings =
-      if pat1.isType then matcher.termMatch(scrutinee.asInstanceOf[matcher.qctx.reflect.Term], pat1.asInstanceOf[matcher.qctx.reflect.Term])
-      else matcher.termMatch(scrutinee.asInstanceOf[matcher.qctx.reflect.Term], pat1.asInstanceOf[matcher.qctx.reflect.Term])
+      if pat1.isType then matcher.termMatch(scrutinee.asInstanceOf[matcher.quotes.reflect.Term], pat1.asInstanceOf[matcher.quotes.reflect.Term])
+      else matcher.termMatch(scrutinee.asInstanceOf[matcher.quotes.reflect.Term], pat1.asInstanceOf[matcher.quotes.reflect.Term])
 
     // val matchings = matcher.termMatch(scrutinee, pattern)
     if typeHoles.isEmpty then matchings
@@ -2732,7 +2732,7 @@ class QuoteContextImpl private (ctx: Context) extends QuoteContext, QuoteUnpickl
     }
   }
 
-  private[this] val hash = QuoteContextImpl.scopeId(using ctx)
+  private[this] val hash = QuotesImpl.scopeId(using ctx)
   override def hashCode: Int = hash
 
-end QuoteContextImpl
+end QuotesImpl

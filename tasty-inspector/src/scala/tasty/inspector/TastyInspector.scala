@@ -9,7 +9,7 @@ import dotty.tools.dotc.core.Contexts.Context
 import dotty.tools.dotc.core.Mode
 import dotty.tools.dotc.core.Phases.Phase
 import dotty.tools.dotc.fromtasty._
-import dotty.tools.dotc.quoted.QuoteContextImpl
+import dotty.tools.dotc.quoted.QuotesImpl
 import dotty.tools.dotc.util.ClasspathFromClassloader
 
 import java.io.File.pathSeparator
@@ -84,7 +84,7 @@ trait TastyInspector:
       override def phaseName: String = "tastyInspector"
 
       override def run(implicit ctx: Context): Unit =
-        val qctx = QuoteContextImpl()
+        val qctx = QuotesImpl()
         self.processCompilationUnit(using qctx)(ctx.compilationUnit.tpdTree.asInstanceOf[qctx.reflect.Tree])
 
     end TastyInspectorPhase

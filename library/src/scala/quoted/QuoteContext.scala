@@ -1,14 +1,16 @@
 package scala.quoted
 
+type QuoteContext = Quotes
+
 /** Quotation context provided by a macro expansion or in the scope of `scala.quoted.run`.
  *  Used to perform all operations on quoted `Expr` or `Type`.
  *
  *  It contains the low-level Typed AST API metaprogramming API.
  *  This API does not have the static type guarantiees that `Expr` and `Type` provide.
  *
- *  @param tasty Typed AST API. Usage: `def f(qctx: QuoteContext) = { import qctx.reflect._; ... }`.
+ *  @param tasty Typed AST API. Usage: `def f(qctx: Quotes) = { import quotes.reflect._; ... }`.
  */
-trait QuoteContext { self: internal.QuoteUnpickler & internal.QuoteMatching =>
+trait Quotes { self: internal.QuoteUnpickler & internal.QuoteMatching =>
 
   // Extension methods for `Expr[T]`
   extension [T](self: Expr[T]):
@@ -34,7 +36,7 @@ trait QuoteContext { self: internal.QuoteUnpickler & internal.QuoteMatching =>
      *  Otherwise returns the `Some` of the value.
      */
     def unlift(using unlift: Unliftable[T]): Option[T] =
-      unlift.fromExpr(self)(using QuoteContext.this)
+      unlift.fromExpr(self)(using Quotes.this)
 
     /** Return the unlifted value of this expression.
      *
@@ -44,8 +46,8 @@ trait QuoteContext { self: internal.QuoteUnpickler & internal.QuoteMatching =>
     def unliftOrError(using unlift: Unliftable[T]): T =
       def reportError =
         val msg = s"Expected a known value. \n\nThe value of: ${self.show}\ncould not be unlifted using $unlift"
-        report.throwError(msg, self)(using QuoteContext.this)
-      unlift.fromExpr(self)(using QuoteContext.this).getOrElse(reportError)
+        report.throwError(msg, self)(using Quotes.this)
+      unlift.fromExpr(self)(using Quotes.this).getOrElse(reportError)
 
     /** View this expression `quoted.Expr[T]` as a `Term` */
     def unseal: reflect.Term = self.asReflectTree // TODO remove
@@ -68,20 +70,20 @@ trait QuoteContext { self: internal.QuoteUnpickler & internal.QuoteMatching =>
    */
   val reflect: scala.tasty.Reflection
 
-  /** Type of a QuoteContext provided by a splice within a quote that took this context.
+  /** Type of a Quotes provided by a splice within a quote that took this context.
    *  It is only required if working with the reflection API.
    *
    *  Usually it is infered by the quotes an splices typing. But sometimes it is necessary
    *  to explicitly state that a context is nested as in the following example:
    *
    *  ```scala
-   *  def run(using qctx: QuoteContext)(tree: qctx.reflect.Tree): Unit =
+   *  def run(using qctx: Quotes)(tree: quotes.reflect.Tree): Unit =
    *    def nested()(using qctx.Nested): Expr[Int] = '{  ${ makeExpr(tree) } + 1  }
    *    '{  ${ nested() } + 2 }
-   *  def makeExpr(using qctx: QuoteContext)(tree: qctx.reflect.Tree): Expr[Int] = ???
+   *  def makeExpr(using qctx: Quotes)(tree: quotes.reflect.Tree): Expr[Int] = ???
    *  ```
    */
-  type Nested = QuoteContext {
+  type Nested = Quotes {
     val reflect: self.reflect.type
   }
 

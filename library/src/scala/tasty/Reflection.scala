@@ -106,7 +106,7 @@ import scala.tasty.reflect._
  *  ```
  */
 trait Reflection { reflection =>
-  // TODO: Move Reflection inside QuoteContext as it can never be instantiated outside a QuoteContext
+  // TODO: Move Reflection inside Quotes as it can never be instantiated outside a Quotes
 
   //////////////
   // CONTEXTS //
@@ -116,8 +116,8 @@ trait Reflection { reflection =>
   type Context <: AnyRef
 
   /** Context of the macro expansion */
-  def rootContext: Context // TODO: Should this be moved to QuoteContext?
-  given Context = rootContext // TODO: Should be an implicit converion from QuoteContext to Context
+  def rootContext: Context // TODO: Should this be moved to Quotes?
+  given Context = rootContext // TODO: Should be an implicit converion from Quotes to Context
 
   ///////////////
   //   TREES   //
@@ -3453,7 +3453,7 @@ trait Reflection { reflection =>
    *
    *  Usage:
    *  ```
-   *  import qctx.reflect._
+   *  import quotes.reflect._
    *  class MyTreeMap extends TreeMap {
    *    override def transformTree(tree: Tree)(using ctx: Context): Tree = ...
    *  }
