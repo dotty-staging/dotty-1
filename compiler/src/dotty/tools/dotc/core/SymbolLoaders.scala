@@ -175,6 +175,7 @@ object SymbolLoaders {
 
       val unit = CompilationUnit(ctx.getSource(src.path))
       enterScanned(unit)(using ctx.fresh.setCompilationUnit(unit))
+  end enterToplevelsFromSource
 
   /** The package objects of scala and scala.reflect should always
    *  be loaded in binary if classfiles are available, even if sourcefiles
@@ -305,12 +306,17 @@ object SymbolLoaders {
         }
     }
   }
+
+  private[core] type Finalizer = SymDenotation => Context ?=> Unit
+
+  private[core] val emptyFinalizer: Finalizer = sym => ()
 }
 
 /** A lazy type that completes itself by calling parameter doComplete.
  *  Any linked modules/classes or module classes are also initialized.
  */
-abstract class SymbolLoader extends LazyType { self =>
+abstract class SymbolLoader extends LazyType, Cloneable { self =>
+  import SymbolLoaders.{Finalizer, emptyFinalizer, SecondCompleter}
   /** Load source or class file for `root`, return */
   def doComplete(root: SymDenotation)(using Context): Unit
 
@@ -329,6 +335,16 @@ abstract class SymbolLoader extends LazyType { self =>
     def description(using Context): String = "proxy to ${self.description}"
   }
 
+  private var finalizer = emptyFinalizer
+
+  def withFinalizer(finalizer: Finalizer): SymbolLoader =
+    val cpy = clone().asInstanceOf[SymbolLoader]
+    cpy.finalizer = { sym =>
+      this.finalizer(sym)
+      finalizer(sym)
+    }
+    cpy
+
   override def complete(root: SymDenotation)(using Context): Unit = {
     def signalError(ex: Exception): Unit = {
       if (ctx.debug) ex.printStackTrace()
@@ -341,6 +357,7 @@ abstract class SymbolLoader extends LazyType { self =>
       val start = System.currentTimeMillis
       trace.onDebug("loading") {
         doComplete(root)
+        finalizer(root)
       }
       report.informTime("loaded " + description, start)
     }
@@ -360,8 +377,7 @@ abstract class SymbolLoader extends LazyType { self =>
     }
     finally {
       def postProcess(denot: SymDenotation) =
-        if (!denot.isCompleted &&
-            !denot.completer.isInstanceOf[SymbolLoaders.SecondCompleter])
+        if !denot.isCompleted && !denot.completer.isInstanceOf[SecondCompleter] then
           denot.markAbsent()
       postProcess(root)
       if (!root.isRoot)

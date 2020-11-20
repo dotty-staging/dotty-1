@@ -700,28 +700,22 @@ class Definitions {
     // a new constructor symbol with 2 arguments, so that both
     // `X extends jl.Enum[X]` and `X extends jl.Enum[X](name, ordinal)`
     // pass typer and go through jl.Enum-specific checks in RefChecks.
-    cls.infoOrCompleter match {
-      case completer: ClassfileLoader =>
-        cls.info = new ClassfileLoader(completer.classfile) {
-          override def complete(root: SymDenotation)(using Context): Unit = {
-            super.complete(root)
-            val constr = cls.primaryConstructor
-            val noArgInfo = constr.info match {
-              case info: PolyType =>
-                info.resType match {
-                  case meth: MethodType =>
-                    info.derivedLambdaType(
-                      resType = meth.derivedLambdaType(
-                      paramNames = Nil, paramInfos = Nil))
-                }
-            }
-            val argConstr = constr.copy().entered
-            constr.info = noArgInfo
-            constr.termRef.recomputeDenot()
-          }
+    cls.infoOrCompleter match
+      case completer: SymbolLoader =>
+        cls.info = completer.withFinalizer { sym =>
+          val constr = cls.primaryConstructor
+          val noArgInfo = constr.info match
+            case info: PolyType =>
+              info.resType match
+                case meth: MethodType =>
+                  info.derivedLambdaType(
+                    resType = meth.derivedLambdaType(
+                    paramNames = Nil, paramInfos = Nil))
+          val argConstr = constr.copy().entered
+          constr.info = noArgInfo
+          constr.termRef.recomputeDenot()
         }
-        cls
-    }
+    cls
   }
   def JavaEnumType = JavaEnumClass.typeRef
 
