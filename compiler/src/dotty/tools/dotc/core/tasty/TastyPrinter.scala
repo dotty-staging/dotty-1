@@ -100,6 +100,15 @@ class TastyPrinter(bytes: Array[Byte]) {
               printTrees()
             case PARAMtype =>
               printNat(); printNat()
+            case EXPORT =>
+              printTree()
+              while nextByte == IMPORTED do printTree()
+              until(end) {
+                newLine()
+                val tag = readByte()
+                sb.append(" ").append(astTagToString(tag))
+                printName();
+              }
             case _ =>
               printTrees()
           }

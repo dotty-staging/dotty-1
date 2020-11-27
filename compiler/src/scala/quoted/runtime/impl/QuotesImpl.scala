@@ -2252,6 +2252,40 @@ class QuotesImpl private (using val ctx: Context) extends Quotes, QuoteUnpickler
     type Symbol = dotc.core.Symbols.Symbol
 
     object Symbol extends SymbolModule:
+      def exports(tree: Export)(owner: Symbol): Map[Symbol, Symbol] = {
+        import dotc.core.Names.{TermName => TName}
+        import dotc.core.{Flags => CFlags}
+
+        def matchingForwarder(exported: Symbol, forwarders: Map[TName, Seq[Symbol]], renames: Map[TName, TName]): Option[(Symbol, Symbol)] =
+          def matchForwarder(exportedName: TName, rename: Option[TName]) = {
+            val sameName = forwarders.getOrElse(rename.getOrElse(exportedName), Nil)
+            (if exported.isValDef then
+              sameName.find(sym =>
+                sym.isDefDef
+                && (sym.info.finalResultType <:< exported.info.finalResultType))
+            else if exported.isDefDef then
+              sameName.find(sym => sym.isDefDef && sym.signature == exported.signature)
+            else if exported.isTypeDef || exported.isClassDef then
+              sameName.find(_.isTypeDef)
+            else
+              None
+            ).map(forwarder => forwarder -> exported)
+          }
+          val exportedName = exported.name.toTermName
+          matchForwarder(exportedName, renames.get(exportedName))
+
+        val ownerForwarders =
+          owner
+            .info
+            .membersBasedOnFlags(CFlags.Exported, excluded = CFlags.Private)
+            .groupMap(_.name.toTermName)(_.symbol)
+        val eligable = tree.tpe.termSymbol.denot.eligableExports(tree)
+        val renames = tree.selectors.collect {
+          case i if !i.rename.isEmpty => i.name -> i.rename
+        }.toMap
+
+        eligable.flatMap(sym => matchingForwarder(sym, ownerForwarders, renames)).toMap
+      }
       def spliceOwner: Symbol = ctx.owner
       def requiredPackage(path: String): Symbol = dotc.core.Symbols.requiredPackage(path)
       def requiredClass(path: String): Symbol = dotc.core.Symbols.requiredClass(path)

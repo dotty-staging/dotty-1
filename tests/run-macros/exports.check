@@ -14,3 +14,57 @@ reflection show extractors:
 Inlined(None, Nil, Block(List(ValDef("Observer", TypeIdent("Observer$"), Some(Apply(Select(New(TypeIdent("Observer$")), "<init>"), Nil))), ClassDef("Observer$", DefDef("<init>", Nil, List(Nil), Inferred(), None), List(Apply(Select(New(Inferred()), "<init>"), Nil)), Nil, Some(ValDef("_", Singleton(Ident("Observer")), None)), List(Export(Ident("Messages"), List(SimpleSelector(count))), DefDef("count", Nil, Nil, Inferred(), Some(Select(Ident("Messages"), "count")))))), Literal(Constant.Unit())))
 visited exports with splice
 visited exports with splice inverted
+members generated from export NatModule.{_} in Nats$: [
+  {
+    forwarder: final def Succ(pred: NatModule.Nat): NatModule.Nat,
+    reference: def Succ(pred: NatModule.Nat): NatModule.Nat
+  },
+  {
+    forwarder: final def Zero: NatModule.Zero.type,
+    reference: lazy val Zero: NatModule.Zero.type
+  },
+  {
+    forwarder: type Nat,
+    reference: class Nat(val toInt: scala.Int) extends java.lang.Object
+  }
+]
+members generated from export Messages.{logMessage => log, _} in $anon: [
+  {
+    forwarder: final def count: scala.Int,
+    reference: def count: scala.Int
+  },
+  {
+    forwarder: final def log(a: scala.Predef.String): scala.Unit,
+    reference: def logMessage(a: scala.Predef.String): scala.Unit
+  }
+]
+members generated from export EnumModule.{_} in Colors$: [
+  {
+    forwarder: @scala.annotation.internal.Child @scala.annotation.internal.Child @scala.annotation.internal.Child type Color,
+    reference: @scala.annotation.internal.Child @scala.annotation.internal.Child @scala.annotation.internal.Child sealed abstract class Color() extends java.lang.Object with scala.reflect.Enum
+  }
+]
+members generated from export BoolsModule.{_} in Bools$: [
+  {
+    forwarder: final def False: BoolsModule.False.type,
+    reference: final val False: BoolsModule.Bool
+  },
+  {
+    forwarder: final def True: BoolsModule.True.type,
+    reference: final val True: BoolsModule.Bool
+  },
+  {
+    forwarder: type Bool,
+    reference: type Bool
+  }
+]
+members generated from export CompanionsModule.{_} in Boxes$: [
+  {
+    forwarder: final def Box: CompanionsModule.Box.type,
+    reference: lazy val Box: CompanionsModule.Box.type
+  },
+  {
+    forwarder: type Box,
+    reference: final class Box[+T](t: T) extends java.lang.Object
+  }
+]

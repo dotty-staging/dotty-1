@@ -361,8 +361,8 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
   def Import(expr: Tree, selectors: List[untpd.ImportSelector])(using Context): Import =
     ta.assignType(untpd.Import(expr, selectors), newImportSymbol(ctx.owner, expr))
 
-  def Export(expr: Tree, selectors: List[untpd.ImportSelector])(using Context): Export =
-    ta.assignType(untpd.Export(expr, selectors))
+  def Export(expr: Tree, selectors: List[untpd.ImportSelector], forwarders: List[Name])(using Context): Export =
+    ta.assignType(untpd.Export(expr, selectors), newExportSymbol(ctx.owner, forwarders))
 
   def PackageDef(pid: RefTree, stats: List[Tree])(using Context): PackageDef =
     ta.assignType(untpd.PackageDef(pid, stats), pid)

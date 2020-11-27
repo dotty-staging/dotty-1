@@ -720,6 +720,10 @@ object Symbols {
   def newImportSymbol(owner: Symbol, info: Type, coord: Coord)(using Context): TermSymbol =
     newSymbol(owner, nme.IMPORT, Synthetic | NonMember, info, coord = coord)
 
+  /** Create an export symbol with given `info`. */
+  def newExportSymbol(owner: Symbol, exported: List[Name], coord: Coord = NoCoord)(using Context): TermSymbol =
+    newSymbol(owner, nme.EXPORT, Synthetic | NonMember, ExportType(exported), coord = coord)
+
   /** Create a class constructor symbol for given class `cls`. */
   def newConstructor(
       cls: ClassSymbol,

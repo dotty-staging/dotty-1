@@ -945,7 +945,7 @@ class TreeUnpickler(reader: TastyReader,
           .withType(localDummy.termRef))
     }
 
-    def skipToplevel()(using Context): Unit= {
+    def skipToplevel()(using Context): Unit = {
       if (!isAtEnd && isTopLevel) {
         skipTree()
         skipToplevel()
@@ -970,9 +970,16 @@ class TreeUnpickler(reader: TastyReader,
       case TYPEDEF | VALDEF | DEFDEF =>
         readIndexedDef()
       case IMPORT =>
-        readImportOrExport(Import(_, _))()
+        readImportOrExport((expr, selectors, _) => Import(expr, selectors))()
       case EXPORT =>
-        readImportOrExport(Export(_, _))()
+        readImportOrExport({ (expr, selectors, end) =>
+          Export(expr, selectors, until(end) {
+            readByte() match {
+              case TYPEREF => readName().toTypeName
+              case TERMREF => readName()
+            }
+          })
+        })()
       case PACKAGE =>
         val start = currentAddr
         processPackage { (pid, end) =>
@@ -983,13 +990,13 @@ class TreeUnpickler(reader: TastyReader,
     }
 
     inline def readImportOrExport(inline mkTree:
-        (Tree, List[untpd.ImportSelector]) => Tree)()(using Context): Tree = {
+        (Tree, List[untpd.ImportSelector], Addr) => Tree)()(using Context): Tree = {
       val start = currentAddr
       assert(sourcePathAt(start).isEmpty)
       readByte()
-      readEnd()
+      val end = readEnd()
       val expr = readTerm()
-      setSpan(start, mkTree(expr, readSelectors()))
+      setSpan(start, mkTree(expr, readSelectors(), end))
     }
 
     def readSelectors()(using Context): List[untpd.ImportSelector] =

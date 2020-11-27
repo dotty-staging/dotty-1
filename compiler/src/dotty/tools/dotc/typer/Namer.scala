@@ -943,6 +943,7 @@ class Namer { typer: Typer =>
        */
       def exportForwarders(exp: Export): List[tpd.MemberDef] = {
         val buf = new mutable.ListBuffer[tpd.MemberDef]
+        val exported = new mutable.ListBuffer[Name]
         val Export(expr, selectors) = exp
         val path = typedAheadExpr(expr, AnySelectionProto)
         checkLegalImportPath(path)
@@ -1011,6 +1012,7 @@ class Namer { typer: Typer =>
                 ddef
               }
 
+            exported += sym.name
             buf += forwarderDef.withSpan(span)
           }
 
@@ -1050,6 +1052,7 @@ class Namer { typer: Typer =>
         addForwarders(selectors, Nil)
         val forwarders = buf.toList
         exp.pushAttachment(ExportForwarders, forwarders)
+        recordSym(newExportSymbol(ctx.owner, exported.toList.distinct, exp.span), exp)
         forwarders
       }
 

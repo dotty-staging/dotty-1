@@ -330,6 +330,21 @@ object SymDenotations {
       else recurWithParamss(info, rawParamss)
     end paramSymss
 
+    /** obtain a list of the possibly exported definitions from the given export tree */
+    final def eligableExports(tree: tpd.Export)(using Context): List[Symbol] =
+      if !(isAllOf(Synthetic | NonMember) && name == nme.EXPORT) then Nil
+      else if tree.tpe.termSymbol ne this.symbol then Nil
+      else
+        ensureCompleted()
+        info match
+          case info: ExportType =>
+            val exportPrefix = tree.expr.tpe
+            exportPrefix.termSymbol.ensureCompleted()
+            info.exported.flatMap(name =>
+              exportPrefix.member(name).alternatives.map(_.symbol))
+
+          case _ => Nil
+
     /** The extension parameter of this extension method
      *  @pre this symbol is an extension method
      */

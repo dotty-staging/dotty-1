@@ -29,3 +29,53 @@ object Messages {
     private val delegate = logger
     export delegate._
   }).log("visited exports with splice inverted")
+  visitExportsShowMembers({
+    object NatModule {
+
+      class Nat(val toInt: Int)
+
+      final object Zero extends Nat(0)
+
+      def Succ(pred: Nat): Nat = Nat(pred.toInt + 1)
+
+    }
+    object Nats {
+      export NatModule._
+    }
+  })
+  visitExportsShowMembers({
+    new Logger {
+      export Messages.{logMessage => log, _}
+    }
+  })
+  visitExportsShowMembers({
+    object EnumModule {
+      enum Color {
+        case Red, Green, Blue
+      }
+    }
+    object Colors {
+      export EnumModule._
+    }
+  })
+  visitExportsShowMembers({
+    object BoolsModule {
+      opaque type Bool = Boolean
+      final val True: Bool = true
+      final val False: Bool = false
+    }
+    object Bools {
+      export BoolsModule._
+    }
+  })
+  visitExportsShowMembers({
+    object CompanionsModule {
+      final class Box[+T] private (t: T)
+      object Box {
+        def create[T](t: T): Box[T] = Box(t)
+      }
+    }
+    object Boxes {
+      export CompanionsModule._
+    }
+  })

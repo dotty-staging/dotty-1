@@ -511,8 +511,8 @@ trait TypeAssigner {
   def assignType(tree: untpd.Import, sym: Symbol)(using Context): Import =
     tree.withType(sym.termRef)
 
-  def assignType(tree: untpd.Export)(using Context): Export =
-    tree.withType(ExportType)
+  def assignType(tree: untpd.Export, sym: Symbol)(using Context): Export =
+    tree.withType(sym.termRef)
 
   def assignType(tree: untpd.Annotated, arg: Tree, annot: Tree)(using Context): Annotated = {
     assert(tree.isType) // annotating a term is done via a Typed node, can't use Annotate directly

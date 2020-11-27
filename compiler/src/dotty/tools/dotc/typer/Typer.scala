@@ -2254,9 +2254,9 @@ class Typer extends Namer
     )
   }
 
-  def typedExport(exp: untpd.Export)(using Context): Export = {
+  def typedExport(exp: untpd.Export, sym: Symbol)(using Context): Export = {
     typedImportOrExport(exp)((expr1, selectors1) =>
-      assignType(cpy.Export(exp)(expr1, selectors1))
+      assignType(cpy.Export(exp)(expr1, selectors1), sym)
     )
   }
 
@@ -2494,7 +2494,7 @@ class Typer extends Namer
           case tree: untpd.Function => typedFunction(tree, pt)
           case tree: untpd.Closure => typedClosure(tree, pt)
           case tree: untpd.Import => typedImport(tree, retrieveSym(tree))
-          case tree: untpd.Export => typedExport(tree)
+          case tree: untpd.Export => typedExport(tree, retrieveSym(tree))
           case tree: untpd.Match => typedMatch(tree, pt)
           case tree: untpd.Return => typedReturn(tree)
           case tree: untpd.WhileDo => typedWhileDo(tree)

@@ -79,7 +79,7 @@ class TreePickler(pickler: TastyPickler) {
     case _ =>
   }
 
-  def registerDef(sym: Symbol): Unit = {
+  def registerDef(sym: Symbol)(using Context): Unit = {
     symRefs(sym) = currentAddr
     forwardSymRefs.get(sym) match {
       case Some(refs) =>
@@ -593,11 +593,22 @@ class TreePickler(pickler: TastyPickler) {
             pickleTree(expr)
             pickleSelectors(selectors)
           }
-        case Export(expr, selectors) =>
+        case tree @ Export(expr, selectors) =>
           writeByte(EXPORT)
           withLength {
             pickleTree(expr)
             pickleSelectors(selectors)
+            tree.tpe match {
+              case tpe: TermRef =>
+                tpe.symbol.info match {
+                  case info: ExportType => info.exported.foreach { name =>
+                    writeByte(if (name.isTypeName) TYPEREF else TERMREF)
+                    pickleName(name)
+                  }
+                  case _ => assert(false, s"expected ExportType")
+                }
+              case _ => assert(false, s"expected TermRef")
+            }
           }
         case PackageDef(pid, stats) =>
           writeByte(PACKAGE)

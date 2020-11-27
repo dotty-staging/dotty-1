@@ -60,7 +60,7 @@ Standard-Section: "ASTs" TopLevelStat*
                   ValOrDefDef
                   TYPEDEF        Length NameRef (type_Term | Template) Modifier*   -- modifiers type name (= type | bounds)  |  modifiers class name template
                   IMPORT         Length qual_Term Selector*                        -- import qual selectors
-                  EXPORT         Length qual_Term Selector*                        -- export qual selectors
+                  EXPORT         Length qual_Term Selector* ExportedName*          -- export qual selectors (and names that were exported)
   ValOrDefDef   = VALDEF         Length NameRef type_Term rhs_Term? Modifier*      -- modifiers val name : type (= rhs)?
                   DEFDEF         Length NameRef TypeParam* Params* returnType_Term
                                         rhs_Term? Modifier*                        -- modifiers def name [typeparams] paramss : returnType (= rhs)?
@@ -215,6 +215,9 @@ Standard-Section: "ASTs" TopLevelStat*
                 | CONTRAVARIANT
 
   Annotation    = ANNOTATION     Length tycon_Type fullAnnotation_Term             -- An annotation, given (class) type of constructor, and full application tree
+
+  ExportedName  = TYPEREF NameRef                                                  -- A name that has been exported
+                | TERMREF NameRef
 
 Note: The signature of a SELECTin or TERMREFin node is the signature of the selected symbol,
       not the signature of the reference. The latter undergoes an asSeenFrom but the former

@@ -3437,6 +3437,11 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
     /** Methods of the module object `val Symbol` */
     trait SymbolModule { this: Symbol.type =>
 
+      /** A map from forwarders in `owner` to the symbols that they originate from,
+       *  found in the prefix of `tree`
+       */
+      def exports(tree: Export)(owner: Symbol): Map[Symbol, Symbol]
+
       /** Symbol of the definition that encloses the current splicing context.
        *
        *  For example, the following call to `spliceOwner` would return the symbol `x`.

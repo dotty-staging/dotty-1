@@ -7,6 +7,7 @@ inline def visitExportsShow[T](inline x: T): Any = ${ visitExportsShowImpl('x) }
 inline def visitExportsShowExtract[T](inline x: T): Any = ${ visitExportsShowExtractImpl('x) }
 inline def visitExportsSplice(inline l: Logger): Logger = ${ mixinLoggerImpl('l) }
 inline def visitExportsSpliceInverse(inline op: Logger => Logger): Logger = ${ mixinLoggerInverseImpl('op) }
+inline def visitExportsShowMembers[T](inline x: T): Any = ${ visitExportsShowMembersImpl('x) }
 
 private def visitExportsExprMapImpl[T: Type](e: Expr[T], f: Expr[T => Any])(using Quotes): Expr[Any] =
   '{$f(${IdempotentExprMap.transform(e)})}
@@ -19,6 +20,35 @@ private def visitExportsTreeMapImpl[T: Type](e: Expr[T], f: Expr[T => Any])(usin
 private def visitExportsShowImpl[T: Type](e: Expr[T])(using Quotes): Expr[Any] =
   import quotes.reflect._
   '{println(${Expr(Term.of(e).show)})}
+
+private def visitExportsShowMembersImpl[T: Type](e: Expr[T])(using Quotes): Expr[Any] =
+  import quotes.reflect._
+  import collection.mutable
+
+  object ExportedMembers extends TreeAccumulator[mutable.Buffer[String]] {
+    def foldTree(x: mutable.Buffer[String], tree: Tree)(owner: Symbol): mutable.Buffer[String] = tree match {
+      case tree: Export =>
+        val exports = Symbol.exports(tree)(owner)
+        val exported = exports.toList.map { (forwarder, exported) =>
+          s"""|  {
+              |    forwarder: ${forwarder.tree.show},
+              |    reference: ${exported.tree.show}
+              |  }""".stripMargin
+        }
+        val msg =
+          s"""members generated from ${tree.show} in ${owner.name}: [${exported.sorted.mkString("\n", ",\n", "\n")}]""".stripMargin
+        foldOverTree(x += msg, tree)(owner)
+      case _ => foldOverTree(x, tree)(owner)
+    }
+  }
+
+  val res =
+    ExportedMembers.foldTree(mutable.Buffer.empty, Term.of(e))(Symbol.spliceOwner).mkString(", ")
+
+  '{ println(${Expr(res)}) }
+
+end visitExportsShowMembersImpl
+
 
 private def visitExportsShowExtractImpl[T: Type](e: Expr[T])(using Quotes): Expr[Any] =
   import quotes.reflect._
