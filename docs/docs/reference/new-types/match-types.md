@@ -159,12 +159,12 @@ and constraints.
    if
 
    ```
-   S =:= T,  m >= n,  Pi =:= Qi and Ti <: Ui for i in 1..n
+   S <: T,  m >= n,  Pi =:= Qi and Ti <: Ui for i in 1..n
    ```
 
-   I.e. scrutinees and patterns must be equal and the corresponding bodies must
-   be subtypes. No case re-ordering is allowed, but the subtype can have more
-   cases than the supertype.
+   I.e. scrutinees must be subtypes, patterns must be equal, and the
+   corresponding scrutinees and bodies must be subtypes. No case re-ordering
+   is allowed, but the subtype can have more cases than the supertype.
 
 2. The second rule states that a match type and its redux are mutual subtypes.
 
