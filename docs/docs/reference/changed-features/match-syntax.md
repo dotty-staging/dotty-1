@@ -18,7 +18,7 @@ The syntactical precedence of match expressions has been changed.
     }
     ```
 
-  (or, dropping the optional braces)
+    (or, dropping the optional braces)
 
     ```scala
     xs match
