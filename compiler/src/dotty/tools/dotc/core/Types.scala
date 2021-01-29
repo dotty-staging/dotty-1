@@ -46,6 +46,11 @@ import dotty.tools.dotc.transform.SymUtils._
 
 object Types {
 
+  def sameThis(tp1: Type, tp2: Type)(using Context): Boolean =
+    // Check if both sides are ThisType before calling `=:=`, because `=:=`
+    // because a non-ThisType can be =:= a ThisType.
+    (tp1 eq tp2) || tp1.isInstanceOf[ThisType] && tp2.isInstanceOf[ThisType] && (tp1 =:= tp2)
+
   @sharable private var nextId = 0
 
   implicit def eqType: CanEqual[Type, Type] = CanEqual.derived
@@ -2663,7 +2668,7 @@ object Types {
    */
   private def designatorFor(prefix: Type, name: Name, denot: Denotation)(using Context): Designator = {
     val sym = denot.symbol
-    if (sym.exists && (prefix.eq(NoPrefix) || prefix.ne(sym.owner.thisType)))
+    if (sym.exists && (prefix.eq(NoPrefix) || !sameThis(prefix, sym.owner.thisType)))
       sym
     else
       name

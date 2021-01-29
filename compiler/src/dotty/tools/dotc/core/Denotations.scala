@@ -1107,7 +1107,7 @@ object Denotations {
         case sd: SymDenotation => true
         case _ => info eq symbol.info
 
-      if !owner.membersNeedAsSeenFrom(pre) && ((pre ne owner.thisType) || hasOriginalInfo)
+      if !owner.membersNeedAsSeenFrom(pre) && (!sameThis(pre, owner.thisType) || hasOriginalInfo)
          || symbol.is(NonMember)
       then this
       else derived(symbol.info)
