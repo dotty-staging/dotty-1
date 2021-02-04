@@ -193,3 +193,6 @@
 [submodule "community-build/community-projects/cask"]
 	path = community-build/community-projects/cask
 	url = https://github.com/dotty-staging/cask.git
+[submodule "community-build/community-projects/cb-test"]
+	path = community-build/community-projects/cb-test
+	url = https://github.com/tdudzik/cb-test.git
