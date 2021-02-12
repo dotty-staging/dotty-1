@@ -196,3 +196,6 @@
 [submodule "community-build/community-projects/cb-test"]
 	path = community-build/community-projects/cb-test
 	url = https://github.com/tdudzik/cb-test.git
+[submodule "community-build/community-projects/cb-test"]
+	path = community-build/community-projects/cb-test
+	url = https://github.com/dotty-staging/cb-test.git
