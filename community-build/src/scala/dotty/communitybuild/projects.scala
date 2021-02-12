@@ -652,6 +652,7 @@ object projects:
 end projects
 
 def allProjects = List(
+  projects.cbTest,
   projects.utest,
   projects.sourcecode,
   projects.oslib,
