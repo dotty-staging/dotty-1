@@ -118,7 +118,19 @@ class PCPCheckAndHeal(@constructorOnly ictx: Context) extends TreeMapWithStages(
         case Nil  => body1
         case tags => tpd.Block(tags, body1).withSpan(body.span)
 
-    super.transformQuotation(body2, quote)
+    quote match {
+      case Apply(fn1 @ TypeApply(fn0, targs), _) =>
+        val heal = new TypeMap {
+          def apply(tp: Type) = tp match {
+            case AnnotatedType(parent, annot) => AnnotatedType(mapOver(parent), annot)
+            case _ => healTypeOfTerm(fn1.srcPos)(tp)
+          }
+        }
+        val targs1 = targs.map(targ => TypeTree(heal(targ.tpe)))
+        cpy.Apply(quote)(cpy.TypeApply(fn1)(fn0, targs1), body2 :: Nil)
+      case quote: TypeApply =>
+        cpy.TypeApply(quote)(quote.fun, body2 :: Nil)
+    }
   }
 
   /** Transform splice
