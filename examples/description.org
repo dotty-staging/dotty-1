@@ -1,0 +1,315 @@
+#+options: toc:nil
+
+* i11682
+#+begin_src elisp :wrap src text :eval no-export :exports both
+  (sbt/compile-file-for-output "examples/i11682.scala")
+#+end_src
+
+#+RESULTS:
+#+begin_src text
+[info] running (fork) dotty.tools.dotc.Main -classpath /home/gruszecki/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.5/scala-library-2.13.5.jar:/home/gruszecki/workspace/dotty/library/../out/bootstrap/scala3-library-bootstrapped/scala-3.0.0-RC2/scala3-library_3.0.0-RC2-3.0.0-RC2-bin-SNAPSHOT.jar -color:never -d out -Yescape-analysis examples/i11682.scala
+bad option '-Yescape-analysis' was ignored
+added to constraint: [[T(param)1] => Any] type T
+Constraint(
+ uninstantiated variables: T(param)1
+ constrained types: [T(param)1] => Any
+ bounds: 
+     T(param)1
+ ordering: 
+)
+type T: 
+
+added to constraint: [[Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, T(param)2 >: Y(param)1 <: Y(param)1] => 
+  Any] type Z, type Y, type T
+Constraint(
+ uninstantiated variables: Z(param)1, T(param)2
+ constrained types: 
+  [Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, T(param)2 >: Y(param)1 <: Y(param)1]
+     => 
+  Any
+ bounds: 
+     Z(param)1 >: Int <: Int
+     Y(param)1 := Int
+     T(param)2 <: AnyKind
+ ordering: 
+     Y(param)1 <: T(param)2, Z(param)1
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type T:  <: AnyKind
+
+added to constraint: [[Z(param)2 >: Int <: Int, Y(param)2 >: Z(param)2 <: Z(param)2, T(param)3] => Any] type Z, type Y, type T
+Constraint(
+ uninstantiated variables: Z(param)2, T(param)3
+ constrained types: [Z(param)2 >: Int <: Int, Y(param)2 >: Z(param)2 <: Z(param)2, T(param)3] => Any
+ bounds: 
+     Z(param)2 >: Int <: Int
+     Y(param)2 := Int
+     T(param)3
+ ordering: 
+     Y(param)2 <: Z(param)2
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type T: 
+
+==> constraining simple pattern type (?1 : Test.Tag[Y]) <:< Test.Tag[T]?
+narrow gadt bound of type Y:  >: Z <: Z from below to T TypeRef(NoPrefix,type T) false
+instantiated: type Y -> Int
+narrow gadt bound of type T:  from above to Int TypeRef(TermRef(ThisType(TypeRef(NoPrefix,module class <root>)),object scala),class Int) false
+adding upper bound type T <: Int = true
+narrow gadt bound of type T:  from below to Y TypeRef(NoPrefix,type Y) false
+adding lower bound type T >: Y = true
+<== constraining simple pattern type (?1 : Test.Tag[Y]) <:< Test.Tag[T] = true
+gadt = Constraint(
+ uninstantiated variables: Z(param)2
+ constrained types: [Z(param)2 >: Int <: Int, Y(param)2 >: Z(param)2 <: Z(param)2, T(param)3] => Any
+ bounds: 
+     Z(param)2 >: Int <: Int
+     Y(param)2 := Int
+     T(param)3 := Int
+ ordering: 
+     Y(param)2 <: Z(param)2
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type T:  = Int
+
+added to constraint: [[Z(param)3 >: Int <: Int, Y(param)3 >: Z(param)3 <: Z(param)3, X(param)1 >: Y(param)3 <: Y(param)3, 
+  T(param)4
+ >: X(param)1 <: X(param)1] => Any] type Z, type Y, type X, type T
+Constraint(
+ uninstantiated variables: Z(param)3, X(param)1, T(param)4
+ constrained types: 
+  [Z(param)3 >: Int <: Int, Y(param)3 >: Z(param)3 <: Z(param)3, X(param)1 >: Y(param)3 <: Y(param)3, 
+    T(param)4
+   >: X(param)1 <: X(param)1] => Any
+ bounds: 
+     Z(param)3 >: Int <: Int
+     Y(param)3 := Int
+     X(param)1 <: AnyKind
+     T(param)4 <: AnyKind
+ ordering: 
+     Y(param)3 <: X(param)1, Z(param)3
+     X(param)1 <: T(param)4
+     T(param)4 <: X(param)1
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type X:  >: T <: T
+type T:  >: X <: X
+
+added to constraint: [[Z(param)4 >: Int <: Int, Y(param)4 >: Z(param)4 <: Z(param)4, X(param)2 >: Y(param)4 <: Y(param)4, 
+  T(param)5
+] => Any] type Z, type Y, type X, type T
+Constraint(
+ uninstantiated variables: Z(param)4, X(param)2, T(param)5
+ constrained types: 
+  [Z(param)4 >: Int <: Int, Y(param)4 >: Z(param)4 <: Z(param)4, X(param)2 >: Y(param)4 <: Y(param)4, 
+    T(param)5
+  ] => Any
+ bounds: 
+     Z(param)4 >: Int <: Int
+     Y(param)4 := Int
+     X(param)2 <: AnyKind
+     T(param)5
+ ordering: 
+     Y(param)4 <: X(param)2, Z(param)4
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type X:  <: AnyKind
+type T: 
+
+==> constraining simple pattern type (?2 : Test.Tag[X]) <:< Test.Tag[T]?
+narrow gadt bound of type X:  >: Y <: Y from below to T TypeRef(NoPrefix,type T) false
+adding lower bound type X >: T = true
+narrow gadt bound of type T:  from below to X TypeRef(NoPrefix,type X) false
+adding lower bound type T >: X = true
+<== constraining simple pattern type (?2 : Test.Tag[X]) <:< Test.Tag[T] = true
+gadt = Constraint(
+ uninstantiated variables: Z(param)4, T(param)5
+ constrained types: 
+  [Z(param)4 >: Int <: Int, Y(param)4 >: Z(param)4 <: Z(param)4, X(param)2 >: Y(param)4 <: Y(param)4, 
+    T(param)5
+  ] => Any
+ bounds: 
+     Z(param)4 >: Int <: Int
+     Y(param)4 := Int
+     X(param)2 := T(param)5
+     T(param)5
+ ordering: 
+     Y(param)4 <: Z(param)4
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type X:  = T
+type T: 
+
+-- [E007] Type Mismatch Error: examples/i11682.scala:30:23 --------------------------------------------
+30 |    case _ : Tag[X] => 0  // error
+   |                       ^
+   |                       Found:    (0 : Int)
+   |                       Required: T
+
+longer explanation available when compiling with `-explain`
+1 warning found
+1 error found
+[error] Nonzero exit code returned from runner: 1
+[error] (scala3-compiler / Compile / runMain) Nonzero exit code returned from runner: 1
+[error] Total time: 6 s, completed Mar 11, 2021 6:24:04 PM
+#+end_src
+
+* i11682a
+#+begin_src elisp :wrap src text :eval no-export :exports both
+  (sbt/compile-file-for-output "examples/i11682a.scala")
+#+end_src
+
+#+RESULTS:
+#+begin_src text
+[info] running (fork) dotty.tools.dotc.Main -classpath /home/gruszecki/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.5/scala-library-2.13.5.jar:/home/gruszecki/workspace/dotty/library/../out/bootstrap/scala3-library-bootstrapped/scala-3.0.0-RC2/scala3-library_3.0.0-RC2-3.0.0-RC2-bin-SNAPSHOT.jar -color:never -d out -Yescape-analysis examples/i11682a.scala
+bad option '-Yescape-analysis' was ignored
+added to constraint: [[T(param)1] => Any] type T
+Constraint(
+ uninstantiated variables: T(param)1
+ constrained types: [T(param)1] => Any
+ bounds: 
+     T(param)1
+ ordering: 
+)
+type T: 
+
+added to constraint: [[Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, T(param)2] => Any] type Z, type Y, type T
+Constraint(
+ uninstantiated variables: Z(param)1, T(param)2
+ constrained types: [Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, T(param)2] => Any
+ bounds: 
+     Z(param)1 >: Int <: Int
+     Y(param)1 := Int
+     T(param)2
+ ordering: 
+     Y(param)1 <: Z(param)1
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type T: 
+
+==> constraining simple pattern type (?1 : Test.Tag[Y]) <:< Test.Tag[T]?
+narrow gadt bound of type Y:  >: Z <: Z from below to T TypeRef(NoPrefix,type T) false
+instantiated: type Y -> Int
+narrow gadt bound of type T:  from above to Int TypeRef(TermRef(ThisType(TypeRef(NoPrefix,module class <root>)),object scala),class Int) false
+adding upper bound type T <: Int = true
+narrow gadt bound of type T:  from below to Y TypeRef(NoPrefix,type Y) false
+adding lower bound type T >: Y = true
+<== constraining simple pattern type (?1 : Test.Tag[Y]) <:< Test.Tag[T] = true
+gadt = Constraint(
+ uninstantiated variables: Z(param)1
+ constrained types: [Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, T(param)2] => Any
+ bounds: 
+     Z(param)1 >: Int <: Int
+     Y(param)1 := Int
+     T(param)2 := Int
+ ordering: 
+     Y(param)1 <: Z(param)1
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type T:  = Int
+
+added to constraint: [[(param)1$1(param)1] => Any] type (param)1$1
+Constraint(
+ uninstantiated variables: (param)1$1(param)1
+ constrained types: [(param)1$1(param)1] => Any
+ bounds: 
+     (param)1$1(param)1
+ ordering: 
+)
+type (param)1$1: 
+
+-- Warning: examples/i11682a.scala:10:9 ---------------------------------------------------------------
+10 |    case _ : Tag[Y] => 0
+   |         ^^^^^^^^^^
+   |         the type test for Test.Tag[Y] cannot be checked at runtime
+2 warnings found
+[success] Total time: 4 s, completed Mar 11, 2021 5:48:45 PM
+#+end_src
+
+* i11682b
+#+begin_src elisp :wrap src text :eval no-export :exports both
+  (sbt/compile-file-for-output "examples/i11682b.scala")
+#+end_src
+
+#+RESULTS:
+#+begin_src text
+[info] running (fork) dotty.tools.dotc.Main -classpath /home/gruszecki/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.5/scala-library-2.13.5.jar:/home/gruszecki/workspace/dotty/library/../out/bootstrap/scala3-library-bootstrapped/scala-3.0.0-RC2/scala3-library_3.0.0-RC2-3.0.0-RC2-bin-SNAPSHOT.jar -color:never -d out -Yescape-analysis examples/i11682b.scala
+bad option '-Yescape-analysis' was ignored
+added to constraint: [[T(param)1] => Any] type T
+Constraint(
+ uninstantiated variables: T(param)1
+ constrained types: [T(param)1] => Any
+ bounds: 
+     T(param)1
+ ordering: 
+)
+type T: 
+
+added to constraint: [[Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, X(param)1 >: Y(param)1 <: Y(param)1, 
+  T(param)2
+] => Any] type Z, type Y, type X, type T
+Constraint(
+ uninstantiated variables: Z(param)1, X(param)1, T(param)2
+ constrained types: 
+  [Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, X(param)1 >: Y(param)1 <: Y(param)1, 
+    T(param)2
+  ] => Any
+ bounds: 
+     Z(param)1 >: Int <: Int
+     Y(param)1 := Int
+     X(param)1 <: AnyKind
+     T(param)2
+ ordering: 
+     Y(param)1 <: X(param)1, Z(param)1
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type X:  <: AnyKind
+type T: 
+
+==> constraining simple pattern type (?1 : Test.Tag[X]) <:< Test.Tag[T]?
+narrow gadt bound of type X:  >: Y <: Y from below to T TypeRef(NoPrefix,type T) false
+adding lower bound type X >: T = true
+narrow gadt bound of type T:  from below to X TypeRef(NoPrefix,type X) false
+adding lower bound type T >: X = true
+<== constraining simple pattern type (?1 : Test.Tag[X]) <:< Test.Tag[T] = true
+gadt = Constraint(
+ uninstantiated variables: Z(param)1, T(param)2
+ constrained types: 
+  [Z(param)1 >: Int <: Int, Y(param)1 >: Z(param)1 <: Z(param)1, X(param)1 >: Y(param)1 <: Y(param)1, 
+    T(param)2
+  ] => Any
+ bounds: 
+     Z(param)1 >: Int <: Int
+     Y(param)1 := Int
+     X(param)1 := T(param)2
+     T(param)2
+ ordering: 
+     Y(param)1 <: Z(param)1
+)
+type Z:  >: Int <: Int
+type Y:  >: Int <: Z
+type X:  = T
+type T: 
+
+-- [E007] Type Mismatch Error: examples/i11682b.scala:11:23 -------------------------------------------
+11 |    case _ : Tag[X] => 0  // error
+   |                       ^
+   |                       Found:    (0 : Int)
+   |                       Required: T
+
+longer explanation available when compiling with `-explain`
+1 warning found
+1 error found
+[error] Nonzero exit code returned from runner: 1
+[error] (scala3-compiler / Compile / runMain) Nonzero exit code returned from runner: 1
+[error] Total time: 3 s, completed Mar 11, 2021 5:48:53 PM
+#+end_src
