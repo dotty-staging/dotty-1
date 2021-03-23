@@ -26,7 +26,7 @@ jobs:
         run: ./project/scripts/sbt "community-build/run sync all"
         env:
           LOGIN: "dotty-bot"
-          TOKEN: ${{ secrets.BOT_TOKEN }}
+          TOKEN: ${{ secrets.CB_BOT_TOKEN }}
           NAME: "Dotty Bot"
           EMAIL: "12519979+dotty-bot@users.noreply.github.com"
           PR_BRANCH: "community-build-sync"
