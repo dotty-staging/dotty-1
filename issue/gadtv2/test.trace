@@ -1,0 +1,805 @@
+sbt:scala3> test
+[info] compiling 2 Scala sources to /home/gruszecki/workspace/dotty/tasty/target/scala-3.0.0-RC1/test-classes ...
+[info] Test run started
+[info] Test dotty.tools.dotc.classpath.JrtClassPathTest.lookupJavaClasses started
+[info] compiling 32 Scala sources to /home/gruszecki/workspace/dotty/compiler/../out/bootstrap/scala3-compiler-bootstrapped/scala-3.0.0-RC2/classes ...
+[info] done compiling
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.95s
+[info] Test run started
+[info] Test dotty.tools.io.AbstractFileTest.t6450 started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.012s
+[info] Test run started
+[info] Test dotty.tools.dotc.parsing.ParserEdgeTest.t9944$u0020respect$u0020line$u0020separator started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.583s
+[info] Test run started
+[info] Test dotty.tools.dotc.core.tasty.PathPicklingTest.test started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 2.919s
+[info] Test run started
+[info] Test dotty.tools.dotc.FromTastyTests.runTestFromTasty started
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/interactive/Completion.scala:64:12 
+[error] 64 |      case (ref: RefTree) :: _ =>
+[error]    |            ^^^^^^^^^^^^
+[error]    |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/interactive/Completion.scala:105:12 
+[error] 105 |      case (ref: RefTree) :: _ => ref.span.point
+[error]     |            ^^^^^^^^^^^^
+[error]     |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/transform/PickleQuotes.scala:81:11 
+[error] 81 |      case tree: RefTree if !Inliner.inInlineMethod =>
+[error]    |           ^^^^^^^^^^^^^
+[error]    |           the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/transform/PickleQuotes.scala:484:36 
+[error] 484 |          case Apply(TypeApply(fn, (body: RefTree) :: Nil), _) if fn.symbol == defn.QuotedTypeModule_of && isCaptured(body.symbol, level + 1) =>
+[error]     |                                    ^^^^^^^^^^^^^
+[error]     |              the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/transform/PickleQuotes.scala:488:15 
+[error] 488 |          case tree: RefTree if isCaptured(tree.symbol, level) =>
+[error]     |               ^^^^^^^^^^^^^
+[error]     |              the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/transform/PickleQuotes.scala:501:15 
+[error] 501 |          case tree: DefTree if level >= 1 =>
+[error]     |               ^^^^^^^^^^^^^
+[error]     |              the type test for dotty.tools.dotc.ast.tpd.DefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Applications.scala:764:25 
+[error] 764 |      || arg.isInstanceOf[RefTree | Apply | TypeApply] && arg.symbol.name.is(DefaultGetterName)
+[error]     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error]     |the type test for dotty.tools.dotc.ast.tpd.RefTree | dotty.tools.dotc.ast.tpd.Apply | dotty.tools.dotc.ast.tpd.TypeApply cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Applications.scala:162:13 
+[error] 162 |        case fn: RefTree => fn.name
+[error]     |             ^^^^^^^^^^^
+[error]     |             the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Checking.scala:970:17 ---
+[error] 970 |            case tree: RefTree if tree.isTerm && (tree.tpe.classSymbol eq caller) =>
+[error]     |                 ^^^^^^^^^^^^^
+[error]     |              the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Checking.scala:1091:19 --
+[error] 1091 |              case t: RefTree if allowed(t.name, checkedSym) =>
+[error]      |                   ^^^^^^^^^^
+[error]      |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Checking.scala:363:13 ---
+[error] 363 |        case tree: MemberDef =>
+[error]     |             ^^^^^^^^^^^^^^^
+[error]     |            the type test for dotty.tools.dotc.ast.tpd.MemberDef cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Checking.scala:368:13 ---
+[error] 368 |        case tree: RefTree =>
+[error]     |             ^^^^^^^^^^^^^
+[error]     |             the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Checking.scala:603:11 ---
+[error] 603 |      case _: MemberDef | _: Import | EmptyTree =>
+[error]     |           ^^^^^^^^^^^^
+[error]     |           the type test for dotty.tools.dotc.ast.tpd.MemberDef cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Checking.scala:666:11 ---
+[error] 666 |      case tree: RefTree
+[error]     |           ^^^^^^^^^^^^^
+[error]     |           the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:809:15 ----
+[error] 809 |          case tree: MemberDef => tree.setDefTree
+[error]     |               ^^^^^^^^^^^^^^^
+[error]     |            the type test for dotty.tools.dotc.ast.tpd.MemberDef cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:1156:15 ---
+[error] 1156 |          case pat: RefTree =>
+[error]      |               ^^^^^^^^^^^^
+[error]      |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:1399:13 ---
+[error] 1399 |        case member: MemberDef => member.setDefTree
+[error]      |             ^^^^^^^^^^^^^^^^^
+[error]      |          the type test for dotty.tools.dotc.ast.tpd.MemberDef cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:1455:17 ---
+[error] 1455 |            case t: RefTree =>
+[error]      |                 ^^^^^^^^^^
+[error]      |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:1477:15 ---
+[error] 1477 |          case t: RefTree =>
+[error]      |               ^^^^^^^^^^
+[error]      |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:1482:23 ---
+[error] 1482 |                  case binding: ValOrDefDef => integrate(binding.rhs, sym)
+[error]      |                       ^^^^^^^^^^^^^^^^^^^^
+[error]      |        the type test for dotty.tools.dotc.ast.tpd.ValOrDefDef cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:1544:15 ---
+[error] 1544 |          case tree: RefTree if level == -1 && tree.symbol.isDefinedInCurrentRun && !tree.symbol.isLocal =>
+[error]      |               ^^^^^^^^^^^^^
+[error]      |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:265:17 ----
+[error] 265 |            case tree: JavaSeqLiteral => finalize(untpd.JavaSeqLiteral(transform(tree.elems), transform(tree.elemtpt))(curSource))
+[error]     |                 ^^^^^^^^^^^^^^^^^^^^
+[error]     |       the type test for dotty.tools.dotc.ast.tpd.JavaSeqLiteral cannot be checked at runtime
+[error]     | This location contains code that was inlined from Inliner.scala:265
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Inliner.scala:269:17 ----
+[error] 269 |            case tree: DefTree => super.transform(tree).setDefTree
+[error]     |                 ^^^^^^^^^^^^^
+[error]     |              the type test for dotty.tools.dotc.ast.tpd.DefTree cannot be checked at runtime
+[error]     | This location contains code that was inlined from Inliner.scala:269
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/QuotesAndSplices.scala:300:13 
+[error] 300 |        case tree: NamedDefTree =>
+[error]     |             ^^^^^^^^^^^^^^^^^^
+[error]     |         the type test for dotty.tools.dotc.ast.tpd.NamedDefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Typer.scala:994:23 ------
+[error] 994 |                  case lhsCore: RefTree if setter.exists =>
+[error]     |                       ^^^^^^^^^^^^^^^^
+[error]     |              the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Typer.scala:2007:30 -----
+[error] 2007 |            body1.isInstanceOf[RefTree] && !isWildcardArg(body1)
+[error]      |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[error]      |            the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Typer.scala:2444:11 -----
+[error] 2444 |      case pid1: RefTree if pkg.is(Package) =>
+[error]      |           ^^^^^^^^^^^^^
+[error]      |           the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Typer.scala:3750:11 -----
+[error] 3750 |      case _: MemberDef | _: PackageDef | _: Import | _: WithoutTypeOrPos[?] | _: Closure => tree
+[error]      |           ^^^^^^^^^^^^
+[error]      |          the type test for dotty.tools.dotc.ast.tpd.MemberDef cannot be checked at runtime
+[error] -- Error: /home/gruszecki/workspace/dotty/compiler/src/dotty/tools/dotc/typer/Typer.scala:3815:11 -----
+[error] 3815 |      case _: RefTree | _: Literal
+[error]      |           ^^^^^^^^^^
+[error]      |           the type test for dotty.tools.dotc.ast.tpd.RefTree cannot be checked at runtime
+[error] 29 errors found
+[error] 29 errors found
+[=======================================] completed (1277/1277, 0 failed, 121s)
+[=======================================] completed (1189/1189, 0 failed, 67s)
+[info] Test dotty.tools.dotc.FromTastyTests.posTestFromTasty started
+[=======================================] completed (2229/2229, 0 failed, 102s)
+[=======================================] completed (2080/2080, 0 failed, 52s)
+
+================================================================================
+Test Report
+================================================================================
+
+4 suites passed, 0 failed, 4 total
+
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 345.936s
+[info] Test run started
+[info] Test dotty.tools.io.ZipArchiveTest.missingFile started
+[info] Test dotty.tools.io.ZipArchiveTest.corruptZip started
+[info] Test dotty.tools.io.ZipArchiveTest.manifest$u0020resources$u0020just$u0020works started
+[info] Test run finished: 0 failed, 0 ignored, 3 total, 0.022s
+[info] Test run started
+[info] Test run finished: 0 failed, 0 ignored, 0 total, 0.0s
+[info] Test run started
+[info] Test dotty.tools.dotc.ast.AttachmentsTests.attachmentsAreNotCopiedOver started
+[info] Test dotty.tools.dotc.ast.AttachmentsTests.stickyAttachmentsAreCopiedOver started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.044s
+[info] Test run started
+[info] Test dotty.tools.repl.DocTests.docOfObjectInClass started
+[info] Test dotty.tools.repl.DocTests.docOfDefInClass started
+[info] Test dotty.tools.repl.DocTests.docOfObjectInObject started
+[info] Test dotty.tools.repl.DocTests.docOfOverride started
+[info] Test dotty.tools.repl.DocTests.docOfOverloadedDef started
+[info] Test dotty.tools.repl.DocTests.docOfOverrideObject started
+[info] Test dotty.tools.repl.DocTests.docOfValInClass started
+[info] Test dotty.tools.repl.DocTests.docOfTraitInClass started
+[info] Test dotty.tools.repl.DocTests.docOfClass started
+[info] Test dotty.tools.repl.DocTests.docOfEmpty started
+[info] Test dotty.tools.repl.DocTests.docOfTrait started
+[info] Test dotty.tools.repl.DocTests.docOfDefInObject started
+[info] Test dotty.tools.repl.DocTests.docOfInherited started
+[info] Test dotty.tools.repl.DocTests.docOfClassInObject started
+[info] Test dotty.tools.repl.DocTests.docOfTraitInObject started
+[info] Test dotty.tools.repl.DocTests.docOfObject started
+[info] Test dotty.tools.repl.DocTests.docOfValInObject started
+[info] Test dotty.tools.repl.DocTests.docOfDef started
+[info] Test dotty.tools.repl.DocTests.docOfVal started
+[info] Test dotty.tools.repl.DocTests.docIsCooked started
+[info] Test dotty.tools.repl.DocTests.docOfClassInClass started
+[info] Test run finished: 0 failed, 0 ignored, 21 total, 2.461s
+[info] Test run started
+[info] Test dotty.tools.repl.TypeTests.typeOfBlock started
+[info] Test dotty.tools.repl.TypeTests.typeOf1 started
+[info] Test dotty.tools.repl.TypeTests.typeOfX started
+[info] Test dotty.tools.repl.TypeTests.typeOfEmpty started
+[info] Test run finished: 0 failed, 0 ignored, 4 total, 0.188s
+[info] Test run started
+[info] Test dotty.tools.dotc.transform.TreeTransformerTest.canOverwrite started
+[info] Test dotty.tools.dotc.transform.TreeTransformerTest.invocationCount started
+[info] Test dotty.tools.dotc.transform.TreeTransformerTest.transformationOrder started
+[info] Test dotty.tools.dotc.transform.TreeTransformerTest.shouldReturnSameTreeIfUnchanged started
+[info] Test run finished: 0 failed, 0 ignored, 4 total, 0.188s
+[info] Test run started
+[info] Test dotty.tools.dotc.classpath.ZipAndJarFileLookupFactoryTest.cacheInvalidation started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.028s
+[info] Test run started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.passByNameNoBoxing started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.notSpecializeAbstractMethod started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.multipleLevelInheritanceNoBoxing started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.specializeParentIntToInt started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.multipleParentsNoBoxing started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.boxingFunction1 started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.boxingFunction2 started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.classWithFieldBoxing started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.noBoxingSpecFunction0 started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.noBoxingSpecFunction1 started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.noBoxingSpecFunction2 started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.specializeFunction2Applys started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.lambdaNoBoxing1 started
+[info] Test dotty.tools.dotc.transform.SpecializeFunctionsTests.lambdaNoBoxing2 started
+[info] Test run finished: 0 failed, 0 ignored, 14 total, 0.685s
+[info] Test run started
+[info] Test dotty.tools.dotc.ast.DesugarTests.caseClassCompanionHasCorrectMembers started
+[info] Test dotty.tools.dotc.ast.DesugarTests.caseClassHasCorrectMembers started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.043s
+[info] Test run started
+[info] Test dotty.tools.SignatureTest.signatureCaching started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.066s
+[info] Test run started
+[info] Test dotty.tools.dotc.typer.SubtypingInvariantTests.typeVarInvariant started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.01s
+[info] Test run started
+[info] Test dotty.tools.dotc.transform.PatmatExhaustivityTest.patmatExhaustivity started
+Output from 'tests/patmat/andtype-refinedtype-interaction.scala' did not match check file. Actual output:
+32: Pattern Match Exhaustivity: _: Trait & C1{x: Int}
+48: Pattern Match Exhaustivity: _: Trait & (C1 | (C2 | T1)){x: Int} & (C3 | (C4 | T2)){x: Int}, _: Clazz & (C1 | (C2 | T1)){x: Int} & (C3 | (C4 | T2)){x: Int}
+54: Pattern Match Exhaustivity: _: Trait & (C1 | (C2 | T1)){x: Int} & C3{x: Int}
+59: Pattern Match Exhaustivity: _: Trait & (C1 & C2){x: Int}
+65: Pattern Match Exhaustivity: _: Trait & (C1 | C2){x: Int} & (C3 | SubC1){x: Int}
+72: Pattern Match Exhaustivity: _: Trait & (T1 & (C1 | SubC2)){x: Int} & (T2 & (C2 | C3 | SubC1)){x: Int} & SubSubC1{x: Int}
+79: Pattern Match Exhaustivity: _: Trait & (T1 & (C1 | SubC2)){x: Int} & (T2 & (C2 | C3 | SubC1)){x: Int} & SubSubC2{x: Int}
+
+
+Test output dumped in: tests/patmat/andtype-refinedtype-interaction.check.out
+  See diff of the checkfile (`brew install icdiff` for colored diff)
+    > diff tests/patmat/andtype-refinedtype-interaction.check tests/patmat/andtype-refinedtype-interaction.check.out
+  Replace checkfile with current output
+    > mv tests/patmat/andtype-refinedtype-interaction.check.out tests/patmat/andtype-refinedtype-interaction.check
+      
+[error] Test dotty.tools.dotc.transform.PatmatExhaustivityTest.patmatExhaustivity failed: java.lang.AssertionError: assertion failed: Total: 188, Failed: 1, Ignored: 3, took 9.168 sec
+[error]     at scala.runtime.Scala3RunTime$.assertFailed(Scala3RunTime.scala:8)
+[error]     at dotty.tools.dotc.transform.PatmatExhaustivityTest.patmatExhaustivity(PatmatExhaustivityTest.scala:77)
+[error]     ...
+[info] Test run finished: 1 failed, 0 ignored, 1 total, 9.169s
+[info] Test run started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyFloat started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyShort started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyDouble started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayEmptyGenericApply started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayGenericApply started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyByte started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyChar started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyLong started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyUnit started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyBoolean started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayInlined2 started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayInlined3 started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayInlined started
+[info] Test dotty.tools.backend.jvm.ArrayApplyOptTest.testArrayApplyInt started
+[info] Test run finished: 0 failed, 0 ignored, 14 total, 2.377s
+[info] Test run started
+[info] Test dotty.tools.dotc.TastyHashTest.pjwHash64Tests started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.002s
+[info] Test run started
+[info] Test dotty.tools.dotc.ast.UntpdTreeMapTest.testMapInterpolatedString started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.006s
+[info] Test run started
+[info] Test dotty.tools.dotc.printing.PrinterTests.packageObject started
+[info] Test dotty.tools.dotc.printing.PrinterTests.tpTreeInfixOps started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.037s
+[info] Test run started
+[info] Test dotty.tools.dotc.parsing.StringInterpolationPositionTest.interpolationLiteralPosition started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.007s
+[info] Test run started
+[info] Test dotty.tools.repl.ReplCompilerTests.testSingletonPrint started
+[info] Test dotty.tools.repl.ReplCompilerTests.i10214$u0020must$u0020show$u0020classic$u0020MatchError started
+[info] Test dotty.tools.repl.ReplCompilerTests.testRes started
+[info] Test dotty.tools.repl.ReplCompilerTests.testVar started
+[info] Test dotty.tools.repl.ReplCompilerTests.compileTwo started
+[info] Test dotty.tools.repl.ReplCompilerTests.compileSingle started
+[info] Test dotty.tools.repl.ReplCompilerTests.i2789 started
+[info] Test dotty.tools.repl.ReplCompilerTests.i3305 ignored
+[info] Test dotty.tools.repl.ReplCompilerTests.i4051 started
+[info] Test dotty.tools.repl.ReplCompilerTests.i5897 started
+[info] Test dotty.tools.repl.ReplCompilerTests.i6200 started
+[info] Test dotty.tools.repl.ReplCompilerTests.i6574 started
+[info] Test dotty.tools.repl.ReplCompilerTests.i7934 started
+[info] Test dotty.tools.repl.ReplCompilerTests.i8677 started
+[info] Test dotty.tools.repl.ReplCompilerTests.byNameParam started
+[info] Test dotty.tools.repl.ReplCompilerTests.inspectWrapper started
+[info] Test dotty.tools.repl.ReplCompilerTests.i10214$u0020must$u0020show$u0020useful$u0020regex$u0020MatchError started
+[info] Test dotty.tools.repl.ReplCompilerTests.rebindVariable started
+[info] Test dotty.tools.repl.ReplCompilerTests.testImportMutable started
+[info] Test dotty.tools.repl.ReplCompilerTests.i10214$u0020must$u0020show$u0020MatchError$u0020on$u0020literal$u0020type started
+[info] Test run finished: 0 failed, 1 ignored, 19 total, 2.141s
+[info] Test run started
+[info] Test dotty.tools.dotc.PrintingTest.printing started
+Pass: 1, Failed: 0
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.085s
+[info] Test run started
+[info] Test dotty.tools.dotc.util.DiffUtilTests.simpleString started
+[info] Test dotty.tools.dotc.util.DiffUtilTests.seqSeq started
+[info] Test dotty.tools.dotc.util.DiffUtilTests.tupleSeq started
+[info] Test dotty.tools.dotc.util.DiffUtilTests.tuple started
+[info] Test dotty.tools.dotc.util.DiffUtilTests.seqTuple started
+[info] Test run finished: 0 failed, 0 ignored, 5 total, 0.018s
+[info] Test run started
+[info] Test dotty.tools.dotc.IdempotencyTests.idempotency started
+[=======================================] completed (4468/4468, 0 failed, 149s)
+[=======================================] completed (2/2, 0 failed, 1s)
+
+================================================================================
+Test Report
+================================================================================
+
+2 suites passed, 0 failed, 2 total
+
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 152.899s
+[info] Test run started
+[info] Test dotty.tools.backend.jvm.TestBCode.invocationReceiversProtected started
+[info] Test dotty.tools.backend.jvm.TestBCode.invocationReceivers started
+[info] Test dotty.tools.backend.jvm.TestBCode.dontWrapArraysInJavaVarargs started
+[info] Test dotty.tools.backend.jvm.TestBCode.switchWithAlternatives started
+[info] Test dotty.tools.backend.jvm.TestBCode.arraysFromDimAndFromNewEqual started
+[info] Test dotty.tools.backend.jvm.TestBCode.i5924b started
+[info] Test dotty.tools.backend.jvm.TestBCode.i5924c started
+[info] Test dotty.tools.backend.jvm.TestBCode.objectsAreFinal started
+[info] Test dotty.tools.backend.jvm.TestBCode.multidimArraysFromOfDim started
+[info] Test dotty.tools.backend.jvm.TestBCode.failTransform started
+[info] Test dotty.tools.backend.jvm.TestBCode.basicSwitch started
+[info] Test dotty.tools.backend.jvm.TestBCode.freshNames started
+[info] Test dotty.tools.backend.jvm.TestBCode.objectsInClassAreFinal started
+[info] Test dotty.tools.backend.jvm.TestBCode.objectsInObjDefAreFinal started
+[info] Test dotty.tools.backend.jvm.TestBCode.efficientTryCases started
+[info] Test dotty.tools.backend.jvm.TestBCode.testInsertReleaseFence started
+[info] Test dotty.tools.backend.jvm.TestBCode.vcElideAllocations started
+[info] Test dotty.tools.backend.jvm.TestBCode.basicTransformNonAnnotated started
+[info] Test dotty.tools.backend.jvm.TestBCode.objectsInObjValAreFinal started
+[info] Test dotty.tools.backend.jvm.TestBCode.i505 started
+[info] Test dotty.tools.backend.jvm.TestBCode.i3271 started
+[info] Test dotty.tools.backend.jvm.TestBCode.i4172 started
+[info] Test dotty.tools.backend.jvm.TestBCode.i5090 started
+[info] Test dotty.tools.backend.jvm.TestBCode.i5191 started
+[info] Test dotty.tools.backend.jvm.TestBCode.i5340 started
+[info] Test dotty.tools.backend.jvm.TestBCode.i5750 started
+[info] Test dotty.tools.backend.jvm.TestBCode.t9179 started
+[info] Test dotty.tools.backend.jvm.TestBCode.matchWithDefaultNoThrowMatchError started
+[info] Test dotty.tools.backend.jvm.TestBCode.switchWithGuards started
+[info] Test dotty.tools.backend.jvm.TestBCode.deprecation started
+[info] Test dotty.tools.backend.jvm.TestBCode.lazyFields started
+[info] Test dotty.tools.backend.jvm.TestBCode.returnThrowInPatternMatch started
+[info] Test dotty.tools.backend.jvm.TestBCode.objectsInObjsAreFinal started
+[info] Test dotty.tools.backend.jvm.TestBCode.specialInvocationReceivers started
+[info] Test dotty.tools.backend.jvm.TestBCode.objectsInClassDefAreFinal started
+[info] Test dotty.tools.backend.jvm.TestBCode.noBoxingInSyntheticEquals started
+[info] Test dotty.tools.backend.jvm.TestBCode.nullChecks started
+[info] Test dotty.tools.backend.jvm.TestBCode.arraysFromOfDim started
+[info] Test dotty.tools.backend.jvm.TestBCode.javaBridgesAreNotVisible started
+[info] Test dotty.tools.backend.jvm.TestBCode.getClazz started
+[info] Test dotty.tools.backend.jvm.TestBCode.partialFunctions started
+[info] Test run finished: 0 failed, 0 ignored, 41 total, 1.73s
+[info] Test run started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.varsWithDocString started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.multipleDocStringsBeforeAndAfter started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.overComment started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.multipleOpenedOnSingleClassInPackage started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.nestedClass started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.objects started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.SingleTraitWihoutPackage started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.eofComment started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.valuesWithDocString started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.overNL started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.nestedComment started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.objectsNestedClass started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.singleCaseClassWithoutPackage started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.withExtends started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.withAnnotation started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.multipleClassesInPackage started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.defsWithDocString started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.defInnerClass started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.typesWithDocString started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.multipleTraitsWithoutPackage started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.multipleMixedEntitiesWithPackage started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.singleClassInPackage started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.packageObject started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.noComment started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.nestedClassThenOuter started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.withAnnotationOverComment started
+[info] Test dotty.tools.dotc.parsing.DocstringTests.multipleDocStringsBeforeEntity started
+[info] Test run finished: 0 failed, 0 ignored, 27 total, 0.344s
+[info] Test run started
+[info] Test dotty.tools.dotc.ast.TreeInfoTest.testDefPath started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.014s
+[info] Test run started
+[info] Test dotty.tools.repl.TabcompleteTests.tabCompleteList started
+[info] Test dotty.tools.repl.TabcompleteTests.tabCompleteInClass started
+[info] Test dotty.tools.repl.TabcompleteTests.moduleCompletion started
+[info] Test dotty.tools.repl.TabcompleteTests.anyRef started
+[info] Test dotty.tools.repl.TabcompleteTests.tabCompleteListInstance started
+[info] Test dotty.tools.repl.TabcompleteTests.tabCompleteFromPreviousImport started
+[info] Test dotty.tools.repl.TabcompleteTests.tabClosureComplete started
+[info] Test dotty.tools.repl.TabcompleteTests.tabCompleteTwiceIn started
+[info] Test dotty.tools.repl.TabcompleteTests.null started
+[info] Test dotty.tools.repl.TabcompleteTests.i3309 started
+[info] Test dotty.tools.repl.TabcompleteTests.i6415 started
+[info] Test dotty.tools.repl.TabcompleteTests.completeFromPreviousState started
+[info] Test dotty.tools.repl.TabcompleteTests.completeFromPreviousState2 started
+[info] Test dotty.tools.repl.TabcompleteTests.tabCompleteRenamedImport started
+[info] Test dotty.tools.repl.TabcompleteTests.$qmark$qmark$qmark started
+[info] Test dotty.tools.repl.TabcompleteTests.importScala started
+[info] Test dotty.tools.repl.TabcompleteTests.tabCompleteModule started
+[info] Test run finished: 0 failed, 0 ignored, 17 total, 2.3s
+[info] Test run started
+[info] Test dotty.tools.dotc.parsing.ModifiersParsingTest.fieldDef started
+[info] Test dotty.tools.dotc.parsing.ModifiersParsingTest.typeDef started
+[info] Test dotty.tools.dotc.parsing.ModifiersParsingTest.valDef started
+[info] Test dotty.tools.dotc.parsing.ModifiersParsingTest.blockDef started
+[info] Test dotty.tools.dotc.parsing.ModifiersParsingTest.paramDef started
+[info] Test run finished: 0 failed, 0 ignored, 5 total, 0.005s
+[info] Test run started
+[info] Test dotty.tools.dotc.typer.DivergenceCheckerTests.testCoveringSet started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.035s
+[info] Test run started
+[info] Test dotty.tools.dotc.reporting.TestMessageLaziness.assureLazy started
+[info] Test dotty.tools.dotc.reporting.TestMessageLaziness.assureLazyExtendMessage started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.015s
+[info] Test run started
+[info] Test dotty.tools.repl.ReplXPrintTyperTests.i10883 started
+[info] Test dotty.tools.repl.ReplXPrintTyperTests.i9111 started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.238s
+[info] Test run started
+[info] Test dotty.tools.repl.LoadTests.helloworld started
+[info] Test dotty.tools.repl.LoadTests.maindefs started
+[info] Test dotty.tools.repl.LoadTests.maindef started
+[info] Test run finished: 0 failed, 0 ignored, 3 total, 0.607s
+[info] Test run started
+[info] Test dotty.tools.dotc.ConstantFoldingTests.constantFoldConditions started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.046s
+[info] Test run started
+[info] Test dotty.tools.dotc.config.ScalaSettingsTests.A$u0020multistring$u0020setting$u0020is$u0020multivalued started
+[info] Test dotty.tools.dotc.config.ScalaSettingsTests.t9719$u0020Apply$u0020$minuslanguage$u0020more$u0020than$u0020once started
+[info] Test dotty.tools.dotc.config.ScalaSettingsTests.Warn$u0020if$u0020multistring$u0020element$u0020is$u0020supplied$u0020multiply started
+[info] Test dotty.tools.dotc.config.ScalaSettingsTests.A$u0020setting$u0020with$u0020aliases$u0020is$u0020accepted started
+[info] Test run finished: 0 failed, 0 ignored, 4 total, 0.007s
+[info] Test run started
+[info] Test dotty.tools.dotc.CompilationTests.negAll started
+[==========>                            ] completed (343/1167, 0 failed, 12s)
+No errors found when compiling neg test out/compileNeg/neg/i3989c              
+error while transforming method splitAt
+error while transforming method tuple2ToZippedOps
+[=======================================] completed (1167/1167, 1 failed, 44s)
+[error] Test dotty.tools.dotc.CompilationTests.negAll failed: java.lang.AssertionError: Neg test should have failed, but did not, took 44.78 sec
+[error]     at dotty.tools.vulpix.ParallelTesting$CompilationTest.checkExpectedErrors(ParallelTesting.scala:919)
+[error]     at dotty.tools.dotc.CompilationTests.negAll(CompilationTests.scala:174)
+[error]     ...
+[info] Test dotty.tools.dotc.CompilationTests.runAll started
+[=======================================] completed (1321/1321, 0 failed, 95s)
+[info] Test dotty.tools.dotc.CompilationTests.pickling started
+[=======================================] completed (3352/3352, 0 failed, 82s)
+[info] Test dotty.tools.dotc.CompilationTests.rewrites started
+[=======================================] completed (1/1, 0 failed, 0s)
+[=======================================] completed (1/1, 0 failed, 0s)
+[=======================================] completed (1/1, 0 failed, 0s)
+[=======================================] completed (1/1, 0 failed, 0s)
+[=======================================] completed (4/4, 0 failed, 0s)
+[info] Test dotty.tools.dotc.CompilationTests.pos started
+[=======================================] completed (2374/2374, 0 failed, 180s)
+[info] Test dotty.tools.dotc.CompilationTests.checkInit started
+[=======================================] completed (104/104, 0 failed, 1s)
+[=======================================] completed (23/23, 0 failed, 0s)
+[=======================================] completed (22/22, 0 failed, 1s)
+[info] Test dotty.tools.dotc.CompilationTests.tastyBootstrap started
+[=======================================] completed (1/1, 0 failed, 11s)
+[=======================================] completed (1/1, 0 failed, 0s)
+[=======================================] completed (1/1, 0 failed, 28s)
+[=======================================] completed (259/259, 0 failed, 44s)
+[=======================================] completed (1/1, 0 failed, 0s)
+[info] Test dotty.tools.dotc.CompilationTests.posTwice started
+[=======================================] completed (131/131, 0 failed, 18s)
+[info] Test dotty.tools.dotc.CompilationTests.explicitNullsNeg started
+[=======================================] completed (52/52, 0 failed, 5s)
+[info] Test dotty.tools.dotc.CompilationTests.explicitNullsPos started
+[=======================================] completed (57/57, 0 failed, 5s)
+[info] Test dotty.tools.dotc.CompilationTests.explicitNullsRun started
+[=======================================] completed (9/9, 0 failed, 0s)
+[info] Test dotty.tools.dotc.CompilationTests.fuzzyAll started
+[=======================================] completed (183/183, 0 failed, 4s)
+[info] Test dotty.tools.dotc.CompilationTests.genericJavaSignatures started
+[=======================================] completed (21/21, 0 failed, 0s)
+
+================================================================================
+Test Report
+================================================================================
+
+22 suites passed, 1 failed, 23 total
+    tests/neg/i3989c.scala failed
+
+
+--------------------------------------------------------------------------------
+Note - reproduction instructions have been dumped to log file:
+    /home/gruszecki/workspace/dotty/testlogs/tests-2021-03-21/tests-2021-03-21-T18-30-42.log
+--------------------------------------------------------------------------------
+[info] Test run finished: 1 failed, 0 ignored, 13 total, 529.714s
+[info] Test run started
+[info] Test dotty.tools.dotc.SettingsTests.jarOutput started
+[info] Test dotty.tools.dotc.SettingsTests.missingOutputDir started
+[info] Test dotty.tools.dotc.SettingsTests.acceptUnconstrained started
+[info] Test dotty.tools.dotc.SettingsTests.t8124$u0020Don$u0027t$u0020crash$u0020on$u0020missing$u0020argument started
+[info] Test dotty.tools.dotc.SettingsTests.validateChoices started
+[info] Test run finished: 0 failed, 0 ignored, 5 total, 0.037s
+[info] Test run started
+[info] Test dotty.tools.CheckTypeTest.checkTypesTest started
+[info] Test dotty.tools.CheckTypeTest.checkTypessTest started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.033s
+[info] Test run started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.strings started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.softKeywords started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.annotations started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.valOrDefDef started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.comments started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.types started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.expressions started
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.patterns ignored
+[info] Test dotty.tools.dotc.printing.SyntaxHighlightingTests.literals started
+[info] Test run finished: 0 failed, 1 ignored, 8 total, 0.034s
+[info] Test run started
+[info] Test dotty.tools.dotc.classpath.MultiReleaseJarTest.mrJar started
+skipping mrJar() on old JDK
+skipping mrJar() on old JDK
+[info] Test dotty.tools.dotc.classpath.MultiReleaseJarTest.ctSymTest started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.0s
+[info] Test run started
+[info] Test dotty.tools.repl.ScriptedTests.replTests started
+[info] Test dotty.tools.repl.ScriptedTests.typePrinterTests started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 9.779s
+[info] Test run started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i4947b started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i4947c started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i4947d started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i6800a started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i6800b started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.inlineAssert started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i4522 started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i4947 started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i6375 started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i9246 started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i9456 started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.i9466 started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.inlineNn started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.finalVals started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.inlineUnit started
+[info] Test dotty.tools.backend.jvm.InlineBytecodeTests.beta_reduce_under_block started
+[info] Test run finished: 0 failed, 0 ignored, 16 total, 0.509s
+[info] Test run started
+[info] Test dotty.tools.dotc.ScalaCommandTest.Simple$u0020one$u0020parameter started
+[info] Test dotty.tools.dotc.ScalaCommandTest.Unfold$u0020$atfile started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.005s
+[info] Test run started
+[info] Test dotty.tools.scripting.ScriptingTests.scriptingDriverTests started
+===> test script name [basic-math.scala]
+mainClass from ScriptingDriver: Test
+===> test script name [hashBang.scala]
+mainClass from ScriptingDriver: hashBang$package
+mainClassFromStack: hashBang
+===> test script name [mainClassOnStack.scala]
+mainClass from ScriptingDriver: Zoo
+script.name: null
+mainClassFromStack: Zoo
+===> test script name [say-hi.scala]
+mainClass from ScriptingDriver: Test
+===> test script name [scriptName.scala]
+mainClass from ScriptingDriver: scriptName$package
+no script.name property is defined
+===> test script name [scriptParent.scala]
+mainClass from ScriptingDriver: ScriptParent
+parentDir: [/home/gruszecki/workspace/dotty/compiler/target/scala-3.0.0-RC1/test-classes/scripting]
+[info] Test dotty.tools.scripting.ScriptingTests.scriptingMainTests started
+===> test script name [hashBang.sc]
+mainClassFromStack: hashBang$package$
+===> test script name [mainClassOnStack.sc]
+mainClassFromStack: Zoo
+===> test script name [scriptPath.sc]
+script.path: /home/gruszecki/workspace/dotty/compiler/target/scala-3.0.0-RC1/test-classes/scripting/scriptPath.sc
+===> test script name [touchFile.sc]
+[info] Test dotty.tools.scripting.ScriptingTests.scriptCompileOnlyTests started
+===> test script name [touchFile.sc]
+testing script compile, with no call to script main method.
+success: no call to main method in mainClass: touchFile$package
+testing script compile, with call to script main method.
+call main method in mainClass: touchFile$package
+success: script created file touchedFile.out
+success: created file touchedFile.out
+[info] Test dotty.tools.scripting.ScriptingTests.scriptingJarTest started
+===> test script name [hashBang.sc]
+mainClassFromStack: hashBang$package$
+===> test script jar name [hashBang.jar]
+mainClassFromStack: hashBang$package$
+===> test script name [mainClassOnStack.sc]
+mainClassFromStack: Zoo
+===> test script jar name [mainClassOnStack.jar]
+mainClassFromStack: Zoo
+===> test script name [scriptPath.sc]
+script.path: /home/gruszecki/workspace/dotty/compiler/target/scala-3.0.0-RC1/test-classes/scripting/scriptPath.sc
+===> test script jar name [scriptPath.jar]
+script.path: scriptPath.sc
+===> test script name [touchFile.sc]
+===> test script jar name [touchFile.jar]
+[info] Test dotty.tools.scripting.ScriptingTests.scriptingNoCompileJar started===> test script name [touchFile.sc]
+
+===> test script jar name [touchFile.jar]
+calling executable jar /home/gruszecki/workspace/dotty/compiler/target/scala-3.0.0-RC1/test-classes/scripting/touchFile.jar
+success: executable jar created file touchedFile.out
+[info] Test run finished: 0 failed, 0 ignored, 5 total, 2.144s
+[info] Test run started
+[info] Test dotty.tools.dotc.reporting.UserDefinedErrorMessages.userDefinedImplicitAmbiguous1 started
+[info] Test dotty.tools.dotc.reporting.UserDefinedErrorMessages.userDefinedImplicitAmbiguous2 started
+[info] Test dotty.tools.dotc.reporting.UserDefinedErrorMessages.userDefinedImplicitAmbiguous3 started
+[info] Test dotty.tools.dotc.reporting.UserDefinedErrorMessages.userDefinedImplicitAmbiguous4 started
+[info] Test dotty.tools.dotc.reporting.UserDefinedErrorMessages.userDefinedImplicitAmbiguous5 started
+[info] Test run finished: 0 failed, 0 ignored, 5 total, 0.2s
+[info] Test run started
+[info] Test dotty.tools.dotc.util.StackTraceTest.dontBlowOnCycle started
+[info] Test dotty.tools.dotc.util.StackTraceTest.showsWrappedExceptions started
+[info] Test dotty.tools.dotc.util.StackTraceTest.showsSuppressed started
+[info] Test dotty.tools.dotc.util.StackTraceTest.showsCause started
+[info] Test dotty.tools.dotc.util.StackTraceTest.showsAllTrace started
+[info] Test dotty.tools.dotc.util.StackTraceTest.showsOnlyPrefix started
+[info] Test run finished: 0 failed, 0 ignored, 6 total, 0.008s
+[info] Test run started
+[info] Test dotty.tools.backend.jvm.StringConcatTest.appendOverloadNoBoxing started
+[info] Test dotty.tools.backend.jvm.StringConcatTest.concatPrimitiveCorrectness started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.038s
+[info] Test run started
+[info] Test run finished: 0 failed, 0 ignored, 0 total, 0.0s
+[info] Test run started
+[info] Test run finished: 0 failed, 0 ignored, 0 total, 0.001s
+[info] Test run started
+[info] Test dotty.tools.dotc.parsing.ScannerTest.scanDotty started
+[info] Test dotty.tools.dotc.parsing.ScannerTest.scanList started
+/home/gruszecki/workspace/dotty
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.011s
+[info] Test run started
+[info] Test run finished: 0 failed, 0 ignored, 0 total, 0.0s
+[info] Test run started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.negAnnotWrongLine started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.infiniteAlloc started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.runOutRedirects started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.infiteNonRec started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.negNoPositionAnnot started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.runCompileFail started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.infiteTailRec started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.badJava started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.pos1Error started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.deadlock started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.negTooManyAnnots started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.runWrongOutput1 started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.runWrongOutput2 started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.runDiffOutput1 started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.runTimeout started
+failed because test tests/vulpix-tests/unit/timeout.scala timed out             
+[=======================================] completed (1/1, 1 failed, 3s)
+[info] Test dotty.tools.vulpix.VulpixUnitTests.missingFile started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.runStackOverflow started
+[info] Test dotty.tools.vulpix.VulpixUnitTests.negAnyPositionAnnot started
+[=======================================] completed (1/1, 0 failed, 0s)
+[info] Test dotty.tools.vulpix.VulpixUnitTests.negMissingAnnot started
+[info] Test run finished: 0 failed, 0 ignored, 19 total, 14.429s
+[info] Test run started
+[loaded package loader <root> in 0ms]
+[loaded package loader scala in 1ms]
+[loaded package loader java in 0ms]
+[loaded package loader java.lang in 0ms]
+[loaded package loader java.io in 0ms]
+[loaded package loader java.lang.reflect in 0ms]
+[loaded package loader sun in 0ms]
+[loaded package loader sun.reflect in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/io/Serializable.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/AnnotatedElement.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/GenericDeclaration.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/Type.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/Class.class) in 1ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/CharSequence.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/String.class) in 0ms]
+[info] Test dotty.tools.repl.ReplVerboseTests.i10883 started
+[loaded package loader <root> in 0ms]
+[loaded package loader scala in 0ms]
+[loaded package loader java in 0ms]
+[loaded package loader java.lang in 0ms]
+[loaded package loader java.io in 0ms]
+[loaded package loader java.lang.reflect in 0ms]
+[loaded package loader sun in 0ms]
+[loaded package loader sun.reflect in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/io/Serializable.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/AnnotatedElement.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/GenericDeclaration.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/Type.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/Class.class) in 1ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/CharSequence.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/String.class) in 0ms]
+[loaded package loader <root> in 0ms]
+[loaded package loader scala in 1ms]
+[loaded package loader java in 0ms]
+[loaded package loader java.lang in 0ms]
+[loaded package loader java.io in 0ms]
+[loaded package loader java.lang.reflect in 0ms]
+[loaded package loader sun in 0ms]
+[loaded package loader sun.reflect in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/io/Serializable.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/AnnotatedElement.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/GenericDeclaration.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/Type.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/Class.class) in 2ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/CharSequence.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/String.class) in 0ms]
+[info] Test dotty.tools.repl.ReplVerboseTests.i9111 started
+[loaded package loader <root> in 0ms]
+[loaded package loader scala in 1ms]
+[loaded package loader java in 0ms]
+[loaded package loader java.lang in 1ms]
+[loaded package loader java.io in 1ms]
+[loaded package loader java.lang.reflect in 0ms]
+[loaded package loader sun in 0ms]
+[loaded package loader sun.reflect in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/io/Serializable.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/AnnotatedElement.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/GenericDeclaration.class) in 1ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/reflect/Type.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/Class.class) in 2ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/CharSequence.class) in 0ms]
+[loaded class file /usr/lib/jvm/java-8-openjdk-amd64/jre/lib/rt.jar(java/lang/String.class) in 0ms]
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.22s
+[info] Test run started
+[info] Test dotty.tools.AnnotationsTest.annotTreeNotErased started
+[info] Test dotty.tools.AnnotationsTest.surviveMissingAnnot started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.301s
+[info] Test run started
+[info] Test dotty.tools.dotc.core.tasty.CommentPicklingTest.commentOnClass started
+[info] Test dotty.tools.dotc.core.tasty.CommentPicklingTest.commentOnObject started
+[info] Test dotty.tools.dotc.core.tasty.CommentPicklingTest.commentLocalDef started
+[info] Test dotty.tools.dotc.core.tasty.CommentPicklingTest.commentLocalVal started
+[info] Test dotty.tools.dotc.core.tasty.CommentPicklingTest.commentOnlazyVal started
+[info] Test dotty.tools.dotc.core.tasty.CommentPicklingTest.commentOnDef started
+[info] Test dotty.tools.dotc.core.tasty.CommentPicklingTest.commentOnVal started
+[info] Test run finished: 0 failed, 0 ignored, 7 total, 0.368s
+[info] Test run started
+[info] Test dotty.tools.io.PathTest.parent started
+[info] Test run finished: 0 failed, 0 ignored, 1 total, 0.002s
+[info] Test run started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsResourcesFromParent started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsClassBytesFromParent started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsResources started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsResourceFromParent started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsParent started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsResourceAsStream started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsClassBytes started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsResource started
+[info] Test dotty.tools.repl.AbstractFileClassLoaderTest.afclGetsResourceInDefaultPackage started
+[info] Test run finished: 0 failed, 0 ignored, 9 total, 0.005s
+[info] Test run started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.orderingTwoPlugins1 started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.orderingTwoPlugins2 started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.orderingTwoPlugins3 started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.orderingTwoPlugins4 started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.deterministic started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.insertAfter started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.insertBefore started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.insertBeforeAfter started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.orderingTransitive started
+[info] Test dotty.tools.dotc.plugins.PluginsTest.constraintUnsatisfiable started
+[info] Test run finished: 0 failed, 0 ignored, 10 total, 0.017s
+[info] Test run started
+[info] Test dotty.tools.backend.jvm.StringInterpolatorOptTest.testRawInterpolator started
+[info] Test dotty.tools.backend.jvm.StringInterpolatorOptTest.testSInterpolator started
+[info] Test run finished: 0 failed, 0 ignored, 2 total, 0.054s
+[info] Test run started
+[info] Test dotty.tools.dotc.config.CommandLineParserTest.parserTokenizes started
+[info] Test dotty.tools.dotc.config.CommandLineParserTest.parserTrims started
+[info] Test dotty.tools.dotc.config.CommandLineParserTest.parserQuotes started
+[info] Test run finished: 0 failed, 0 ignored, 3 total, 0.001s
+[info] Test run started
+[info] Test dotty.tools.tasty.TastyHeaderUnpicklerTest ignored
+[info] Test run finished: 0 failed, 1 ignored, 0 total, 0.006s
+[info] Test run started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.reject_ExperimentalReadFinal_GTEqualMinor started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.accept_FinalReadFinal_LTEqualMinor started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.accept_ExperimentalReadFinal_LTMinor started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.reject_ExperimentalReadNEExperimental started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.reject_NEMajor started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.reject_FinalReadFinal_GTMinor started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.accept_ExperimentalReadEQExperimental_EQMinor started
+[info] Test dotty.tools.tasty.TastyVersionFormatTest.reject_FinalReadExperimental started
+[info] Test run finished: 0 failed, 0 ignored, 8 total, 0.012s
+[error] Failed: Total 336, Failed 2, Errors 0, Passed 332, Skipped 2
+[error] Failed tests:
+[error] 	dotty.tools.dotc.transform.PatmatExhaustivityTest
+[error] 	dotty.tools.dotc.CompilationTests
+[info] Passed: Total 9, Failed 0, Errors 0, Passed 8, Skipped 1
+[error] (scala3-compiler / Test / testOnly) sbt.TestsFailedException: Tests unsuccessful
+[error] (scala3-compiler-bootstrapped / Compile / compileIncremental) Compilation failed
+[error] Total time: 1110 s (18:30), completed Mar 21, 2021 6:43:21 PM

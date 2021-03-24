@@ -1,0 +1,30 @@
+
+#+begin_src elisp :wrap src text
+  (sbt/run-for-output "compile")
+  (sbt/compile-file-for-output "issue/gadts/tree.scala")
+#+end_src
+
+#+RESULTS:
+#+begin_src text
+[info] running (fork) dotty.tools.dotc.Main -classpath /home/gruszecki/.cache/coursier/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.5/scala-library-2.13.5.jar:/home/gruszecki/workspace/dotty/library/../out/bootstrap/scala3-library-bootstrapped/scala-3.0.0-RC2/scala3-library_3.0.0-RC2-3.0.0-RC2-bin-SNAPSHOT.jar -color:never -d out -Yescape-analysis issue/gadts/tree.scala
+bad option '-Yescape-analysis' was ignored
+-- [E029] Pattern Match Exhaustivity Warning: issue/gadts/tree.scala:21:4 ----------------------------
+21 |    trees match
+   |    ^^^^^
+   |    match may not be exhaustive.
+   |
+   |    It would fail on pattern case: Nil
+
+longer explanation available when compiling with `-explain`
+-- Warning: issue/gadts/tree.scala:17:11 -------------------------------------------------------------
+17 |      case _ : List[Int] => 0
+   |           ^^^^^^^^^^^^^
+   |           the type test for List[Int] cannot be checked at runtime
+3 warnings found
+[success] Total time: 3 s, completed Mar 24, 2021 11:20:44 AM
+#+end_src
+
+#+begin_src elisp :results none
+  (sbt/run-for-output "compile")
+  (sbt/compile-file-for-output "issue/gadts/i3989c.alt.scala")
+#+end_src
