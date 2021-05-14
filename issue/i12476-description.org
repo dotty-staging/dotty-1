@@ -1,0 +1,84 @@
+#+name: ino
+#+begin_src elisp :cache yes
+  "i12476"
+#+end_src
+
+#+RESULTS[cdd66e3c7ef31789eb34506df4ada23f3f2945f3]: ino
+: i12476
+
+* Test
+
+  #+begin_src elisp :var ino=ino :results silent
+    (magit-branch-and-checkout (concat "investigate/" ino) "HEAD")
+  #+end_src
+
+  #+begin_src elisp :var ino=ino :results silent
+    (write-file (concat ino "-description.org"))
+  #+end_src
+
+  #+begin_src elisp :var ino=ino :results silent
+    (find-file (concat ino ".scala"))
+  #+end_src
+
+  #+begin_src elisp :var ino=ino :results silent
+    (save-excursion
+      (beginning-of-buffer)
+      (while (re-search-forward (rx "$" "ISSUE$") nil t)
+        (replace-match ino t t)))
+  #+end_src
+
+* i12476
+
+  This is where the actual file starts. I left the previous blocks in case you'd
+  be interested in them.
+
+  This block defines the file we will be testing. To output it to an actual
+  file, type ~, b t~.
+
+  Note that all src blocks in org-mode can be edited in their own mode by typing
+  ~, '~ with point anywhere inside them.
+
+  #+begin_src scala :tangle i12476.scala
+    object test {
+      def foo[A, B](m: B) = {
+        m match {
+          case _: A =>
+            m match {
+              case _: B =>  // crash with -Yno-deep-subtypes
+            }
+        }
+      }
+    }
+  #+end_src
+
+  The next block defines how to test the file. It can be run with by typing ~,
+  ,~ with point anywhere inside it.
+
+  This will /block/ until the compilation finishes. If this is a problem, type =C-g=.
+  While the above is compiling, note that the buffer will be cleared once. This
+  is because there are two separate function calls. We separately compile the
+  compiler to avoid polluting the actual trace.
+
+  #+begin_src elisp
+    (sbt/run-until-output "scala3-compiler/compile")
+    (sbt/compile-file-for-output "issue/i12476.scala")
+  #+end_src
+
+  Running this block should have inserted the resulting trace above. This is
+  nice for committing things to git. It can be toggled off by adding ~:results
+  silent~, see blocks at the top of file.
+
+  Inside the trace additional keybindings should be available:
+
+  | Key     | Description                                              |
+  |---------+----------------------------------------------------------|
+  | ~, SPC~ | Jump to matching header                                  |
+  | ~, ]~   | Jump forward to closing header                           |
+  | ~, ]~   | (if not inside a trace) Jump forward to the next header  |
+  | ~, [~   | Jump backward to opening header                          |
+  | ~, [~   | (if not inside a trace) Jump backward to the next header |
+  | ~, }~   | Jump forward to sibling header                           |
+  | ~, {~   | Jump backward to sibling header                          |
+
+  There are other commands - feel free to try them out - but they might be less
+  useful to you.

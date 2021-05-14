@@ -73,7 +73,7 @@ trait PatternTypeConstrainer { self: TypeComparer =>
    *  scrutinee and pattern types. This does not apply if the pattern type is only applied to type variables,
    *  in which case the subtyping relationship "heals" the type.
    */
-  def constrainPatternType(pat: Type, scrut: Type, widenParams: Boolean = true): Boolean = trace(i"constrainPatternType($scrut, $pat)", gadts) {
+  def constrainPatternType(pat: Type, scrut: Type, widenParams: Boolean = true): Boolean = trace.force(i"constrainPatternType($scrut, $pat)", gadts) {
 
     def classesMayBeCompatible: Boolean = {
       import Flags._
@@ -217,7 +217,7 @@ trait PatternTypeConstrainer { self: TypeComparer =>
       else if widenParams then widenVariantParams(scrutineeTp)
       else scrutineeTp
     val narrowTp = SkolemType(patternTp)
-    trace(i"constraining simple pattern type $narrowTp <:< $widePt", gadts, res => s"$res\ngadt = ${ctx.gadt.debugBoundsDescription}") {
+    trace.force(i"constraining simple pattern type $narrowTp <:< $widePt", gadts, res => s"$res\ngadt = ${ctx.gadt.debugBoundsDescription}") {
       isSubType(narrowTp, widePt)
     }
   }
