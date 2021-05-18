@@ -2615,7 +2615,6 @@ object Parsers {
           case USCORE if in.lookahead.isArrow =>
             val start = in.skipToken()
             typeBounds().withSpan(Span(start, in.lastOffset, start))
-
           case _ =>
             infixType()
         }
