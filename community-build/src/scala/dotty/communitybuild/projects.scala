@@ -658,9 +658,9 @@ object projects:
 
   lazy val onnxScala = SbtCommunityProject(
     project = "onnx-scala",
-    sbtTestCommand = "test",
+    sbtTestCommand = "compile",
     sbtPublishCommand = "publishLocal",
-    dependencies = List(scalatest)
+    dependencies = List()
   )
 
   lazy val playJson = SbtCommunityProject(
