@@ -131,6 +131,7 @@ class CommunityBuildTestB extends CommunityBuildTest:
 end CommunityBuildTestB
 
 @Category(Array(classOf[TestCategory]))
+// community-build/testOnly dotty.communitybuild.CommunityBuildTestC
 class CommunityBuildTestC extends CommunityBuildTest:
   // @Test def akka = projects.akka.run()
   // @Test def algebra = projects.algebra.run()
