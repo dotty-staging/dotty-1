@@ -2616,11 +2616,11 @@ object Parsers {
             val start = in.skipToken()
             Ident(tpnme.WILDCARD).withSpan(Span(start, in.lastOffset, start))
           case _ =>
-            infixType()
+            rejectWildcardType(infixType())
         }
       }
       CaseDef(pat, EmptyTree, atSpan(accept(ARROW)) {
-        val t = typ()
+        val t = rejectWildcardType(typ())
         newLinesOptWhenFollowedBy(CASE)
         t
       })
