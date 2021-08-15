@@ -102,7 +102,7 @@ class Compiler {
          new LetOverApply,           // Lift blocks from receivers of applications
          new ArrayConstructors) ::   // Intercept creation of (non-generic) arrays and intrinsify.
     List(new PreRecheck) ::
-    List(new TestRecheck) ::
+    List(new CheckCaptures) ::
     List(new Erasure) ::             // Rewrite types to JVM model, erasing all type parameters, abstract types and refinements.
     List(new ElimErasedValueType,    // Expand erased value types to their underlying implmementation types
          new PureStats,              // Remove pure stats from blocks
