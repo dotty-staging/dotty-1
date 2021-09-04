@@ -4,6 +4,7 @@ package dotc
 import core._
 import Contexts._
 import typer.{TyperPhase, RefChecks}
+import cc.CheckCaptures
 import parsing.Parser
 import Phases.Phase
 import transform._
@@ -84,6 +85,8 @@ class Compiler {
          new ExplicitSelf,           // Make references to non-trivial self types explicit as casts
          new ElimByName,             // Expand by-name parameter references
          new StringInterpolatorOpt) :: // Optimizes raw and s string interpolators by rewriting them to string concatenations
+    List(new PreRecheck) ::          // Preparations for check captures phase, enabled under -Ycc
+    List(new CheckCaptures) ::       // Check captures, enabled under -Ycc
     List(new PruneErasedDefs,        // Drop erased definitions from scopes and simplify erased expressions
          new UninitializedDefs,      // Replaces `compiletime.uninitialized` by `_`
          new InlinePatterns,         // Remove placeholders of inlined patterns
@@ -101,8 +104,6 @@ class Compiler {
          new TupleOptimizations,     // Optimize generic operations on tuples
          new LetOverApply,           // Lift blocks from receivers of applications
          new ArrayConstructors) ::   // Intercept creation of (non-generic) arrays and intrinsify.
-    List(new PreRecheck) ::          // Preparations for recheck phase, enabled under -Yrecheck
-    List(new TestRecheck) ::         // Test rechecking, enabled under -Yrecheck
     List(new Erasure) ::             // Rewrite types to JVM model, erasing all type parameters, abstract types and refinements.
     List(new ElimErasedValueType,    // Expand erased value types to their underlying implmementation types
          new PureStats,              // Remove pure stats from blocks

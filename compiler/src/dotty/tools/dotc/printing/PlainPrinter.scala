@@ -14,6 +14,8 @@ import Variances.varianceSign
 import util.SourcePosition
 import scala.util.control.NonFatal
 import scala.annotation.switch
+import config.Config
+import cc.CapturingType
 
 class PlainPrinter(_ctx: Context) extends Printer {
   /** The context of all public methods in Printer and subclasses.
@@ -186,6 +188,15 @@ class PlainPrinter(_ctx: Context) extends Printer {
           keywordStr(" match ") ~ "{" ~ casesText ~ "}" ~
           (" <: " ~ toText(bound) provided !bound.isAny)
         }.close
+      case CapturingType(parent, refs) =>
+        if printDebug && !refs.isConst then
+          s"$refs " ~ toText(parent)
+        else if refs.elems.isEmpty then
+          toText(parent)
+        else if Config.printCaptureSetsAsPrefix then
+          changePrec(GlobalPrec)("{" ~ Text(refs.elems.toList.map(toTextCaptureRef), ", ") ~ "} " ~ toText(parent))
+        else
+          changePrec(InfixPrec)(toText(parent) ~ " retains " ~ toText(refs.toRetainsTypeArg))
       case tp: PreviousErrorType if ctx.settings.XprintTypes.value =>
         "<error>" // do not print previously reported error message because they may try to print this error type again recuresevely
       case tp: ErrorType =>
@@ -273,7 +284,7 @@ class PlainPrinter(_ctx: Context) extends Printer {
 
   /** If -uniqid is set, the unique id of symbol, after a # */
   protected def idString(sym: Symbol): String =
-    if (showUniqueIds || Printer.debugPrintUnique) "#" + sym.id else ""
+    if showUniqueIds then "#" + sym.id else ""
 
   def nameString(sym: Symbol): String =
     simpleNameString(sym) + idString(sym) // + "<" + (if (sym.exists) sym.owner else "") + ">"
@@ -313,7 +324,7 @@ class PlainPrinter(_ctx: Context) extends Printer {
       case tp @ ConstantType(value) =>
         toText(value)
       case pref: TermParamRef =>
-        nameString(pref.binder.paramNames(pref.paramNum))
+        nameString(pref.binder.paramNames(pref.paramNum)) ~ lambdaHash(pref.binder)
       case tp: RecThis =>
         val idx = openRecs.reverse.indexOf(tp.binder)
         if (idx >= 0) selfRecName(idx + 1)
@@ -333,6 +344,11 @@ class PlainPrinter(_ctx: Context) extends Printer {
       case tp => trimPrefix(toTextLocal(tp)) ~ "#"
     }
   }
+
+  def toTextCaptureRef(tp: Type): Text =
+    homogenize(tp) match
+      case tp: SingletonType => toTextRef(tp)
+      case _ => toText(tp)
 
   protected def isOmittablePrefix(sym: Symbol): Boolean =
     defn.unqualifiedOwnerTypes.exists(_.symbol == sym) || isEmptyPrefix(sym)

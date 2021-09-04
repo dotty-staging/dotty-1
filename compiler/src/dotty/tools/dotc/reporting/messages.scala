@@ -280,12 +280,11 @@ import transform.SymUtils._
       val (foundStr, expectedStr) = Formatting.typeDiff(found2, expected2)(using printCtx)
       s"""|Found:    $foundStr
           |Required: $expectedStr""".stripMargin
-        + whereSuffix + postScript 
+        + whereSuffix + postScript
 
-    override def explain = 
+    override def explain =
       val treeStr = inTree.map(x => s"\nTree: ${x.show}").getOrElse("")
       treeStr + "\n" + super.explain
-      
 
   end TypeMismatch
 

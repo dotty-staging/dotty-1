@@ -14,15 +14,22 @@ import typer.ErrorReporting.err
 import typer.ProtoTypes.*
 import typer.TypeAssigner.seqLitType
 import typer.ConstFold
+import NamerOps.methodType
 import config.Printers.recheckr
 import util.Property
 import StdNames.nme
 import reporting.trace
 
+object Recheck:
+
+  /** Attachment key for rechecked types of TypeTrees */
+  private val RecheckedType = Property.Key[Type]
+
 abstract class Recheck extends Phase, IdentityDenotTransformer:
   thisPhase =>
 
   import ast.tpd.*
+  import Recheck.*
 
   def preRecheckPhase = this.prev.asInstanceOf[PreRecheck]
 
@@ -36,12 +43,17 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
   override def widenSkolems = true
 
   def run(using Context): Unit =
-    newRechecker().checkUnit(ctx.compilationUnit)
+    val rechecker = newRechecker()
+    rechecker.reinferAll.traverse(ctx.compilationUnit.tpdTree)
+    rechecker.checkUnit(ctx.compilationUnit)
 
   def newRechecker()(using Context): Rechecker
 
   class Rechecker(ictx: Context):
-    val ta = ictx.typeAssigner
+    private val ta = ictx.typeAssigner
+    private val keepTypes = inContext(ictx) {
+      ictx.settings.Xprint.value.containsPhase(thisPhase)
+    }
 
     extension (sym: Symbol) def updateInfo(newInfo: Type)(using Context): Unit =
       if sym.info ne newInfo then
@@ -53,23 +65,40 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
               else sym.flags
           ).installAfter(preRecheckPhase)
 
-    /** Hook to be overridden */
-    protected def reinfer(tp: Type)(using Context): Type = tp
+    extension (tpe: Type) def rememberFor(tree: Tree)(using Context): Unit =
+      if (tpe ne tree.tpe) && !tree.hasAttachment(RecheckedType) then
+        tree.putAttachment(RecheckedType, tpe)
 
-    def reinferResult(info: Type)(using Context): Type = info match
-      case info: MethodOrPoly =>
-        info.derivedLambdaType(resType = reinferResult(info.resultType))
-      case _ =>
-        reinfer(info)
+    def knownType(tree: Tree) =
+      tree.attachmentOrElse(RecheckedType, tree.tpe)
 
-    def enterDef(stat: Tree)(using Context): Unit =
-      val sym = stat.symbol
-      stat match
-        case stat: ValOrDefDef if stat.tpt.isInstanceOf[InferredTypeTree] =>
-          sym.updateInfo(reinferResult(sym.info))
-        case stat: Bind =>
-          sym.updateInfo(reinferResult(sym.info))
-        case _ =>
+    def reinfer(tp: Type)(using Context): Type = tp
+
+    object reinferAll extends TreeTraverser:
+      def traverse(tree: Tree)(using Context) =
+        traverseChildren(tree)
+        tree match
+          case tree: InferredTypeTree =>
+            reinfer(tree.tpe).rememberFor(tree)
+          case tree: ValOrDefDef if tree.tpt.isInstanceOf[InferredTypeTree] =>
+            val sym = tree.symbol
+            def integrateRT(restp: Type, info: Type, psymss: List[List[Symbol]]): Type = info match
+              case info: MethodOrPoly =>
+                info.derivedLambdaType(resType =
+                  integrateRT(restp.subst(psymss.head, info.paramRefs), info.resType, psymss.tail))
+              case info: ExprType =>
+                info.derivedExprType(resType = restp)
+              case _ =>
+                restp
+            if !sym.isConstructor then
+              val info1 = integrateRT(knownType(tree.tpt), sym.info, sym.paramSymss)
+              recheckr.println(i"update info $sym: ${sym.info} --> $info1")
+              sym.updateInfo(info1)
+          case tree: Bind =>
+            val sym = tree.symbol
+            sym.updateInfo(reinfer(sym.info))
+          case _ =>
+    end reinferAll
 
     def constFold(tree: Tree, tp: Type)(using Context): Type =
       val tree1 = tree.withType(tp)
@@ -93,7 +122,6 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
 
     def recheckBind(tree: Bind, pt: Type)(using Context): Type = tree match
       case Bind(name, body) =>
-        enterDef(tree)
         recheck(body, pt)
         val sym = tree.symbol
         if sym.isType then sym.typeRef else sym.info
@@ -105,14 +133,13 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
         bindType
 
     def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Type =
-      if !tree.rhs.isEmpty then recheck(tree.rhs, tree.symbol.info)
+      if !tree.rhs.isEmpty then recheck(tree.rhs, sym.info)
       sym.termRef
 
     def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Type =
-      tree.paramss.foreach(_.foreach(enterDef))
       val rhsCtx = linkConstructorParams(sym)
       if !tree.rhs.isEmpty && !sym.isInlineMethod && !sym.isEffectivelyErased then
-        recheck(tree.rhs, tree.symbol.localReturnType)(using rhsCtx)
+        inContext(rhsCtx) { recheck(tree.rhs, recheck(tree.tpt)) }
       sym.termRef
 
     def recheckTypeDef(tree: TypeDef, sym: Symbol)(using Context): Type =
@@ -134,6 +161,10 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
           case _ => mapOver(t)
       formals.mapConserve(tm)
 
+    /** Hook for method type instantiation */
+    def instantiate(mt: MethodType, argTypes: => List[Type])(using Context): Type =
+      mt.instantiate(argTypes)
+
     def recheckApply(tree: Apply, pt: Type)(using Context): Type =
       recheck(tree.fun).widen match
         case fntpe: MethodType =>
@@ -153,7 +184,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
               assert(formals.isEmpty)
               Nil
           val argTypes = recheckArgs(tree.args, formals, fntpe.paramRefs)
-          constFold(tree, fntpe.instantiate(argTypes))
+          constFold(tree, instantiate(fntpe, argTypes))
 
     def recheckTypeApply(tree: TypeApply, pt: Type)(using Context): Type =
       recheck(tree.fun).widen match
@@ -195,10 +226,10 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
 
     def recheckMatch(tree: Match, pt: Type)(using Context): Type =
       val selectorType = recheck(tree.selector)
-      val casesTypes = tree.cases.map(recheck(_, selectorType.widen, pt))
+      val casesTypes = tree.cases.map(recheckCase(_, selectorType.widen, pt))
       TypeComparer.lub(casesTypes)
 
-    def recheck(tree: CaseDef, selType: Type, pt: Type)(using Context): Type =
+    def recheckCase(tree: CaseDef, selType: Type, pt: Type)(using Context): Type =
       recheck(tree.pat, selType)
       recheck(tree.guard, defn.BooleanType)
       recheck(tree.body, pt)
@@ -214,7 +245,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
 
     def recheckTry(tree: Try, pt: Type)(using Context): Type =
       val bodyType = recheck(tree.expr, pt)
-      val casesTypes = tree.cases.map(recheck(_, defn.ThrowableType, pt))
+      val casesTypes = tree.cases.map(recheckCase(_, defn.ThrowableType, pt))
       val finalizerType = recheck(tree.finalizer, defn.UnitType)
       TypeComparer.lub(bodyType :: casesTypes)
 
@@ -227,9 +258,8 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
       val elemTypes = tree.elems.map(recheck(_, elemProto))
       seqLitType(tree, TypeComparer.lub(declaredElemType :: elemTypes))
 
-    def recheckTypeTree(tree: TypeTree)(using Context): Type = tree match
-      case tree: InferredTypeTree => reinfer(tree.tpe)
-      case _ => tree.tpe
+    def recheckTypeTree(tree: TypeTree)(using Context): Type =
+      knownType(tree)
 
     def recheckAnnotated(tree: Annotated)(using Context): Type =
       tree.tpe match
@@ -246,7 +276,6 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
       NoType
 
     def recheckStats(stats: List[Tree])(using Context): Unit =
-      stats.foreach(enterDef)
       stats.foreach(recheck(_))
 
     /** Recheck tree without adapting it, returning its new type.
@@ -300,6 +329,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
           case tree: NameTree => recheckNamed(tree, pt)
           case tree => recheckUnnamed(tree, pt)
         checkConforms(result, pt, tree)
+        if keepTypes then result.rememberFor(tree)
         result
       catch case ex: Exception =>
         println(i"error while rechecking $tree")
@@ -307,8 +337,12 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
     }
     end recheck
 
+    private val debugSuccesses = false
+
     def checkConforms(tpe: Type, pt: Type, tree: Tree)(using Context): Unit = tree match
-      case _: DefTree | EmptyTree | _: TypeTree =>
+      case _: DefTree | EmptyTree | _: TypeTree | _: Closure =>
+        // Don't report closure nodes, since their span is a point; wait instead
+        // for enclosing block to preduce an error
       case _ =>
         val actual = tpe.widenExpr
         val expected = pt.widenExpr
@@ -317,13 +351,28 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
           || expected.isRepeatedParam
              && actual <:< expected.translateFromRepeated(toArray = tree.tpe.isRef(defn.ArrayClass))
         if !isCompatible then
-          println(i"err at ${ctx.phase}")
-          err.typeMismatch(tree.withType(tpe), pt)
+          err.typeMismatch(tree.withType(tpe), expected)
+        else if debugSuccesses then
+          tree match
+            case _: Ident =>
+              println(i"SUCCESS $tree:\n${TypeComparer.explained(_.isSubType(actual, expected))}")
+            case _ =>
 
     def checkUnit(unit: CompilationUnit)(using Context): Unit =
       recheck(unit.tpdTree)
 
   end Rechecker
+
+  override def show(tree: untpd.Tree)(using Context): String =
+    val addRecheckedTypes = new TreeMap:
+      override def transform(tree: Tree)(using Context): Tree =
+        val tree1 = super.transform(tree)
+        tree.getAttachment(RecheckedType) match
+          case Some(tpe) => tree1.withType(tpe)
+          case None => tree1
+    atPhase(thisPhase) {
+      super.show(addRecheckedTypes.transform(tree.asInstanceOf[tpd.Tree]))
+    }
 end Recheck
 
 class TestRecheck extends Recheck:

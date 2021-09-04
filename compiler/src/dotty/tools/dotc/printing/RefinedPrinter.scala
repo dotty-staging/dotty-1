@@ -703,6 +703,8 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
         val (prefix, postfix) = if isTermHole then ("{{{ ", " }}}") else ("[[[ ", " ]]]")
         val argsText = toTextGlobal(args, ", ")
         prefix ~~ idx.toString ~~ "|" ~~ argsText ~~ postfix
+      case CapturingTypeTree(refs, parent) =>
+        changePrec(GlobalPrec)("{" ~ Text(refs.map(toText), ", ") ~ "} " ~ toText(parent))
       case _ =>
         tree.fallbackToText(this)
     }

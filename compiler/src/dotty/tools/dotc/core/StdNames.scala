@@ -119,6 +119,7 @@ object StdNames {
     val BITMAP_TRANSIENT: N           = s"${BITMAP_PREFIX}trans$$"    // initialization bitmap for transient lazy vals
     val BITMAP_CHECKINIT: N           = s"${BITMAP_PREFIX}init$$"      // initialization bitmap for checkinit values
     val BITMAP_CHECKINIT_TRANSIENT: N = s"${BITMAP_PREFIX}inittrans$$" // initialization bitmap for transient checkinit values
+    val CAPTURING                     = "|>"
     val DEFAULT_GETTER: N             = str.DEFAULT_GETTER
     val DEFAULT_GETTER_INIT: N        = "$lessinit$greater"
     val DO_WHILE_PREFIX: N            = "doWhile$"
@@ -275,6 +276,7 @@ object StdNames {
 
     // Compiler-internal
     val ANYname: N                  = "<anyname>"
+    val CAPTURE_ROOT: N             = "*"
     val COMPANION: N                = "<companion>"
     val CONSTRUCTOR: N              = "<init>"
     val STATIC_CONSTRUCTOR: N       = "<clinit>"
@@ -362,6 +364,7 @@ object StdNames {
     val AppliedTypeTree: N      = "AppliedTypeTree"
     val ArrayAnnotArg: N        = "ArrayAnnotArg"
     val CAP: N                  = "CAP"
+    val ClassManifestFactory: N = "ClassManifestFactory"
     val Constant: N             = "Constant"
     val ConstantType: N         = "ConstantType"
     val Eql: N                  = "Eql"
@@ -439,7 +442,6 @@ object StdNames {
     val canEqualAny : N         = "canEqualAny"
     val cbnArg: N               = "<cbn-arg>"
     val checkInitialized: N     = "checkInitialized"
-    val ClassManifestFactory: N = "ClassManifestFactory"
     val classOf: N              = "classOf"
     val classType: N            = "classType"
     val clone_ : N              = "clone"
@@ -571,6 +573,7 @@ object StdNames {
     val reflectiveSelectable: N = "reflectiveSelectable"
     val reify : N               = "reify"
     val releaseFence : N        = "releaseFence"
+    val retains: N              = "retains"
     val rootMirror : N          = "rootMirror"
     val run: N                  = "run"
     val runOrElse: N            = "runOrElse"
