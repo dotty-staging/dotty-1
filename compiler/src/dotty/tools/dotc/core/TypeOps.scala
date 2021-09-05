@@ -165,7 +165,8 @@ object TypeOps:
         // corrective steps, so no widening is wanted.
         simplify(l, theMap) | simplify(r, theMap)
       case CapturingType(parent, refs) =>
-        if !ctx.mode.is(Mode.Type) && refs <:< parent.captureSet == CompareResult.OK then
+        if !ctx.mode.is(Mode.Type)
+            && refs.subCaptures(parent.captureSet, frozen = true) == CompareResult.OK then
           simplify(parent, theMap)
         else
           mapOver

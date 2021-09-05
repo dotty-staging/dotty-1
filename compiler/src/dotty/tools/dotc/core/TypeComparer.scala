@@ -24,7 +24,7 @@ import typer.Applications.productSelectorTypes
 import reporting.trace
 import NullOpsDecorator._
 import annotation.constructorOnly
-import cc.{CapturingType, derivedCapturingType, CaptureSet}
+import cc.{CapturingType, derivedCapturingType, CaptureSet, stripCapturing}
 
 /** Provides methods to compare types.
  */
@@ -491,8 +491,10 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             // under -Ycheck. Test case is i7965.scala.
 
       case CapturingType(parent1, refs1) =>
-        if refs1 <:< tp2.captureSet == CaptureSet.CompareResult.OK then recur(parent1, tp2)
-        else thirdTry
+        if refs1.subCaptures(tp2.captureSet, frozenConstraint) == CaptureSet.CompareResult.OK then
+          recur(parent1, tp2)
+        else
+          thirdTry
       case tp1: AnnotatedType if !tp1.isRefining =>
         recur(tp1.parent, tp2)
       case tp1: MatchType =>
@@ -810,15 +812,13 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             }
           case _ => false
         comparePaths || {
-          val tp2n = tp1 match
-            case tp1: CaptureRef
-            if tp1.isTracked && tp2.captureSet.accountsFor(tp1) =>
-              // If `{x}` subcaptures the capture set of the RHS, we can dispense
-              // with capture checking. This is achieved by widening the RHS with
-              // the universal capture set `{*}`.
-              CapturingType(tp2, CaptureSet.universal)
-            case _ => tp2
-          isSubType(tp1.underlying.widenExpr, tp2n, approx.addLow)
+          var tp1w = tp1.underlying.widenExpr
+          tp1 match
+            case tp1: CaptureRef if tp1.isTracked =>
+              val stripped = tp1w.stripCapturing
+              tp1w = CapturingType(stripped, tp1.singletonCaptureSet)
+            case _ =>
+          isSubType(tp1w, tp2, approx.addLow)
         }
       case tp1: RefinedType =>
         isNewSubType(tp1.parent)
@@ -2382,8 +2382,10 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     case tp1: TypeVar if tp1.isInstantiated =>
       tp1.underlying & tp2
     case CapturingType(parent1, refs1) =>
-      if tp2.captureSet <:< refs1 == CaptureSet.CompareResult.OK then parent1 & tp2
-      else tp1.derivedCapturingType(parent1 & tp2, refs1)
+      if tp2.captureSet.subCaptures(refs1, frozenConstraint) == CaptureSet.CompareResult.OK then
+        parent1 & tp2
+      else
+        tp1.derivedCapturingType(parent1 & tp2, refs1)
     case tp1: AnnotatedType if !tp1.isRefining =>
       tp1.underlying & tp2
     case _ =>

@@ -63,7 +63,7 @@ object CheckCaptures:
   def checkWellformedPost(tp: Type, pos: SrcPos)(using Context): Unit = tp match
     case CapturingType(parent, refs) =>
       for ref <- refs.elems do
-        if (ref.captureSet frozen_<:< CaptureSet.empty) == CompareResult.OK then
+        if ref.captureSet.subCaptures(CaptureSet.empty, frozen = true) == CompareResult.OK then
           report.error(em"$ref cannot be tracked since its capture set is empty", pos)
         else if parent.captureSet.accountsFor(ref) then
           report.warning(em"redundant capture: $parent already accounts for $ref", pos)
@@ -164,15 +164,15 @@ class CheckCaptures extends Recheck:
         checkSubset(targetSet, curEnv.captured, pos)
 
     def assertSub(cs1: CaptureSet, cs2: CaptureSet)(using Context) =
-      assert((cs1 <:< cs2) == CompareResult.OK, i"$cs1 is not a subset of $cs2")
+      assert(cs1.subCaptures(cs2, frozen = false) == CompareResult.OK, i"$cs1 is not a subset of $cs2")
 
     def checkElem(elem: CaptureRef, cs: CaptureSet, pos: SrcPos)(using Context) =
-      val res = elem.singletonCaptureSet <:< cs
+      val res = elem.singletonCaptureSet.subCaptures(cs, frozen = false)
       if res != CompareResult.OK then
         report.error(i"$elem cannot be referenced here; it is not included in allowed capture set ${res.blocking}", pos)
 
     def checkSubset(cs1: CaptureSet, cs2: CaptureSet, pos: SrcPos)(using Context) =
-      val res = cs1 <:< cs2
+      val res = cs1.subCaptures(cs2, frozen = false)
       if res != CompareResult.OK then
         report.error(i"references $cs1 are not all included in allowed capture set ${res.blocking}", pos)
 

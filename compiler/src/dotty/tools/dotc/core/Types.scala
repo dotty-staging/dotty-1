@@ -1848,7 +1848,7 @@ object Types {
       if captureSet.accountsFor(ref) then this else CapturingType(this, ref.singletonCaptureSet)
 
     def capturing(cs: CaptureSet)(using Context): Type =
-      if cs.isConst && (cs frozen_<:< captureSet) == CompareResult.OK then this
+      if cs.isConst && cs.subCaptures(captureSet, frozen = true) == CompareResult.OK then this
       else this match
         case CapturingType(parent, cs1) => parent.capturing(cs1 ++ cs)
         case _ => CapturingType(this, cs)
@@ -2703,7 +2703,7 @@ object Types {
      */
     def canBeTracked(using Context) =
       ((prefix eq NoPrefix)
-      || symbol.is(ParamAccessor)
+      || symbol.is(ParamAccessor) && (prefix eq symbol.owner.thisType)
       || symbol.hasAnnotation(defn.AbilityAnnot)
       || isRootCapability
       ) && !symbol.is(Method)

@@ -79,25 +79,22 @@ sealed abstract class CaptureSet extends Showable:
   def accountsFor(x: CaptureRef)(using Context): Boolean =
     reporting.trace(i"$this accountsFor $x, ${x.captureSetOfInfo}?", show = true) {
       elems.contains(x)
-      || !x.isRootCapability && (x.captureSetOfInfo frozen_<:< this) == CompareResult.OK
+      || !x.isRootCapability
+          && x.captureSetOfInfo.subCaptures(this, frozen = true) == CompareResult.OK
     }
 
   /** The subcapturing test */
-  def <:< (that: CaptureSet)(using Context): CompareResult =
-    subcaptures(that)(using ctx, VarState())
+  def subCaptures(that: CaptureSet, frozen: Boolean)(using Context): CompareResult =
+    subCaptures(that)(using ctx, if frozen then FrozenState else VarState())
 
-  /** The subcapturing test, where all variables are treated as frozen */
-  def frozen_<:<(that: CaptureSet)(using Context): CompareResult =
-    subcaptures(that)(using ctx, FrozenState)
-
-  def =:= (that: CaptureSet)(using Context): Boolean =
-       (this frozen_<:< that) == CompareResult.OK
-    && (that frozen_<:< this) == CompareResult.OK
-
-  private def subcaptures(that: CaptureSet)(using Context, VarState): CompareResult =
+  private def subCaptures(that: CaptureSet)(using Context, VarState): CompareResult =
     val result = that.tryInclude(elems)
     if result == CompareResult.OK then addSuper(that) else varState.abort()
     result
+
+  def =:= (that: CaptureSet)(using Context): Boolean =
+       this.subCaptures(that, frozen = true) == CompareResult.OK
+    && that.subCaptures(this, frozen = true) == CompareResult.OK
 
   /** The smallest capture set (via <:<) that is a superset of both
    *  `this` and `that`
@@ -230,6 +227,7 @@ object CaptureSet:
     def addNewElems(newElems: Refs)(using Context, VarState): CompareResult =
       if recordElemsState() then
         elems ++= newElems
+        // assert(id != 2 || elems.size != 2, this)
         val depsIt = deps.iterator
         while depsIt.hasNext do
           val result = depsIt.next.tryInclude(newElems)

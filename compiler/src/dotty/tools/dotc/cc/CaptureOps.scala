@@ -82,3 +82,11 @@ extension (tp: Type)
       tp.tp1.canHaveInferredCapture || tp.tp2.canHaveInferredCapture
     case _ =>
       false
+
+  def stripCapturing(using Context): Type = tp.dealiasKeepAnnots match
+    case CapturingType(parent, _) =>
+      parent.stripCapturing
+    case atd @ AnnotatedType(parent, annot) =>
+      atd.derivedAnnotatedType(parent.stripCapturing, annot)
+    case _ =>
+      tp
