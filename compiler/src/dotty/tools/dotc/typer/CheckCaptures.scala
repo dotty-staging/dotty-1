@@ -125,11 +125,30 @@ class CheckCaptures extends Recheck:
         case _ =>
           tp
 
+      /** Refine a possibly applied class type C where the class has tracked parameters
+       *  x_1: T_1, ..., x_n: T_n to C { val x_1: CV_1 T_1, ..., val x_n: CV_n T_n }
+       *  where CV_1, ..., CV_n are fresh capture sets.
+       */
+      def addCaptureRefinements(tp: Type): Type = tp.stripped match
+        case _: TypeRef | _: AppliedType if tp.typeSymbol.isClass =>
+          val cls = tp.typeSymbol.asClass
+          cls.paramGetters.foldLeft(tp) { (core, getter) =>
+            if getter.termRef.isTracked then
+              val getterType = tp.memberInfo(getter).strippedDealias
+              RefinedType(core, getter.name, CapturingType(getterType, CaptureSet.Var()))
+                .showing(i"add capture refinement $tp --> $result", capt)
+            else
+              core
+          }
+        case _ =>
+          tp
+
       def addVars(tp: Type): Type =
-        val tp1 = addInnerVars(tp)
+        var tp1 = addInnerVars(tp)
+        val tp2 = addCaptureRefinements(tp1)
         if tp1.canHaveInferredCapture
-        then CapturingType(tp1, CaptureSet.Var())
-        else tp1
+        then CapturingType(tp2, CaptureSet.Var())
+        else tp2
 
       addVars(cleanType(tp))
     end reinfer
@@ -204,15 +223,38 @@ class CheckCaptures extends Recheck:
       try super.recheckClassDef(tree, impl, sym)
       finally curEnv = saved
 
-    override def instantiate(mt: MethodType, argTypes: => List[Type])(using Context): Type =
-      if mt.isResultDependent then SubstParamsMap(mt, argTypes)(mt.resType)
-      else mt.resType
+    /** Refine the type of a constructor call `new C(t_1, ..., t_n)`
+     *  to C{val x_1: T_1, ..., x_m: T_m} where x_1, ..., x_m are the tracked
+     *  parameters of C and T_1, ..., T_m are the types of the corresponding arguments.
+     */
+    private def addParamArgRefinements(core: Type, argTypes: List[Type], cls: ClassSymbol)(using Context): Type =
+      cls.paramGetters.lazyZip(argTypes).foldLeft(core) { (core, refine) =>
+        val (getter, argType) = refine
+        if getter.termRef.isTracked then RefinedType(core, getter.name, argType)
+        else core
+      }
+
+    /** Handle an application of method `sym` with type `mt` to arguments of types `argTypes`.
+     *  This means:
+     *   - Instantiate result type with actual arguments
+     *   - If call is to a constructor:
+     *      - remember types of arguments corresponding to tracked
+     *        parameters in refinements.
+     *      - add capture set of instantiated class to capture set of result type.
+     */
+    override def instantiate(mt: MethodType, argTypes: List[Type], sym: Symbol)(using Context): Type =
+      val ownType =
+        if mt.isResultDependent then SubstParamsMap(mt, argTypes)(mt.resType)
+        else mt.resType
+      if sym.isConstructor then
+        val cls = sym.owner.asClass
+        addParamArgRefinements(ownType, argTypes, cls).capturing(capturedVars(cls))
+          .showing(i"constr type $mt with $argTypes%, % in $cls = $result", capt)
+      else ownType
 
     override def recheckApply(tree: Apply, pt: Type)(using Context): Type =
-      val sym = tree.symbol
-      includeCallCaptures(sym, tree.srcPos)
-      val cs = if sym.isConstructor then capturedVars(sym.owner) else CaptureSet.empty
-      super.recheckApply(tree, pt).capturing(cs)
+      includeCallCaptures(tree.symbol, tree.srcPos)
+      super.recheckApply(tree, pt)
 
     override def recheck(tree: Tree, pt: Type = WildcardType)(using Context): Type =
       val saved = curEnv

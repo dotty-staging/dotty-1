@@ -119,6 +119,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
               excluded = if tree.symbol.is(Private) then EmptyFlags else Private
             ).suchThat(tree.symbol ==)
           constFold(tree, qualType.select(name, mbr))
+            //.showing(i"recheck select $qualType . $name : ${mbr.symbol.info} = $result")
 
     def recheckBind(tree: Bind, pt: Type)(using Context): Type = tree match
       case Bind(name, body) =>
@@ -161,8 +162,10 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
           case _ => mapOver(t)
       formals.mapConserve(tm)
 
-    /** Hook for method type instantiation */
-    def instantiate(mt: MethodType, argTypes: => List[Type])(using Context): Type =
+    /** Hook for method type instantiation
+     *
+     */
+    def instantiate(mt: MethodType, argTypes: List[Type], sym: Symbol)(using Context): Type =
       mt.instantiate(argTypes)
 
     def recheckApply(tree: Apply, pt: Type)(using Context): Type =
@@ -184,7 +187,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
               assert(formals.isEmpty)
               Nil
           val argTypes = recheckArgs(tree.args, formals, fntpe.paramRefs)
-          constFold(tree, instantiate(fntpe, argTypes))
+          constFold(tree, instantiate(fntpe, argTypes, tree.fun.symbol))
 
     def recheckTypeApply(tree: TypeApply, pt: Type)(using Context): Type =
       recheck(tree.fun).widen match
