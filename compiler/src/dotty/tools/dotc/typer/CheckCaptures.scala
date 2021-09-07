@@ -218,11 +218,16 @@ class CheckCaptures extends Recheck:
       try super.recheckDefDef(tree, sym)
       finally curEnv = saved
 
-    override def recheckClassDef(tree: TypeDef, impl: Template, sym: ClassSymbol)(using Context): Type =
+    override def recheckClassDef(tree: TypeDef, impl: Template, cls: ClassSymbol)(using Context): Type =
+      for param <- cls.paramGetters do
+        if param.is(Private) && !param.info.captureSet.isAlwaysEmpty then
+          report.error(
+            "Implementation restriction: Class parameter with non-empty capture set must be a `val`",
+            param.srcPos)
       val saved = curEnv
-      val localSet = capturedVars(sym)
-      if !localSet.isAlwaysEmpty then curEnv = Env(sym, localSet, false, curEnv)
-      try super.recheckClassDef(tree, impl, sym)
+      val localSet = capturedVars(cls)
+      if !localSet.isAlwaysEmpty then curEnv = Env(cls, localSet, false, curEnv)
+      try super.recheckClassDef(tree, impl, cls)
       finally curEnv = saved
 
     /** First half: Refine the type of a constructor call `new C(t_1, ..., t_n)`
