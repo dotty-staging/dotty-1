@@ -168,7 +168,9 @@ class CheckCaptures extends Recheck:
           if env.isOpen && env.owner != sym.enclosure then
             capt.println(i"Mark $sym with cs ${ref.captureSet} free in ${env.owner}")
             checkElem(ref, env.captured, pos)
-            recur(env.outer)
+            if env.owner.isConstructor then
+              if env.outer.owner != sym.enclosure then recur(env.outer.outer)
+            else recur(env.outer)
         if ref.isTracked then recur(curEnv)
 
     def includeCallCaptures(sym: Symbol, pos: SrcPos)(using Context): Unit =
@@ -223,15 +225,20 @@ class CheckCaptures extends Recheck:
       try super.recheckClassDef(tree, impl, sym)
       finally curEnv = saved
 
-    /** Refine the type of a constructor call `new C(t_1, ..., t_n)`
+    /** First half: Refine the type of a constructor call `new C(t_1, ..., t_n)`
      *  to C{val x_1: T_1, ..., x_m: T_m} where x_1, ..., x_m are the tracked
      *  parameters of C and T_1, ..., T_m are the types of the corresponding arguments.
+     *
+     *  Second half: union of all capture sets of arguments to tracked parameters.
      */
-    private def addParamArgRefinements(core: Type, argTypes: List[Type], cls: ClassSymbol)(using Context): Type =
-      cls.paramGetters.lazyZip(argTypes).foldLeft(core) { (core, refine) =>
+    private def addParamArgRefinements(core: Type, argTypes: List[Type], cls: ClassSymbol)(using Context): (Type, CaptureSet) =
+      cls.paramGetters.lazyZip(argTypes).foldLeft((core, CaptureSet.empty: CaptureSet)) { (acc, refine) =>
+        val (core, allCaptures) = acc
         val (getter, argType) = refine
-        if getter.termRef.isTracked then RefinedType(core, getter.name, argType)
-        else core
+        if getter.termRef.isTracked then
+          (RefinedType(core, getter.name, argType), allCaptures ++ argType.captureSet)
+        else
+          (core, allCaptures)
       }
 
     /** Handle an application of method `sym` with type `mt` to arguments of types `argTypes`.
@@ -248,7 +255,8 @@ class CheckCaptures extends Recheck:
         else mt.resType
       if sym.isConstructor then
         val cls = sym.owner.asClass
-        addParamArgRefinements(ownType, argTypes, cls).capturing(capturedVars(cls))
+        val (refined, cs) = addParamArgRefinements(ownType, argTypes, cls)
+        refined.capturing(cs ++ capturedVars(cls) ++ capturedVars(sym))
           .showing(i"constr type $mt with $argTypes%, % in $cls = $result", capt)
       else ownType
 
