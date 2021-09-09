@@ -51,10 +51,11 @@ sealed abstract class CaptureSet extends Showable:
    *  Constant capture sets never allow to add new elements.
    *  Variables allow it if and only if the new elements can be included
    *  in all their supersets.
+   *  @param origin   The set where the elements come from, or `empty` if not known.
    *  @return CompareResult.OK if elements were added, or a conflicting
    *          capture set that prevents addition otherwise.
    */
-  protected def addNewElems(newElems: Refs)(using Context, VarState): CompareResult
+  protected def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult
 
   /** If this is a variable, add `cs` as a super set */
   protected def addSuper(cs: CaptureSet): this.type
@@ -66,12 +67,13 @@ sealed abstract class CaptureSet extends Showable:
 
   /** Try to include all references of `elems` that are not yet accounted by this
    *  capture set. Inclusion is via `addNewElems`.
+   *  @param origin   The set where the elements come from, or `empty` if not known.
    *  @return  CompareResult.OK if all unaccounted elements could be added,
    *           capture set that prevents addition otherwise.
    */
-  protected def tryInclude(elems: Refs)(using Context, VarState): CompareResult =
+  protected def tryInclude(elems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
     val unaccounted = elems.filter(!accountsFor(_))
-    if unaccounted.isEmpty then CompareResult.OK else addNewElems(unaccounted)
+    if unaccounted.isEmpty then CompareResult.OK else addNewElems(unaccounted, origin)
 
   /** {x} <:< this   where <:< is subcapturing, but treating all variables
    *                 as frozen.
@@ -88,7 +90,7 @@ sealed abstract class CaptureSet extends Showable:
     subCaptures(that)(using ctx, if frozen then FrozenState else VarState())
 
   private def subCaptures(that: CaptureSet)(using Context, VarState): CompareResult =
-    val result = that.tryInclude(elems)
+    val result = that.tryInclude(elems, this)
     if result == CompareResult.OK then addSuper(that) else varState.abort()
     result
 
@@ -144,6 +146,12 @@ sealed abstract class CaptureSet extends Showable:
       case cs: Const => mapped
       case cs: Var => Mapped(cs, f, mapped)
 
+  def bimap(f: BiTypeMap)(using Context): CaptureSet =
+    val mappedElems = elems.map(f.forward)
+    this match
+      case cs: Const => Const(mappedElems)
+      case cs: Var => BiMapped(cs, f, mappedElems)
+
   def substParams(tl: BindingType, to: List[Type])(using Context) =
     flatMap {
       case ref: ParamRef if ref.binder eq tl => to(ref.paramNum).captureSet
@@ -165,6 +173,9 @@ object CaptureSet:
   type Refs = SimpleIdentitySet[CaptureRef]
   type Vars = SimpleIdentitySet[Var]
   type Deps = SimpleIdentitySet[CaptureSet]
+
+  /** If set to `true`, capture stack traces that tell us where sets are created */
+  private final val debugSets = false
 
   private val emptySet = SimpleIdentitySet.empty
   @sharable private var varId = 0
@@ -190,7 +201,7 @@ object CaptureSet:
     def isConst = true
     def isAlwaysEmpty = elems.isEmpty
 
-    def addNewElems(elems: Refs)(using Context, VarState): CompareResult =
+    def addNewElems(elems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       CompareResult.fail(this)
 
     def addSuper(cs: CaptureSet) = this
@@ -224,13 +235,13 @@ object CaptureSet:
     def resetDeps()(using state: VarState): Unit =
       deps = state.deps(this)
 
-    def addNewElems(newElems: Refs)(using Context, VarState): CompareResult =
+    def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       if recordElemsState() then
         elems ++= newElems
         // assert(id != 2 || elems.size != 2, this)
         val depsIt = deps.iterator
         while depsIt.hasNext do
-          val result = depsIt.next.tryInclude(newElems)
+          val result = depsIt.next.tryInclude(newElems, this)
           if result != CompareResult.OK then return result
         CompareResult.OK
       else
@@ -247,10 +258,22 @@ object CaptureSet:
   class Mapped private[CaptureSet] (cv: Var, f: CaptureRef => CaptureSet, initial: CaptureSet) extends Var(initial.elems):
     addSub(cv)
     addSub(initial)
+    val stack = if debugSets then (new Throwable).getStackTrace().take(20) else null
 
-    override def addNewElems(newElems: Refs)(using Context, VarState): CompareResult =
-      val added = mapRefs(newElems, f)
-      val result = super.addNewElems(added.elems)
+    private def whereCreated(using Context): String =
+      if stack == null then ""
+      else i"""
+              |Stack trace of variable creation:"
+              |${stack.mkString("\n")}"""
+
+    override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
+      val added =
+        if origin eq cv then mapRefs(newElems, f)
+        else
+          if !origin.isConst && (origin ne initial) then
+            report.error(i"trying to add elems $newElems from unrecognized source of mapped set $this$whereCreated")
+          Const(newElems)
+      val result = super.addNewElems(added.elems, origin)
       if result == CompareResult.OK then
         added match
           case added: Var =>
@@ -262,13 +285,28 @@ object CaptureSet:
     override def toString = s"Mapped$id($cv, elems = $elems)"
   end Mapped
 
+  class BiMapped private[CaptureSet] (cv: Var, bimap: BiTypeMap, initialElems: Refs) extends Var(initialElems):
+    addSub(cv)
+
+    override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
+      if origin eq cv then
+        super.addNewElems(newElems.map(bimap.forward), origin)
+      else
+        val r = super.addNewElems(newElems, origin)
+        if r == CompareResult.OK then
+          cv.tryInclude(newElems.map(bimap.backward), this)
+            .showing(i"propagating new elems $newElems backward from $this to $cv", capt)
+          else r
+
+  end BiMapped
+
   /** A variable with elements given at any time as { x <- cv.elems | p(x) } */
   class Filtered private[CaptureSet] (cv: Var, p: CaptureRef => Boolean)
   extends Var(cv.elems.filter(p)):
     addSub(cv)
 
-    override def addNewElems(newElems: Refs)(using Context, VarState): CompareResult =
-      super.addNewElems(newElems.filter(p))
+    override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
+      super.addNewElems(newElems.filter(p), origin)
 
     override def toString = s"${getClass.getSimpleName}$id($cv, elems = $elems)"
   end Filtered

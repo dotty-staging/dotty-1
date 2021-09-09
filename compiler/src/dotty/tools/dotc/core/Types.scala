@@ -5455,6 +5455,23 @@ object Types {
       }
   end VariantTraversal
 
+  /** A supertrait for some typemaps that are bijections. Used for capture checking
+   *  BiTypeMaps should map capture references to capture references.
+   */
+  trait BiTypeMap extends TypeMap:
+    def inverse(tp: Type): Type
+
+    def forward(ref: CaptureRef): CaptureRef = this(ref) match
+      case result: CaptureRef if result.canBeTracked => result
+
+    def backward(ref: CaptureRef): CaptureRef = inverse(ref) match
+      case result: CaptureRef if result.canBeTracked => result
+
+    override protected
+    def mapCapturingType(tp: Type, parent: Type, refs: CaptureSet, v: Int): Type =
+      derivedCapturingType(tp, this(parent), refs.bimap(this))
+  end BiTypeMap
+
   abstract class TypeMap(implicit protected var mapCtx: Context)
   extends VariantTraversal with (Type => Type) { thisMap =>
 
