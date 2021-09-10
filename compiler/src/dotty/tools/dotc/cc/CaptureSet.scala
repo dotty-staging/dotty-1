@@ -140,11 +140,17 @@ sealed abstract class CaptureSet extends Showable:
    *  and joining the results. If the current capture set is a variable, the same
    *  transformation is applied to all future additions of new elements.
    */
-  def flatMap(f: CaptureRef => CaptureSet)(using Context): CaptureSet =
-    val mapped = mapRefs(elems, f)
-    this match
-      case cs: Const => mapped
-      case cs: Var => Mapped(cs, f, mapped)
+  def map(tm: TypeMap)(using Context): CaptureSet = tm match
+    case tm: BiTypeMap =>
+      val mappedElems = elems.map(tm.forward)
+      this match
+        case cs: Const => Const(mappedElems)
+        case cs: Var => BiMapped(cs, tm, mappedElems)
+    case _ =>
+      val mapped = mapRefs(elems, tm, tm.variance)
+      this match
+        case cs: Const => mapped
+        case cs: Var => Mapped(cs, tm, tm.variance, mapped)
 
   def bimap(f: BiTypeMap)(using Context): CaptureSet =
     val mappedElems = elems.map(f.forward)
@@ -153,10 +159,7 @@ sealed abstract class CaptureSet extends Showable:
       case cs: Var => BiMapped(cs, f, mappedElems)
 
   def substParams(tl: BindingType, to: List[Type])(using Context) =
-    flatMap {
-      case ref: ParamRef if ref.binder eq tl => to(ref.paramNum).captureSet
-      case ref => ref.singletonCaptureSet
-    }
+    map(Substituters.SubstParamsMap(tl, to))
 
   def toRetainsTypeArg(using Context): Type =
     assert(isConst)
@@ -255,7 +258,9 @@ object CaptureSet:
   /** A variable that changes when `cv` changes, where all additional new elements are mapped
    *  using   ∪ { f(x) | x <- elems }
    */
-  class Mapped private[CaptureSet] (cv: Var, f: CaptureRef => CaptureSet, initial: CaptureSet) extends Var(initial.elems):
+  class Mapped private[CaptureSet] (
+      cv: Var, tm: TypeMap, variance: Int, initial: CaptureSet
+    ) extends Var(initial.elems):
     addSub(cv)
     addSub(initial)
     val stack = if debugSets then (new Throwable).getStackTrace().take(20) else null
@@ -268,9 +273,10 @@ object CaptureSet:
 
     override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       val added =
-        if origin eq cv then mapRefs(newElems, f)
+        if origin eq cv then
+          mapRefs(newElems, tm, variance)
         else
-          if !origin.isConst && (origin ne initial) then
+          if variance <= 0 && !origin.isConst && (origin ne initial) then
             report.error(i"trying to add elems $newElems from unrecognized source of mapped set $this$whereCreated")
           Const(newElems)
       val result = super.addNewElems(added.elems, origin)
@@ -320,8 +326,20 @@ object CaptureSet:
   extends Filtered(cv, other.accountsFor(_)):
     addSub(other)
 
+  def extrapolateCaptureRef(r: CaptureRef, tm: TypeMap, variance: Int)(using Context): CaptureSet =
+    val r1 = tm(r)
+    val upper = r1.captureSet
+    def isExact =
+      upper.isAlwaysEmpty || upper.isConst && upper.elems.size == 1 && upper.elems.contains(r1)
+    if variance > 0 || isExact then upper
+    else if variance < 0 then CaptureSet.empty
+    else assert(false, i"trying to add $upper from $r via ${tm.getClass} in a non-variant setting")
+
   def mapRefs(xs: Refs, f: CaptureRef => CaptureSet)(using Context): CaptureSet =
     ((empty: CaptureSet) /: xs)((cs, x) => cs ++ f(x))
+
+  def mapRefs(xs: Refs, tm: TypeMap, variance: Int)(using Context): CaptureSet =
+    mapRefs(xs, extrapolateCaptureRef(_, tm, variance))
 
   type CompareResult = CompareResult.Type
 

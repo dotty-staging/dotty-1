@@ -5429,7 +5429,7 @@ object Types {
 
   /** Common base class of TypeMap and TypeAccumulator */
   abstract class VariantTraversal:
-    protected[core] var variance: Int = 1
+    protected[dotc] var variance: Int = 1
 
     inline protected def atVariance[T](v: Int)(op: => T): T = {
       val saved = variance
@@ -5537,14 +5537,10 @@ object Types {
     def isRange(tp: Type): Boolean = tp.isInstanceOf[Range]
 
     protected def mapCapturingType(tp: Type, parent: Type, refs: CaptureSet, v: Int): Type =
-      def extrapolateCaptureRef(r: CaptureRef): CaptureSet =
-        val r1 = this(r)
-        val upper = r1.captureSet
-        def isExact = upper.isConst && upper.elems.size == 1 && upper.elems.contains(r1)
-        if v > 0 || isExact then upper
-        else if v < 0 then CaptureSet.empty
-        else assert(false)
-      derivedCapturingType(tp, this(parent), refs.flatMap(extrapolateCaptureRef))
+      val saved = variance
+      variance = v
+      try derivedCapturingType(tp, this(parent), refs.map(this))
+      finally variance = saved
 
     /** Map this function over given type */
     def mapOver(tp: Type): Type = {
