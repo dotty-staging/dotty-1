@@ -152,12 +152,6 @@ sealed abstract class CaptureSet extends Showable:
         case cs: Const => mapped
         case cs: Var => Mapped(cs, tm, tm.variance, mapped)
 
-  def bimap(f: BiTypeMap)(using Context): CaptureSet =
-    val mappedElems = elems.map(f.forward)
-    this match
-      case cs: Const => Const(mappedElems)
-      case cs: Var => BiMapped(cs, f, mappedElems)
-
   def substParams(tl: BindingType, to: List[Type])(using Context) =
     map(Substituters.SubstParamsMap(tl, to))
 
