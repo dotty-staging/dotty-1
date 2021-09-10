@@ -12,7 +12,7 @@ import Symbols._, StdNames._, Annotations._, Trees._, Symbols._
 import Decorators._, DenotTransformers._
 import collection.{immutable, mutable}
 import util.{Property, SourceFile, NoSource}
-import NameKinds.{TempResultName, OuterSelectName}
+import NameKinds.{TempResultName, OuterSelectName, ModuleClassName}
 import typer.ConstFold
 
 import scala.annotation.tailrec
@@ -356,6 +356,17 @@ object tpd extends Trees.Instance[Type] with TypedTreeInfo {
     val forwarders = fns.lazyZip(methNames).map(forwarder)
     val cdef = ClassDef(cls, DefDef(constr), forwarders)
     Block(cdef :: Nil, New(cls.typeRef, Nil))
+  }
+
+  def topLevelModule(name: TermName, ddefs: List[Tree])(using Context): List[Tree] = {
+    val owner = ctx.owner// ddefs.head.symbol.owner
+    val moduleSym = newCompleteModuleSymbol(owner, name,
+      EmptyFlags, EmptyFlags, Nil, Scopes.newScopeWith(ddefs.map(_.symbol)*)).entered
+    val moduleClass = newNormalizedClassSymbol(owner, ModuleClassName(name).toTypeName, Synthetic | Final | Module, List(defn.ObjectType), selfInfo = moduleSym.termRef).entered
+    val constr = newConstructor(moduleClass, Synthetic, Nil, Nil).entered
+    val vdef = ValDef(moduleSym, ref(defn.Predef_undefined)) //Apply(New(moduleClass.typeRef).select(constr), Nil))
+    val cdef = ClassDef(moduleClass, DefDef(constr), ddefs.map(_.changeOwner(owner, moduleClass)))
+    List(vdef, cdef)
   }
 
   def Import(expr: Tree, selectors: List[untpd.ImportSelector])(using Context): Import =

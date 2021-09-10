@@ -133,8 +133,8 @@ abstract class AccessProxies {
       val accessed = reference.symbol.asTerm
       var accessorClass = hostForAccessorOf(accessed: Symbol)
       if (accessorClass.exists) {
-        if accessorClass.is(Package) then
-          accessorClass = ctx.owner.topLevelClass
+        // if accessorClass.is(Package) then
+        //   accessorClass = ctx.owner.topLevelClass
         val accessorName = accessorNameOf(accessed.name, accessorClass)
         val accessorInfo =
           accessed.info.ensureMethodic.asSeenFrom(accessorClass.thisType, accessed.owner)

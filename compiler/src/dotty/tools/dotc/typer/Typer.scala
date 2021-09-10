@@ -2531,8 +2531,14 @@ class Typer extends Namer
         inContext(ctx.packageContext(tree, pkg)) {
           var stats1 = typedStats(tree.stats, pkg.moduleClass)._1
           if (!ctx.isAfterTyper)
-            stats1 = stats1 ++ typedBlockStats(MainProxies.mainProxies(stats1))._1
+            stats1 = stats1 ::: typedBlockStats(MainProxies.mainProxies(stats1))._1
+            val topLevelInlineAccessors = addAccessorDefs(pkg, Nil)
+            if topLevelInlineAccessors.nonEmpty then
+              val moduleStats = tpd.topLevelModule("Inline$Accessors".toTermName, topLevelInlineAccessors)
+              stats1 = stats1 ::: moduleStats
+
           cpy.PackageDef(tree)(pid1, stats1).withType(pkg.termRef)
+          // cpy.Template(tree)(body = Accessors.addAccessorDefs(tree.symbol.owner, tree.body))
         }
       case _ =>
         // Package will not exist if a duplicate type has already been entered, see `tests/neg/1708.scala`

@@ -596,7 +596,7 @@ object Symbols {
       def complete(denot: SymDenotation)(using Context): Unit = {
         val cls = denot.asClass.classSymbol
         val decls = newScope
-        denot.info = ClassInfo(owner.thisType, cls, parentTypes.map(_.dealias), decls)
+        denot.info = ClassInfo(owner.thisType, cls, parentTypes.map(_.dealias), decls, selfInfo)
       }
     }
     newClassSymbol(owner, name, flags, completer, privateWithin, coord, assocFile)
