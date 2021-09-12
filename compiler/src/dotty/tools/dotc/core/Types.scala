@@ -1800,7 +1800,7 @@ object Types {
      *  @param dropLast  The number of trailing parameters that should be dropped
      *                   when forming the function type.
      */
-    def toFunctionType(isJava: Boolean, dropLast: Int = 0)(using Context): Type = this match {
+    def toFunctionType(isJava: Boolean, dropLast: Int = 0, alwaysDependent: Boolean = false)(using Context): Type = this match {
       case mt: MethodType if !mt.isParamDependent =>
         val formals1 = if (dropLast == 0) mt.paramInfos else mt.paramInfos dropRight dropLast
         val isContextual = mt.isContextualMethod && !ctx.erasedTypes
@@ -1812,7 +1812,7 @@ object Types {
         val funType = defn.FunctionOf(
           formals1 mapConserve (_.translateFromRepeated(toArray = isJava)),
           result1, isContextual, isErased)
-        if (mt.isResultDependent) RefinedType(funType, nme.apply, mt)
+        if (alwaysDependent || mt.isResultDependent) RefinedType(funType, nme.apply, mt)
         else funType
     }
 

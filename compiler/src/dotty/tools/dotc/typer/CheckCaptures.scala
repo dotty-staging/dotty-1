@@ -125,6 +125,26 @@ class CheckCaptures extends Recheck:
         case _ =>
           tp
 
+      def addFunctionRefinements(tp: Type, refineOK: Boolean = true): Type = tp match
+        case tp @ AppliedType(tycon, args) =>
+          if defn.isNonRefinedFunction(tp) && refineOK then
+            MethodType.companion(
+                isContextual = defn.isContextFunctionClass(tycon.classSymbol),
+                isErased = defn.isErasedFunctionClass(tycon.classSymbol)
+              )(args.init, addFunctionRefinements(args.last))
+              .toFunctionType(isJava = false, alwaysDependent = true)
+              .showing(i"add function refinement $tp --> $result", capt)
+          else
+            tp.derivedAppliedType(tycon, args.map(addFunctionRefinements(_)))
+        case tp @ RefinedType(core, _, rinfo) if defn.isFunctionType(tp) =>
+          mapRefined(tp, addFunctionRefinements(core, refineOK = false), addFunctionRefinements(rinfo))
+        case tp: MethodOrPoly =>
+          tp.derivedLambdaType(resType = addFunctionRefinements(tp.resType))
+        case tp: ExprType =>
+          tp.derivedExprType(resType = addFunctionRefinements(tp.resType))
+        case _ =>
+          tp
+
       /** Refine a possibly applied class type C where the class has tracked parameters
        *  x_1: T_1, ..., x_n: T_n to C { val x_1: CV_1 T_1, ..., val x_n: CV_n T_n }
        *  where CV_1, ..., CV_n are fresh capture sets.
@@ -146,9 +166,10 @@ class CheckCaptures extends Recheck:
       def addVars(tp: Type): Type =
         var tp1 = addInnerVars(tp)
         val tp2 = addCaptureRefinements(tp1)
+        val tp3 = addFunctionRefinements(tp2)
         if tp1.canHaveInferredCapture
-        then CapturingType(tp2, CaptureSet.Var())
-        else tp2
+        then CapturingType(tp3, CaptureSet.Var())
+        else tp3
 
       addVars(cleanType(tp))
     end reinfer
