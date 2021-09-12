@@ -191,8 +191,8 @@ class PlainPrinter(_ctx: Context) extends Printer {
       case CapturingType(parent, refs) =>
         if printDebug && !refs.isConst then
           changePrec(GlobalPrec)(s"$refs " ~ toText(parent))
-        else if refs.elems.isEmpty then
-          toText(parent)
+        else if !refs.isConst && refs.elems.isEmpty then
+          changePrec(GlobalPrec)("? " ~ toText(parent))
         else if Config.printCaptureSetsAsPrefix then
           changePrec(GlobalPrec)("{" ~ Text(refs.elems.toList.map(toTextCaptureRef), ", ") ~ "} " ~ toText(parent))
         else
