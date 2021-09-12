@@ -298,6 +298,7 @@ object CaptureSet:
             .showing(i"propagating new elems $newElems backward from $this to $cv", capt)
           else r
 
+    override def toString = s"BiMapped$id($cv, elems = $elems)"
   end BiMapped
 
   /** A variable with elements given at any time as { x <- cv.elems | p(x) } */

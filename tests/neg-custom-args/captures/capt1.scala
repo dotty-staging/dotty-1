@@ -10,20 +10,20 @@ def h1(x: C @retains(*), y: C): Any =
   () => f()  // ok
 
 def h2(x: C @retains(*)): Matchable =
-  def f(y: Int) = if x == null then y else y
-  f  // error
+  def f(y: Int) = if x == null then y else y  // error
+  f
 
 class A
 type Cap = C @retains(*)
 
 def h3(x: Cap): A =
-  class F(y: Int) extends A:
+  class F(y: Int) extends A:   // error
     def m() = if x == null then y else y
-  F(22)  // error
+  F(22)
 
 def h4(x: Cap, y: Int): A =
-  new A:
-    def m() = if x == null then y else y  // error
+  new A: // error
+    def m() = if x == null then y else y
 
 def foo() =
   val x: C @retains(*) = ???

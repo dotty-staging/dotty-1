@@ -208,7 +208,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
 
     def recheckBlock(stats: List[Tree], expr: Tree, pt: Type)(using Context): Type =
       recheckStats(stats)
-      val exprType = recheck(expr, pt.dropIfProto)
+      val exprType = recheck(expr)
       TypeOps.avoid(exprType, localSyms(stats).filterConserve(_.isTerm))
 
     def recheckBlock(tree: Block, pt: Type)(using Context): Type =
