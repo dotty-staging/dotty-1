@@ -102,8 +102,8 @@ sealed abstract class CaptureSet extends Showable:
    *  `this` and `that`
    */
   def ++ (that: CaptureSet)(using Context): CaptureSet =
-    if this.isConst && this.elems.forall(that.accountsFor) then that
-    else if that.isConst && that.elems.forall(this.accountsFor) then this
+    if this.subCaptures(that, frozen = true) == CompareResult.OK then that
+    else if that.subCaptures(this, frozen = true) == CompareResult.OK then this
     else if this.isConst && that.isConst then Const(this.elems ++ that.elems)
     else Var(this.elems ++ that.elems).addSub(this).addSub(that)
 
@@ -115,8 +115,8 @@ sealed abstract class CaptureSet extends Showable:
   /** The largest capture set (via <:<) that is a subset of both `this` and `that`
    */
   def **(that: CaptureSet)(using Context): CaptureSet =
-    if this.isConst && this.elems.forall(that.accountsFor) then this
-    else if that.isConst && that.elems.forall(this.accountsFor) then that
+    if this.subCaptures(that, frozen = true) == CompareResult.OK then this
+    else if that.subCaptures(this, frozen = true) == CompareResult.OK then that
     else (this, that) match
       case (cs1: Const, cs2: Const) => Const(cs1.elems.intersect(cs2.elems))
       case (cs1: Var, cs2) => Intersected(cs1, cs2)
