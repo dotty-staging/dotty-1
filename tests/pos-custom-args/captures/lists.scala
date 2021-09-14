@@ -37,4 +37,4 @@ def test(c: Cap, d: Cap) =
   def m[A, B] = //: (f: {*} A => B) => {f} (LIST[A] => LIST[B]) =
     (f: {*} A => B) => (((xs: LIST[A]) => xs.map(f)): {f} LIST[A] => LIST[B])
 
-  //def mc: (f: {*} String => Int) => {f} (LIST[String] => LIST[Int]) = m[String, Int]
+  def mc: (f: {*} String => Int) => {f} (LIST[String] => LIST[Int]) = m[String, Int]

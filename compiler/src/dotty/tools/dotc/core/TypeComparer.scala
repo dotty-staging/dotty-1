@@ -605,6 +605,11 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             isSubRefinements(tp1w.asInstanceOf[RefinedType], tp2, skipped2) &&
             recur(tp1, skipped2)
 
+        if ctx.phase == Phases.checkCapturesPhase && defn.isFunctionOrPolyType(tp2) then
+          tp1 match
+            case tp1: RefinedType if defn.isFunctionOrPolyType(tp1) =>
+              return recur(tp1.refinedInfo, tp2.refinedInfo)
+            case _ =>
         compareRefined
       case tp2: RecType =>
         def compareRec = tp1.safeDealias match {
@@ -1977,8 +1982,17 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           case formal2 :: rest2 =>
             val formal2a = if (tp2.isParamDependent) formal2.subst(tp2, tp1) else formal2
             val paramsMatch =
-              if precise then isSameTypeWhenFrozen(formal1, formal2a)
-              else isSubTypeWhenFrozen(formal2a, formal1)
+              if ctx.phase == Phases.checkCapturesPhase then
+                // ^^^ TODO: make this more robust. We want isSubtypeWhenFrozen for the type parts
+                // of formals but isSameType for the capture sets. We cannot use isSubType for
+                // capture sets since that constrains inferred arguments not enough, and we
+                // cannot constrain them later since we would run into the "cannot constrain mapped
+                // type from new source" problem.
+                isSameType(formal1, formal2a)
+              else if precise then
+                isSameTypeWhenFrozen(formal1, formal2a)
+              else
+                isSubTypeWhenFrozen(formal2a, formal1)
             paramsMatch && loop(rest1, rest2)
           case nil =>
             false

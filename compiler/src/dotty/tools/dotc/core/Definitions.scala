@@ -1521,6 +1521,9 @@ class Definitions {
   def isFunctionType(tp: Type)(using Context): Boolean =
     isNonRefinedFunction(tp.dropDependentRefinement)
 
+  def isFunctionOrPolyType(tp: RefinedType)(using Context): Boolean =
+    isFunctionType(tp) || (tp.parent.typeSymbol eq defn.PolyFunctionClass)
+
   // Specialized type parameters defined for scala.Function{0,1,2}.
   @tu lazy val Function1SpecializedParamTypes: collection.Set[TypeRef] =
     Set(IntType, LongType, FloatType, DoubleType)

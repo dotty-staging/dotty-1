@@ -242,9 +242,7 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
       if !printDebug && appliedText(tp.asInstanceOf[HKLambda].resType).isEmpty =>
         // don't eta contract if the application would be printed specially
         toText(tycon)
-      case tp: RefinedType
-      if (defn.isFunctionType(tp) || (tp.parent.typeSymbol eq defn.PolyFunctionClass))
-          && !printDebug =>
+      case tp: RefinedType if defn.isFunctionOrPolyType(tp) && !printDebug =>
         toTextMethodAsFunction(tp.refinedInfo)
       case tp: TypeRef =>
         if (tp.symbol.isAnonymousClass && !showUniqueIds)
