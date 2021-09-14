@@ -103,7 +103,7 @@ class CheckCaptures extends Recheck:
 
       def mapRefined(tp: RefinedType, core1: Type, rinfo1: Type): Type =
         if (rinfo1 ne tp.refinedInfo) && defn.isFunctionType(tp)
-        then rinfo1.toFunctionType(isJava = false)
+        then rinfo1.toFunctionType(isJava = false, alwaysDependent = true)
         else tp.derivedRefinedType(core1, tp.refinedName, rinfo1)
 
       val cleanType = new TypeMap:
@@ -116,18 +116,27 @@ class CheckCaptures extends Recheck:
       def addInnerVars(tp: Type): Type = tp match
         case tp @ AppliedType(tycon, args) =>
           tp.derivedAppliedType(tycon, args.map(addVars))
-        case tp @ RefinedType(core, _, rinfo) =>
-          mapRefined(tp, addInnerVars(core), addVars(rinfo))
-        case tp: MethodOrPoly =>
-          tp.derivedLambdaType(resType = addVars(tp.resType))
+        case tp @ RefinedType(core, rname, rinfo) =>
+          val rinfo1 = addVars(rinfo)
+          if defn.isFunctionType(tp) then
+            rinfo1.toFunctionType(isJava = false, alwaysDependent = true)
+          else
+            tp.derivedRefinedType(addInnerVars(core), rname, rinfo1)
+        case tp: MethodType =>
+          tp.derivedLambdaType(
+            paramInfos = tp.paramInfos.mapConserve(addVars),
+            resType = addVars(tp.resType))
+        case tp: PolyType =>
+          tp.derivedLambdaType(
+            resType = addVars(tp.resType))
         case tp: ExprType =>
           tp.derivedExprType(resType = addVars(tp.resType))
         case _ =>
           tp
 
-      def addFunctionRefinements(tp: Type, refineOK: Boolean = true): Type = tp match
+      def addFunctionRefinements(tp: Type): Type = tp match
         case tp @ AppliedType(tycon, args) =>
-          if defn.isNonRefinedFunction(tp) && refineOK then
+          if defn.isNonRefinedFunction(tp) then
             MethodType.companion(
                 isContextual = defn.isContextFunctionClass(tycon.classSymbol),
                 isErased = defn.isErasedFunctionClass(tycon.classSymbol)
@@ -136,8 +145,9 @@ class CheckCaptures extends Recheck:
               .showing(i"add function refinement $tp --> $result", capt)
           else
             tp.derivedAppliedType(tycon, args.map(addFunctionRefinements(_)))
-        case tp @ RefinedType(core, _, rinfo) if defn.isFunctionType(tp) =>
-          mapRefined(tp, addFunctionRefinements(core, refineOK = false), addFunctionRefinements(rinfo))
+        case tp @ RefinedType(core, rname, rinfo) if !defn.isFunctionType(tp) =>
+          tp.derivedRefinedType(
+            addFunctionRefinements(core), rname, addFunctionRefinements(rinfo))
         case tp: MethodOrPoly =>
           tp.derivedLambdaType(resType = addFunctionRefinements(tp.resType))
         case tp: ExprType =>
@@ -166,12 +176,12 @@ class CheckCaptures extends Recheck:
       def addVars(tp: Type): Type =
         var tp1 = addInnerVars(tp)
         val tp2 = addCaptureRefinements(tp1)
-        val tp3 = addFunctionRefinements(tp2)
         if tp1.canHaveInferredCapture
-        then CapturingType(tp3, CaptureSet.Var())
-        else tp3
+        then CapturingType(tp2, CaptureSet.Var())
+        else tp2
 
-      addVars(cleanType(tp))
+      addVars(addFunctionRefinements(cleanType(tp)))
+        .showing(i"reinfer $tp --> $result", capt)
     end reinfer
 
     private var curEnv: Env = Env(NoSymbol, CaptureSet.empty, false, null)
