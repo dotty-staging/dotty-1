@@ -164,10 +164,7 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
         changePrec(GlobalPrec) {
           "("
           ~ keywordText("erased ").provided(info.isErasedMethod)
-          ~ ( if info.isParamDependent || info.isResultDependent
-              then paramsText(info)
-              else argsText(info.paramInfos)
-            )
+          ~ paramsText(info)
           ~ ") "
           ~ arrow(info.isImplicitMethod)
           ~ " "
