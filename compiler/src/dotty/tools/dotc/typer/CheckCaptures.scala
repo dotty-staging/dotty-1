@@ -301,14 +301,9 @@ class CheckCaptures extends Recheck:
       super.recheckApply(tree, pt)
 
     override def recheck(tree: Tree, pt: Type = WildcardType)(using Context): Type =
-      val saved = curEnv
-      if pt.needsBox && !curEnv.isBoxed then // ^^^ refine?
-        curEnv = Env(NoSymbol, CaptureSet.Var(), true, curEnv)
-      try
-        val res = super.recheck(tree, pt)
-        if curEnv.isOpen then assertSub(res.boxedCaptured, curEnv.captured)
-        res
-      finally curEnv = saved
+      val res = super.recheck(tree, pt)
+      if curEnv.isOpen then assertSub(res.boxedCaptured, curEnv.captured)
+      res
 
     override def checkUnit(unit: CompilationUnit)(using Context): Unit =
       super.checkUnit(unit)
