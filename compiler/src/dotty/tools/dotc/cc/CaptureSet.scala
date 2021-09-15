@@ -161,7 +161,7 @@ sealed abstract class CaptureSet extends Showable:
       if tp.exists then OrType(tp, ref, soft = false) else ref)
 
   def toRegularAnnotation(using Context): Annotation  =
-    Annotation(CaptureAnnotation(this).tree)
+    Annotation(CaptureAnnotation(this, boxed = false).tree)
 
   override def toText(printer: Printer): Text =
     Str("{") ~ Text(elems.toList.map(printer.toTextCaptureRef), ", ") ~ Str("}")
@@ -400,7 +400,7 @@ object CaptureSet:
         tp.captureSet
       case _: TypeRef | _: TypeParamRef =>
         empty
-      case CapturingType(parent, refs) =>
+      case CapturingType(parent, refs, _) =>
         recur(parent) ++ refs
       case AppliedType(tycon, args) =>
         val cs = recur(tycon)

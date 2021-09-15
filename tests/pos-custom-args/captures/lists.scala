@@ -34,7 +34,22 @@ def test(c: Cap, d: Cap) =
   val ys1 = zs.tail
   val y1 = ys1.head
 
-  def m[A, B] = //: (f: {*} A => B) => {f} (LIST[A] => LIST[B]) =
-    (f: {*} A => B) => (((xs: LIST[A]) => xs.map(f)): {f} LIST[A] => LIST[B])
 
-  def mc: (f: {*} String => Int) => {f} (LIST[String] => LIST[Int]) = m[String, Int]
+  def m1[A, B] =
+    (f: {*} A => B) => (xs: LIST[A]) => xs.map(f)
+
+  def m1c: (f: {*} String => Int) => {f} LIST[String] => LIST[Int] = m1[String, Int]
+
+  def m2 = [A, B] =>
+      (f: {*} A => B) => (xs: LIST[A]) => xs.map(f)
+
+  def m2c: [A, B] => (f: {*} A => B) => {f} LIST[A] => LIST[B] = m2
+
+  val a0 = identity[{d, y} Cap => Unit]
+  val a1 = zs.map[{d, y} Cap => Unit](a0)
+//  val a2 = zs.map[{d, y} Cap => Unit](identity[{d, y} Cap => Unit])
+//  val a3 = zs.map(identity[{d, y} Cap => Unit])
+//  val a4 = zs.map(identity)
+//  val a2 = map(identity)(zs)
+//  val a3 = m1(identity)(zs)
+

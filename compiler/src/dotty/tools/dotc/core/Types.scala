@@ -38,7 +38,7 @@ import scala.util.hashing.{ MurmurHash3 => hashing }
 import config.Printers.{core, typr, matchTypes}
 import reporting.{trace, Message}
 import java.lang.ref.WeakReference
-import cc.{CapturingType, CaptureSet, derivedCapturingType, retainedElems}
+import cc.{CapturingType, CaptureSet, derivedCapturingType, retainedElems, isBoxedCapturing}
 import CaptureSet.CompareResult
 
 import scala.annotation.internal.sharable
@@ -203,7 +203,7 @@ object Types {
         else this1.underlying.isRef(sym, skipRefined)
       case this1: TypeVar =>
         this1.instanceOpt.isRef(sym, skipRefined)
-      case CapturingType(_, _) =>
+      case CapturingType(_, _, _) =>
         false
       case this1: AnnotatedType =>
         this1.parent.isRef(sym, skipRefined)
@@ -373,7 +373,7 @@ object Types {
       case tp: AndOrType => tp.tp1.unusableForInference || tp.tp2.unusableForInference
       case tp: LambdaType => tp.resultType.unusableForInference || tp.paramInfos.exists(_.unusableForInference)
       case WildcardType(optBounds) => optBounds.unusableForInference
-      case CapturingType(parent, refs) => parent.unusableForInference || refs.elems.exists(_.unusableForInference)
+      case CapturingType(parent, refs, _) => parent.unusableForInference || refs.elems.exists(_.unusableForInference)
       case _: ErrorType => true
       case _ => false
 
@@ -1382,7 +1382,7 @@ object Types {
       case tp: TypeVar =>
         val tp1 = tp.instanceOpt
         if (tp1.exists) tp1.dealias1(keep) else tp
-      case tp @ CapturingType(parent, refs) => // ^^^ merge with below for efficiency?
+      case tp @ CapturingType(parent, refs, _) => // ^^^ merge with below for efficiency?
         tp.derivedCapturingType(parent.dealias1(keep), refs)
       case tp: AnnotatedType =>
         val tp1 = tp.parent.dealias1(keep)
@@ -1845,13 +1845,14 @@ object Types {
     }
 
     def capturing(ref: CaptureRef)(using Context): Type =
-      if captureSet.accountsFor(ref) then this else CapturingType(this, ref.singletonCaptureSet)
+      if captureSet.accountsFor(ref) then this
+      else CapturingType(this, ref.singletonCaptureSet, this.isBoxedCapturing)
 
     def capturing(cs: CaptureSet)(using Context): Type =
       if cs.isConst && cs.subCaptures(captureSet, frozen = true) == CompareResult.OK then this
       else this match
-        case CapturingType(parent, cs1) => parent.capturing(cs1 ++ cs)
-        case _ => CapturingType(this, cs)
+        case CapturingType(parent, cs1, boxed) => parent.capturing(cs1 ++ cs)
+        case _ => CapturingType(this, cs, this.isBoxedCapturing)
 
     /** The set of distinct symbols referred to by this type, after all aliases are expanded */
     def coveringSet(using Context): Set[Symbol] =
@@ -3694,7 +3695,7 @@ object Types {
           case tp: AppliedType => tp.fold(status, compute(_, _, theAcc))
           case tp: TypeVar if !tp.isInstantiated => combine(status, Provisional)
           case tp: TermParamRef if tp.binder eq thisLambdaType => TrueDeps
-          case CapturingType(parent, refs) =>
+          case CapturingType(parent, refs, _) =>
             (compute(status, parent, theAcc) /: refs.elems) {
               (s, ref) => ref match
                 case tp: TermParamRef if tp.binder eq thisLambdaType => combine(s, CaptureDeps)
@@ -3763,7 +3764,7 @@ object Types {
           def apply(tp: Type) = tp match {
             case tp @ TermParamRef(`thisLambdaType`, _) =>
               range(defn.NothingType, atVariance(1)(apply(tp.underlying)))
-            case CapturingType(parent, refs) =>
+            case CapturingType(parent, refs, boxed) =>
               val parent1 = this(parent)
               val elems1 = refs.elems.filter {
                 case tp @ TermParamRef(`thisLambdaType`, _) => false
@@ -3773,8 +3774,8 @@ object Types {
                 derivedCapturingType(tp, parent1, refs)
               else
                 range(
-                  CapturingType(parent1, CaptureSet(elems1)),
-                  CapturingType(parent1, CaptureSet.universal))
+                  CapturingType(parent1, CaptureSet(elems1), boxed),
+                  CapturingType(parent1, CaptureSet.universal, boxed))
             case AnnotatedType(parent, ann) if ann.refersToParamOf(thisLambdaType) =>
               val parent1 = mapOver(parent)
               if ann.symbol == defn.RetainsAnnot then
@@ -5579,7 +5580,7 @@ object Types {
         case tp: ExprType =>
           derivedExprType(tp, this(tp.resultType))
 
-        case CapturingType(parent, refs) =>
+        case CapturingType(parent, refs, _) =>
           mapCapturingType(tp, parent, refs, variance)
 
         case tp @ AnnotatedType(underlying, annot) =>
@@ -6051,7 +6052,7 @@ object Types {
         val x2 = atVariance(0)(this(x1, tp.scrutinee))
         foldOver(x2, tp.cases)
 
-      case CapturingType(parent, refs) =>
+      case CapturingType(parent, refs, _) =>
         (this(x, parent) /: refs.elems)(this)
 
       case AnnotatedType(underlying, annot) =>

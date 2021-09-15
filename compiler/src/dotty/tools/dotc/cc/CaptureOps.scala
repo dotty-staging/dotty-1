@@ -11,6 +11,7 @@ import util.Property.Key
 import tpd.*
 
 private val Captures: Key[CaptureSet] = Key()
+private val IsBoxed: Key[Unit] = Key()
 
 def retainedElems(tree: Tree)(using Context): List[Tree] = tree match
   case Apply(_, Typed(SeqLiteral(elems, _), _) :: Nil) => elems
@@ -29,12 +30,15 @@ extension (tree: Tree)
         tree.putAttachment(Captures, refs)
         refs
 
+  def isBoxedCapturing(using Context) =
+    tree.hasAttachment(IsBoxed)
+
 extension (tp: Type)
 
   def derivedCapturingType(parent: Type, refs: CaptureSet)(using Context): Type = tp match
-    case CapturingType(p, r) =>
+    case CapturingType(p, r, b) =>
       if (parent eq p) && (refs eq r) then tp
-      else CapturingType(parent, refs)
+      else CapturingType(parent, refs, b)
 
   /** If this is  type variable instantiated or upper bounded with a capturing type,
    *  the capture set associated with that type. Extended to and-or types and
@@ -42,34 +46,15 @@ extension (tp: Type)
    *  that captureset counts towards the capture variables of the envirionment.
    */
   def boxedCaptured(using Context): CaptureSet =
-    def getBoxed(tp: Type, enabled: Boolean): CaptureSet = tp match
-      case CapturingType(_, refs) if enabled => refs
-      case tp: TypeVar => getBoxed(tp.underlying, enabled = true)
-      case tp: TypeRef if tp.symbol == defn.AnyClass && enabled => CaptureSet.universal
-      case tp: TypeProxy => getBoxed(tp.superType, enabled)
-      case tp: AndType => getBoxed(tp.tp1, enabled) ++ getBoxed(tp.tp2, enabled)
-      case tp: OrType => getBoxed(tp.tp1, enabled) ** getBoxed(tp.tp2, enabled)
+    def getBoxed(tp: Type): CaptureSet = tp match
+      case CapturingType(_, refs, boxed) => if boxed then refs else CaptureSet.empty
+      case tp: TypeProxy => getBoxed(tp.superType)
+      case tp: AndType => getBoxed(tp.tp1) ++ getBoxed(tp.tp2)
+      case tp: OrType => getBoxed(tp.tp1) ** getBoxed(tp.tp2)
       case _ => CaptureSet.empty
-    getBoxed(tp, enabled = false)
+    getBoxed(tp)
 
-  /** If this type appears as an expected type of a term, does it imply
-   *  that the term should be boxed?
-   *  ^^^ Special treat Any? - but the current status is more conservative in that
-   *  it counts free variables in expressions that have Any as expected type.
-   */
-  def needsBox(using Context): Boolean = tp match
-    case _: TypeVar => true
-    case tp: TypeRef =>
-      tp.info match
-        case TypeBounds(lo, _) => lo.needsBox
-        case _ => false
-    case tp: RefinedOrRecType => tp.parent.needsBox
-    case CapturingType(_, _) => false
-    case tp: AnnotatedType => tp.parent.needsBox
-    case tp: LazyRef => tp.ref.needsBox
-    case tp: AndType => tp.tp1.needsBox || tp.tp2.needsBox
-    case tp: OrType => tp.tp1.needsBox && tp.tp2.needsBox
-    case _ => false
+  def isBoxedCapturing(using Context) = !tp.boxedCaptured.isAlwaysEmpty
 
   def canHaveInferredCapture(using Context): Boolean = tp match
     case tp: TypeRef if tp.symbol.isClass =>
@@ -84,7 +69,7 @@ extension (tp: Type)
       false
 
   def stripCapturing(using Context): Type = tp.dealiasKeepAnnots match
-    case CapturingType(parent, _) =>
+    case CapturingType(parent, _, _) =>
       parent.stripCapturing
     case atd @ AnnotatedType(parent, annot) =>
       atd.derivedAnnotatedType(parent.stripCapturing, annot)

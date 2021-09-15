@@ -61,7 +61,7 @@ object CheckCaptures:
    *  This check is performed after capture sets are computed in phase cc.
    */
   def checkWellformedPost(tp: Type, pos: SrcPos)(using Context): Unit = tp match
-    case CapturingType(parent, refs) =>
+    case CapturingType(parent, refs, _) =>
       for ref <- refs.elems do
         if ref.captureSet.subCaptures(CaptureSet.empty, frozen = true) == CompareResult.OK then
           report.error(em"$ref cannot be tracked since its capture set is empty", pos)
@@ -115,7 +115,7 @@ class CheckCaptures extends Recheck:
 
       def addInnerVars(tp: Type): Type = tp match
         case tp @ AppliedType(tycon, args) =>
-          tp.derivedAppliedType(tycon, args.map(addVars))
+          tp.derivedAppliedType(tycon, args.map(addVars(_, boxed = true)))
         case tp @ RefinedType(core, rname, rinfo) =>
           val rinfo1 = addVars(rinfo)
           if defn.isFunctionType(tp) then
@@ -124,7 +124,7 @@ class CheckCaptures extends Recheck:
             tp.derivedRefinedType(addInnerVars(core), rname, rinfo1)
         case tp: MethodType =>
           tp.derivedLambdaType(
-            paramInfos = tp.paramInfos.mapConserve(addVars),
+            paramInfos = tp.paramInfos.mapConserve(addVars(_)),
             resType = addVars(tp.resType))
         case tp: PolyType =>
           tp.derivedLambdaType(
@@ -165,7 +165,7 @@ class CheckCaptures extends Recheck:
           cls.paramGetters.foldLeft(tp) { (core, getter) =>
             if getter.termRef.isTracked then
               val getterType = tp.memberInfo(getter).strippedDealias
-              RefinedType(core, getter.name, CapturingType(getterType, CaptureSet.Var()))
+              RefinedType(core, getter.name, CapturingType(getterType, CaptureSet.Var(), boxed = false))
                 .showing(i"add capture refinement $tp --> $result", capt)
             else
               core
@@ -173,11 +173,11 @@ class CheckCaptures extends Recheck:
         case _ =>
           tp
 
-      def addVars(tp: Type): Type =
+      def addVars(tp: Type, boxed: Boolean = false): Type =
         var tp1 = addInnerVars(tp)
         val tp2 = addCaptureRefinements(tp1)
         if tp1.canHaveInferredCapture
-        then CapturingType(tp2, CaptureSet.Var())
+        then CapturingType(tp2, CaptureSet.Var(), boxed)
         else tp2
 
       addVars(addFunctionRefinements(cleanType(tp)))
@@ -213,6 +213,15 @@ class CheckCaptures extends Recheck:
             case ref: TermRef => ref.symbol.enclosure != ownEnclosure
             case _ => true
           }
+        checkSubset(targetSet, curEnv.captured, pos)
+
+    def includeBoxedCaptures(tp: Type, pos: SrcPos)(using Context): Unit =
+      if curEnv.isOpen then
+        val ownEnclosure = ctx.owner.enclosingMethodOrClass
+        val targetSet = tp.boxedCaptured.filter {
+          case ref: TermRef => ref.symbol.enclosure != ownEnclosure
+          case _ => true
+        }
         checkSubset(targetSet, curEnv.captured, pos)
 
     def assertSub(cs1: CaptureSet, cs2: CaptureSet)(using Context) =
@@ -302,7 +311,8 @@ class CheckCaptures extends Recheck:
 
     override def recheck(tree: Tree, pt: Type = WildcardType)(using Context): Type =
       val res = super.recheck(tree, pt)
-      if curEnv.isOpen then assertSub(res.boxedCaptured, curEnv.captured)
+      if tree.isTerm then
+        includeBoxedCaptures(res, tree.srcPos)
       res
 
     override def checkUnit(unit: CompilationUnit)(using Context): Unit =
@@ -315,7 +325,7 @@ class CheckCaptures extends Recheck:
           case LambdaTypeTree(_, restpt) =>
             checkNotGlobal(restpt, allArgs*)
           case _ =>
-            for ref <- tree.tpe.captureSet.elems do
+            for ref <- knownType(tree).captureSet.elems do
               val isGlobal = ref match
                 case ref: TermRef =>
                   ref.isRootCapability || ref.prefix != NoPrefix && ref.symbol.hasAnnotation(defn.AbilityAnnot)
@@ -325,9 +335,9 @@ class CheckCaptures extends Recheck:
                 val notAllowed = i" is not allowed to capture the $what capability $ref"
                 def msg = tree match
                   case tree: InferredTypeTree =>
-                    i"""inferred type argument ${tree.tpe}$notAllowed
+                    i"""inferred type argument ${knownType(tree)}$notAllowed
                         |
-                        |The inferred arguments are: [$allArgs%, %]"""
+                        |The inferred arguments are: [${allArgs.map(knownType)}%, %]"""
                   case _ => s"type argument$notAllowed"
                 report.error(msg, tree.srcPos)
 
@@ -336,16 +346,16 @@ class CheckCaptures extends Recheck:
         tree match
           case _: InferredTypeTree =>
           case tree: TypeTree =>
-            tree.tpe.foreachPart(
+            knownType(tree).foreachPart(
               checkWellformedPost(_, tree.srcPos))
-            tree.tpe.foreachPart {
+            knownType(tree).foreachPart {
               case AnnotatedType(_, annot) =>
                 checkWellformedPost(annot.tree)
               case _ =>
             }
           case tree1 @ TypeApply(fn, args) if disallowGlobal =>
             for arg <- args do
-              //println(i"checking $arg in $tree: ${arg.tpe.captureSet}")
+              //println(i"checking $arg in $tree: ${knownType(tree).captureSet}")
               checkNotGlobal(arg, args*)
           case _ =>
         traverseChildren(tree)
