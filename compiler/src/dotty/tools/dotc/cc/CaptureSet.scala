@@ -343,7 +343,9 @@ object CaptureSet:
     opaque type Type = CaptureSet
     val OK: Type = Const(emptySet)
     def fail(cs: CaptureSet): Type = cs
-    extension (result: Type) def blocking: CaptureSet = result
+    extension (result: Type)
+      def blocking: CaptureSet = result
+      def show: String = if result == OK then "OK" else result.toString
 
   class VarState:
     private val elemsMap: util.EqHashMap[Var, Refs] = new util.EqHashMap

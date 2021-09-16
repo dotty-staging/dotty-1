@@ -491,7 +491,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             // under -Ycheck. Test case is i7965.scala.
 
       case CapturingType(parent1, refs1, _) =>
-        if refs1.subCaptures(tp2.captureSet, frozenConstraint) == CaptureSet.CompareResult.OK then
+        if subCaptures(refs1, tp2.captureSet, frozenConstraint) == CaptureSet.CompareResult.OK then
           recur(parent1, tp2)
         else
           thirdTry
@@ -2396,7 +2396,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     case tp1: TypeVar if tp1.isInstantiated =>
       tp1.underlying & tp2
     case CapturingType(parent1, refs1, _) =>
-      if tp2.captureSet.subCaptures(refs1, frozenConstraint) == CaptureSet.CompareResult.OK then
+      if subCaptures(tp2.captureSet, refs1, frozenConstraint) == CaptureSet.CompareResult.OK then
         parent1 & tp2
       else
         tp1.derivedCapturingType(parent1 & tp2, refs1)
@@ -2461,6 +2461,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
     case _ =>
       false
   }
+
+  protected def subCaptures(refs1: CaptureSet, refs2: CaptureSet, frozen: Boolean)(using Context): CaptureSet.CompareResult.Type =
+    refs1.subCaptures(refs2, frozen)
 
   // ----------- Diagnostics --------------------------------------------------
 
@@ -2730,6 +2733,7 @@ object TypeComparer {
     else res match
       case ClassInfo(_, cls, _, _, _) => cls.showLocated
       case bounds: TypeBounds => i"type bounds [$bounds]"
+      case CaptureSet.CompareResult.OK => "OK"
       case res: printing.Showable => res.show
       case _ => String.valueOf(res)
 
@@ -3057,6 +3061,11 @@ class ExplainingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
   override def addConstraint(param: TypeParamRef, bound: Type, fromBelow: Boolean)(using Context): Boolean =
     traceIndented(i"add constraint $param ${if (fromBelow) ">:" else "<:"} $bound $frozenConstraint, constraint = ${ctx.typerState.constraint}") {
       super.addConstraint(param, bound, fromBelow)
+    }
+
+  override def subCaptures(refs1: CaptureSet, refs2: CaptureSet, frozen: Boolean)(using Context): CaptureSet.CompareResult.Type =
+    traceIndented(i"subcaptures $refs1 <:< $refs2 ${if frozen then "frozen" else ""}") {
+      super.subCaptures(refs1, refs2, frozen)
     }
 
   def lastTrace(header: String): String = header + { try b.toString finally b.clear() }
