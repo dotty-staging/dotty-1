@@ -44,7 +44,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
 
   def run(using Context): Unit =
     val rechecker = newRechecker()
-    rechecker.reinferAll.traverse(ctx.compilationUnit.tpdTree)
+    rechecker.transformTypes.traverse(ctx.compilationUnit.tpdTree)
     rechecker.checkUnit(ctx.compilationUnit)
 
   def newRechecker()(using Context): Rechecker
@@ -72,15 +72,15 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
     def knownType(tree: Tree) =
       tree.attachmentOrElse(RecheckedType, tree.tpe)
 
-    def reinfer(tp: Type)(using Context): Type = tp
+    def transformType(tp: Type, inferred: Boolean)(using Context): Type = tp
 
-    object reinferAll extends TreeTraverser:
+    object transformTypes extends TreeTraverser:
       def traverse(tree: Tree)(using Context) =
         traverseChildren(tree)
         tree match
-          case tree: InferredTypeTree =>
-            reinfer(tree.tpe).rememberFor(tree)
-          case tree: ValOrDefDef if tree.tpt.isInstanceOf[InferredTypeTree] =>
+          case tree: TypeTree =>
+            transformType(tree.tpe, tree.isInstanceOf[InferredTypeTree]).rememberFor(tree)
+          case tree: ValOrDefDef if tree.tpt.hasAttachment(RecheckedType) =>
             val sym = tree.symbol
             def integrateRT(restp: Type, info: Type, psymss: List[List[Symbol]]): Type = info match
               case info: MethodOrPoly =>
@@ -96,9 +96,9 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
               sym.updateInfo(info1)
           case tree: Bind =>
             val sym = tree.symbol
-            sym.updateInfo(reinfer(sym.info))
+            sym.updateInfo(transformType(sym.info, inferred = true))
           case _ =>
-    end reinferAll
+    end transformTypes
 
     def constFold(tree: Tree, tp: Type)(using Context): Type =
       val tree1 = tree.withType(tp)

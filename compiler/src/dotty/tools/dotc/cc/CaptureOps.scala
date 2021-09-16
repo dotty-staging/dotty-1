@@ -30,8 +30,11 @@ extension (tree: Tree)
         tree.putAttachment(Captures, refs)
         refs
 
-  def isBoxedCapturing(using Context) =
+  def isBoxedCapturing(using Context): Boolean =
     tree.hasAttachment(IsBoxed)
+
+  def setBoxedCapturing()(using Context): Unit =
+    tree.putAttachment(IsBoxed, ())
 
 extension (tp: Type)
 

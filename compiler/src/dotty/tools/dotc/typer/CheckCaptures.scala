@@ -99,17 +99,17 @@ class CheckCaptures extends Recheck:
   class CaptureChecker(ictx: Context) extends Rechecker(ictx):
     import ast.tpd.*
 
-    override def reinfer(tp: Type)(using Context): Type =
+    override def transformType(tp: Type, inferred: Boolean)(using Context): Type =
 
-      def mapRefined(tp: RefinedType, core1: Type, rinfo1: Type): Type =
-        if (rinfo1 ne tp.refinedInfo) && defn.isFunctionType(tp)
-        then rinfo1.toFunctionType(isJava = false, alwaysDependent = true)
-        else tp.derivedRefinedType(core1, tp.refinedName, rinfo1)
-
-      val cleanType = new TypeMap:
+      val prepare = new TypeMap:
         def apply(t: Type) = t match
-          case AnnotatedType(parent, annot) if annot.symbol == defn.RetainsAnnot =>
+          case AnnotatedType(parent, annot) if inferred && annot.symbol == defn.RetainsAnnot =>
             apply(parent)
+          case AppliedType(tycon, args) if false && !inferred && !defn.isNonRefinedFunction(t) =>
+            for case AnnotatedType(parent, annot) <- args do
+              if annot.symbol == defn.RetainsAnnot then
+                annot.tree.setBoxedCapturing()
+            mapOver(t)
           case _ =>
             mapOver(t)
 
@@ -180,9 +180,28 @@ class CheckCaptures extends Recheck:
         then CapturingType(tp2, CaptureSet.Var(), boxed)
         else tp2
 
-      addVars(addFunctionRefinements(cleanType(tp)))
-        .showing(i"reinfer $tp --> $result", capt)
-    end reinfer
+      if inferred then
+        val cleanup = new TypeMap:
+          def apply(t: Type) = t match
+            case AnnotatedType(parent, annot) if annot.symbol == defn.RetainsAnnot =>
+              apply(parent)
+            case _ =>
+              mapOver(t)
+        addVars(addFunctionRefinements(cleanup(tp)))
+          .showing(i"reinfer $tp --> $result", capt)
+      else
+        val addBoxes = new TypeTraverser:
+          def traverse(t: Type) =
+            t match
+              case AppliedType(tycon, args) if !defn.isNonRefinedFunction(t) =>
+                for case AnnotatedType(parent, annot) <- args do
+                  if annot.symbol == defn.RetainsAnnot then
+                    annot.tree.setBoxedCapturing()
+              case _ =>
+            traverseChildren(t)
+        addBoxes.traverse(tp)
+        tp
+    end transformType
 
     private var curEnv: Env = Env(NoSymbol, CaptureSet.empty, false, null)
 
