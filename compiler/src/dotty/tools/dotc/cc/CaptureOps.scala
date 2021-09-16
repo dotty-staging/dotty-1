@@ -59,6 +59,8 @@ extension (tp: Type)
   def canHaveInferredCapture(using Context): Boolean = tp match
     case tp: TypeRef if tp.symbol.isClass =>
       !tp.symbol.isValueClass && tp.symbol != defn.AnyClass
+    case _: TypeVar | _: TypeParamRef =>
+      false
     case tp: TypeProxy =>
       tp.superType.canHaveInferredCapture
     case tp: AndType =>
