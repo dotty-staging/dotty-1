@@ -349,6 +349,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
       case _ =>
         val actual = tpe.widenExpr
         val expected = pt.widenExpr
+        //println(i"check conforms $actual <:< $expected")
         val isCompatible =
           actual <:< expected
           || expected.isRepeatedParam

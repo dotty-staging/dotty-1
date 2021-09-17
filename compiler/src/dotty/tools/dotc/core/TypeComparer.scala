@@ -606,11 +606,9 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             recur(tp1, skipped2)
 
         if ctx.phase == Phases.checkCapturesPhase && defn.isFunctionOrPolyType(tp2) then
-          tp1 match
-            case tp1: RefinedType if defn.isFunctionOrPolyType(tp1) =>
-              return recur(tp1.refinedInfo, tp2.refinedInfo)
-            case _ =>
-        compareRefined
+          hasMatchingMember(nme.apply, tp1, tp2)
+        else
+          compareRefined
       case tp2: RecType =>
         def compareRec = tp1.safeDealias match {
           case tp1: RecType =>
@@ -1988,7 +1986,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
                 // capture sets since that constrains inferred arguments not enough, and we
                 // cannot constrain them later since we would run into the "cannot constrain mapped
                 // type from new source" problem.
-                isSameType(formal1, formal2a)
+                isSubType(formal2a, formal1)
               else if precise then
                 isSameTypeWhenFrozen(formal1, formal2a)
               else
