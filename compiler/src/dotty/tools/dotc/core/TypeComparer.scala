@@ -605,10 +605,24 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             isSubRefinements(tp1w.asInstanceOf[RefinedType], tp2, skipped2) &&
             recur(tp1, skipped2)
 
-        if ctx.phase == Phases.checkCapturesPhase && defn.isFunctionOrPolyType(tp2) then
-          hasMatchingMember(nme.apply, tp1, tp2)
-        else
-          compareRefined
+        def isSubInfo(info1: Type, info2: Type): Boolean = (info1, info2) match
+          case (info1: PolyType, info2: PolyType) =>
+            sameLength(info1.paramNames, info2.paramNames)
+            && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1))
+          case (info1: MethodType, info2: MethodType) =>
+            matchingMethodParams(info1, info2, precise = false)
+            && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1))
+          case _ =>
+            isSubType(info1, info2)
+
+        tp1 match
+          case tp1: RefinedType
+          if ctx.phase == Phases.checkCapturesPhase
+              && defn.isFunctionOrPolyType(tp1)
+              && defn.isFunctionOrPolyType(tp2) =>
+            isSubInfo(tp1.refinedInfo, tp2.refinedInfo)
+          case _ =>
+            compareRefined
       case tp2: RecType =>
         def compareRec = tp1.safeDealias match {
           case tp1: RecType =>
@@ -1793,69 +1807,68 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
   protected def hasMatchingMember(name: Name, tp1: Type, tp2: RefinedType): Boolean =
     trace(i"hasMatchingMember($tp1 . $name :? ${tp2.refinedInfo}), mbr: ${tp1.member(name).info}", subtyping) {
 
+      // If the member is an abstract type and the prefix is a path, compare the member itself
+      // instead of its bounds. This case is needed situations like:
+      //
+      //    class C { type T }
+      //    val foo: C
+      //    foo.type <: C { type T {= , <: , >:} foo.T }
+      //
+      // or like:
+      //
+      //    class C[T]
+      //    C[?] <: C[TV]
+      //
+      // where TV is a type variable. See i2397.scala for an example of the latter.
+      def matchAbstractTypeMember(info1: Type): Boolean = info1 match {
+        case TypeBounds(lo, hi) if lo ne hi =>
+          tp2.refinedInfo match {
+            case rinfo2: TypeBounds if tp1.isStable =>
+              val ref1 = tp1.widenExpr.select(name)
+              isSubType(rinfo2.lo, ref1) && isSubType(ref1, rinfo2.hi)
+            case _ =>
+              false
+          }
+        case _ => false
+      }
+
+      // An additional check for type member matching: If the refinement of the
+      // supertype `tp2` does not refer to a member symbol defined in the parent of `tp2`.
+      // then the symbol referred to in the subtype must have a signature that coincides
+      // in its parameters with the refinement's signature. The reason for the check
+      // is that if the refinement does not refer to a member symbol, we will have to
+      // resort to reflection to invoke the member. And Java reflection needs to know exact
+      // erased parameter types. See neg/i12211.scala. Other reflection algorithms could
+      // conceivably dispatch without knowning precise parameter signatures. One can signal
+      // this by inheriting from the `scala.reflect.SignatureCanBeImprecise` marker trait,
+      // in which case the signature test is elided.
+      def sigsOK(symInfo: Type, info2: Type) =
+        tp2.underlyingClassRef(refinementOK = true).member(name).exists
+        || tp2.derivesFrom(defn.WithoutPreciseParameterTypesClass)
+        || symInfo.isInstanceOf[MethodType]
+            && symInfo.signature.consistentParams(info2.signature)
+
+      // A relaxed version of isSubType, which compares method types
+      // under the standard arrow rule which is contravarient in the parameter types,
+      // but under the condition that signatures might have to match (see sigsOK)
+      // This relaxed version is needed to correctly compare dependent function types.
+      // See pos/i12211.scala.
+      def isSubInfo(info1: Type, info2: Type, symInfo: Type): Boolean =
+        info2 match
+          case info2: MethodType =>
+            info1 match
+              case info1: MethodType =>
+                val symInfo1 = symInfo.stripPoly
+                matchingMethodParams(info1, info2, precise = false)
+                && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1), symInfo1.resultType)
+                && sigsOK(symInfo1, info2)
+              case _ => isSubType(info1, info2)
+          case _ => isSubType(info1, info2)
+
       def qualifies(m: SingleDenotation): Boolean =
-        // If the member is an abstract type and the prefix is a path, compare the member itself
-        // instead of its bounds. This case is needed situations like:
-        //
-        //    class C { type T }
-        //    val foo: C
-        //    foo.type <: C { type T {= , <: , >:} foo.T }
-        //
-        // or like:
-        //
-        //    class C[T]
-        //    C[?] <: C[TV]
-        //
-        // where TV is a type variable. See i2397.scala for an example of the latter.
-        def matchAbstractTypeMember(info1: Type): Boolean = info1 match {
-          case TypeBounds(lo, hi) if lo ne hi =>
-            tp2.refinedInfo match {
-              case rinfo2: TypeBounds if tp1.isStable =>
-                val ref1 = tp1.widenExpr.select(name)
-                isSubType(rinfo2.lo, ref1) && isSubType(ref1, rinfo2.hi)
-              case _ =>
-                false
-            }
-          case _ => false
-        }
-
-        // An additional check for type member matching: If the refinement of the
-        // supertype `tp2` does not refer to a member symbol defined in the parent of `tp2`.
-        // then the symbol referred to in the subtype must have a signature that coincides
-        // in its parameters with the refinement's signature. The reason for the check
-        // is that if the refinement does not refer to a member symbol, we will have to
-        // resort to reflection to invoke the member. And Java reflection needs to know exact
-        // erased parameter types. See neg/i12211.scala. Other reflection algorithms could
-        // conceivably dispatch without knowning precise parameter signatures. One can signal
-        // this by inheriting from the `scala.reflect.SignatureCanBeImprecise` marker trait,
-        // in which case the signature test is elided.
-        def sigsOK(symInfo: Type, info2: Type) =
-          tp2.underlyingClassRef(refinementOK = true).member(name).exists
-          || tp2.derivesFrom(defn.WithoutPreciseParameterTypesClass)
-          || symInfo.isInstanceOf[MethodType]
-              && symInfo.signature.consistentParams(info2.signature)
-
-        // A relaxed version of isSubType, which compares method types
-        // under the standard arrow rule which is contravarient in the parameter types,
-        // but under the condition that signatures might have to match (see sigsOK)
-        // This relaxed version is needed to correctly compare dependent function types.
-        // See pos/i12211.scala.
-        def isSubInfo(info1: Type, info2: Type, symInfo: Type): Boolean =
-          info2 match
-            case info2: MethodType =>
-              info1 match
-                case info1: MethodType =>
-                  val symInfo1 = symInfo.stripPoly
-                  matchingMethodParams(info1, info2, precise = false)
-                  && isSubInfo(info1.resultType, info2.resultType.subst(info2, info1), symInfo1.resultType)
-                  && sigsOK(symInfo1, info2)
-                case _ => isSubType(info1, info2)
-            case _ => isSubType(info1, info2)
-
         val info1 = m.info.widenExpr
         isSubInfo(info1, tp2.refinedInfo.widenExpr, m.symbol.info.orElse(info1))
         || matchAbstractTypeMember(m.info)
-      end qualifies
 
       tp1.member(name) match // inlined hasAltWith for performance
         case mbr: SingleDenotation => qualifies(mbr)
@@ -1980,15 +1993,10 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           case formal2 :: rest2 =>
             val formal2a = if (tp2.isParamDependent) formal2.subst(tp2, tp1) else formal2
             val paramsMatch =
-              if ctx.phase == Phases.checkCapturesPhase then
-                // ^^^ TODO: make this more robust. We want isSubtypeWhenFrozen for the type parts
-                // of formals but isSameType for the capture sets. We cannot use isSubType for
-                // capture sets since that constrains inferred arguments not enough, and we
-                // cannot constrain them later since we would run into the "cannot constrain mapped
-                // type from new source" problem.
-                isSubType(formal2a, formal1)
-              else if precise then
+              if precise then
                 isSameTypeWhenFrozen(formal1, formal2a)
+              else if ctx.phase == Phases.checkCapturesPhase then
+                isSubType(formal2a, formal1)
               else
                 isSubTypeWhenFrozen(formal2a, formal1)
             paramsMatch && loop(rest1, rest2)
