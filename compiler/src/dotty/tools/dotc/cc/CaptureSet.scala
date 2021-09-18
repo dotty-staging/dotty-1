@@ -35,7 +35,8 @@ sealed abstract class CaptureSet extends Showable:
    */
   def elems: Refs
 
-  /** Is this capture set constant (i.e. not a capture variable)?
+  /** Is this capture set constant (i.e. not an unsolved capture variable)?
+   *  Solved capture variables count as constant.
    */
   def isConst: Boolean
 
@@ -46,6 +47,11 @@ sealed abstract class CaptureSet extends Showable:
 
   /** Is this capture set definitely non-empty? */
   final def isNotEmpty: Boolean = !elems.isEmpty
+
+  /** Cast to variable. @pre: @isConst */
+  def asVar: Var =
+    assert(!isConst)
+    asInstanceOf[Var]
 
   /** Add new elements to this capture set if allowed.
    *  @pre `newElems` is not empty and does not overlap with `this.elems`.
@@ -133,24 +139,22 @@ sealed abstract class CaptureSet extends Showable:
   def **(that: CaptureSet)(using Context): CaptureSet =
     if this.subCaptures(that, frozen = true) == CompareResult.OK then this
     else if that.subCaptures(this, frozen = true) == CompareResult.OK then that
-    else (this, that) match
-      case (cs1: Const, cs2: Const) => Const(cs1.elems.intersect(cs2.elems))
-      case (cs1: Var, cs2) => Intersected(cs1, cs2)
-      case (cs1, cs2: Var) => Intersected(cs2, cs1)
+    else if this.isConst && that.isConst then Const(elems.intersect(that.elems))
+    else if that.isConst then Intersected(this.asVar, that)
+    else Intersected(that.asVar, this)
 
   def -- (that: CaptureSet.Const)(using Context): CaptureSet =
     val elems1 = elems.filter(!that.accountsFor(_))
     if elems1.size == elems.size then this
-    else this match
-      case cs1: Const => Const(elems1)
-      case cs1: Var => Diff(cs1, that)
+    else if this.isConst then Const(elems1)
+    else Diff(asVar, that)
 
   def - (ref: CaptureRef)(using Context): CaptureSet =
     this -- ref.singletonCaptureSet
 
-  def filter(p: CaptureRef => Boolean)(using Context): CaptureSet = this match
-    case cs1: Const => Const(elems.filter(p))
-    case cs1: Var => Filtered(cs1, p)
+  def filter(p: CaptureRef => Boolean)(using Context): CaptureSet =
+    if this.isConst then Const(elems.filter(p))
+    else Filtered(asVar, p)
 
   /** capture set obtained by applying `f` to all elements of the current capture set
    *  and joining the results. If the current capture set is a variable, the same
@@ -159,14 +163,12 @@ sealed abstract class CaptureSet extends Showable:
   def map(tm: TypeMap)(using Context): CaptureSet = tm match
     case tm: BiTypeMap =>
       val mappedElems = elems.map(tm.forward)
-      this match
-        case cs: Const => Const(mappedElems)
-        case cs: Var => BiMapped(cs, tm, mappedElems)
+      if isConst then Const(mappedElems)
+      else BiMapped(asVar, tm, mappedElems)
     case _ =>
       val mapped = mapRefs(elems, tm, tm.variance)
-      this match
-        case cs: Const => mapped
-        case cs: Var => Mapped(cs, tm, tm.variance, mapped)
+      if isConst then mapped
+      else Mapped(asVar, tm, tm.variance, mapped)
 
   def substParams(tl: BindingType, to: List[Type])(using Context) =
     map(Substituters.SubstParamsMap(tl, to))
@@ -227,9 +229,11 @@ object CaptureSet:
       varId += 1
       varId
 
+    private var isSolved: Boolean = false
+
     var elems: Refs = initialElems
     var deps: Deps = emptySet
-    def isConst = false
+    def isConst = isSolved
     def isAlwaysEmpty = false
 
     private def recordElemsState()(using VarState): Boolean =
@@ -249,7 +253,7 @@ object CaptureSet:
       deps = state.deps(this)
 
     def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
-      if recordElemsState() then
+      if !isConst && recordElemsState() then
         elems ++= newElems
         // assert(id != 2 || elems.size != 2, this)
         val depsIt = deps.iterator
@@ -298,12 +302,10 @@ object CaptureSet:
           Const(newElems)
       val result = super.addNewElems(added.elems, origin)
       if result == CompareResult.OK then
-        added match
-          case added: Var =>
-            if added.recordDepsState() then addSub(added)
-            else CompareResult.fail(this)
-          case _ =>
-      result
+        if added.isConst then result
+        else if added.asVar.recordDepsState() then { addSub(added); result }
+        else CompareResult.fail(this)
+      else result
 
     override def toString = s"Mapped$id($cv, elems = $elems)"
   end Mapped
@@ -367,8 +369,10 @@ object CaptureSet:
     val OK: Type = Const(emptySet)
     def fail(cs: CaptureSet): Type = cs
     extension (result: Type)
+      def isOK: Boolean = result eq OK
       def blocking: CaptureSet = result
       def show: String = if result == OK then "OK" else result.toString
+      inline def andAlso(op: => Type) = if result.isOK then op else result
 
   class VarState:
     private val elemsMap: util.EqHashMap[Var, Refs] = new util.EqHashMap
