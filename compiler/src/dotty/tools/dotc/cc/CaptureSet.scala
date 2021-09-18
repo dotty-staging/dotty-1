@@ -72,14 +72,19 @@ sealed abstract class CaptureSet extends Showable:
    *  @return  CompareResult.OK if all unaccounted elements could be added,
    *           capture set that prevents addition otherwise.
    */
-  protected def tryInclude(elems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
+  protected final def tryInclude(elems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
     val unaccounted = elems.filter(!accountsFor(_))
-    if unaccounted.isEmpty then CompareResult.OK else addNewElems(unaccounted, origin)
+    if unaccounted.isEmpty then CompareResult.OK
+    else addNewElems(unaccounted, origin)
+
+  protected final def tryInclude(elem: CaptureRef, origin: CaptureSet)(using Context, VarState): CompareResult =
+    if accountsFor(elem) then CompareResult.OK
+    else addNewElems(elem.singletonCaptureSet.elems, origin)
 
   /** {x} <:< this   where <:< is subcapturing, but treating all variables
    *                 as frozen.
    */
-  def accountsFor(x: CaptureRef)(using Context): Boolean =
+  def accountsFor(x: CaptureRef)(using ctx: Context): Boolean =
     reporting.trace(i"$this accountsFor $x, ${x.captureSetOfInfo}?", show = true) {
       elems.contains(x)
       || !x.isRootCapability
@@ -91,12 +96,19 @@ sealed abstract class CaptureSet extends Showable:
     subCaptures(that)(using ctx, if frozen then FrozenState else VarState())
 
   private def subCaptures(that: CaptureSet)(using Context, VarState): CompareResult =
-    val result = that.tryInclude(elems, this)
-    if result == CompareResult.OK then
-      addSuper(that)
-    else
-      varState.abort()
-      result
+    def recur(elems: List[CaptureRef]): CompareResult = elems match
+      case elem :: elems1 =>
+        var result = that.tryInclude(elem, this)
+        if result != CompareResult.OK && !elem.isRootCapability && summon[VarState] != FrozenState then
+          result = elem.captureSetOfInfo.subCaptures(that)
+        if result == CompareResult.OK then
+          recur(elems1)
+        else
+          varState.abort()
+          result
+      case Nil =>
+        addSuper(that)
+    recur(elems.toList)
 
   def =:= (that: CaptureSet)(using Context): Boolean =
        this.subCaptures(that, frozen = true) == CompareResult.OK
