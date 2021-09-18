@@ -15,7 +15,7 @@ import util.SourcePosition
 import scala.util.control.NonFatal
 import scala.annotation.switch
 import config.Config
-import cc.CapturingType
+import cc.{CapturingType, CaptureSet}
 
 class PlainPrinter(_ctx: Context) extends Printer {
   /** The context of all public methods in Printer and subclasses.
@@ -189,13 +189,20 @@ class PlainPrinter(_ctx: Context) extends Printer {
           (" <: " ~ toText(bound) provided !bound.isAny)
         }.close
       case CapturingType(parent, refs, boxed) =>
+        def refsId = refs match
+          case refs: CaptureSet.Var if ctx.settings.YccDebug.value => refs.id.toString
+          case _ => ""
         def box = Str("box ") provided boxed
         if printDebug && !refs.isConst then
           changePrec(GlobalPrec)(box ~ s"$refs " ~ toText(parent))
         else if !refs.isConst && refs.elems.isEmpty then
-          changePrec(GlobalPrec)("? " ~ toText(parent))
+          changePrec(GlobalPrec)("?" ~ refsId ~ " " ~ toText(parent))
         else if Config.printCaptureSetsAsPrefix then
-          changePrec(GlobalPrec)(box ~ "{" ~ Text(refs.elems.toList.map(toTextCaptureRef), ", ") ~ "} " ~ toText(parent))
+          changePrec(GlobalPrec)(
+            box ~ "{"
+            ~ Text(refs.elems.toList.map(toTextCaptureRef), ", ")
+            ~ "}" ~ refsId
+            ~ " " ~ toText(parent))
         else
           changePrec(InfixPrec)(toText(parent) ~ " retains " ~ box ~ toText(refs.toRetainsTypeArg))
       case tp: PreviousErrorType if ctx.settings.XprintTypes.value =>
