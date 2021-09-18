@@ -203,6 +203,14 @@ class CheckCaptures extends Recheck:
         tp
     end transformType
 
+    def interpolateVars(using Context) = new TypeTraverser:
+      override def traverse(t: Type) =
+        t match
+          case CapturingType(_, refs: CaptureSet.Var, _) if !refs.isConst =>
+          	refs.solve(variance)
+          case _ =>
+        traverseChildren(t)
+
     private var curEnv: Env = Env(NoSymbol, CaptureSet.empty, false, null)
 
     private val myCapturedVars: util.EqHashMap[Symbol, CaptureSet] = EqHashMap()
@@ -268,14 +276,17 @@ class CheckCaptures extends Recheck:
       super.recheckIdent(tree)
 
     override def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Unit =
-      super.recheckValDef(tree, sym)
+      try super.recheckValDef(tree, sym)
+      finally interpolateVars.traverse(sym.info)
 
     override def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Unit =
       val saved = curEnv
       val localSet = capturedVars(sym)
       if !localSet.isAlwaysEmpty then curEnv = Env(sym, localSet, false, curEnv)
       try super.recheckDefDef(tree, sym)
-      finally curEnv = saved
+      finally
+        interpolateVars.traverse(sym.info)
+        curEnv = saved
 
     override def recheckClassDef(tree: TypeDef, impl: Template, cls: ClassSymbol)(using Context): Type =
       for param <- cls.paramGetters do

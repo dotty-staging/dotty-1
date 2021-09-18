@@ -173,6 +173,15 @@ sealed abstract class CaptureSet extends Showable:
   def substParams(tl: BindingType, to: List[Type])(using Context) =
     map(Substituters.SubstParamsMap(tl, to))
 
+  /** An upper approximation of this capture set. This is the set itself
+   *  except for real (non-mapped, non-filtered) capture set variables, where
+   *  it is the intersection of all upper approximations of known supersets
+   *  of the variable.
+   *  The upper approximation is meaningful only if it is constant. If not,
+   *  `upperApprox` can return an arbitrary capture set variable.
+   */
+  def upperApprox(using Context): CaptureSet
+
   def toRetainsTypeArg(using Context): Type =
     assert(isConst)
     ((NoType: Type) /: elems) ((tp, ref) =>
@@ -221,6 +230,8 @@ object CaptureSet:
 
     def addSuper(cs: CaptureSet)(using Context, VarState) = CompareResult.OK
 
+    def upperApprox(using Context): CaptureSet = this
+
     override def toString = elems.toString
   end Const
 
@@ -265,13 +276,30 @@ object CaptureSet:
         CompareResult.fail(this)
 
     def addSuper(cs: CaptureSet)(using Context, VarState): CompareResult =
-      if (cs eq this) || cs.elems.contains(defn.captureRoot.termRef) then
+      if (cs eq this) || cs.elems.contains(defn.captureRoot.termRef) || isConst then
         CompareResult.OK
       else if recordDepsState() then
         deps += cs
         CompareResult.OK
       else
         CompareResult.fail(this)
+
+    def upperApprox(using Context): CaptureSet =
+      if isConst then this
+      else (universal /: deps) { (acc, sup) =>
+        if acc.isConst then
+          val supApprox = sup.upperApprox
+          if supApprox.isConst then acc ** supApprox else supApprox
+        else acc
+      }
+
+    def solve(variance: Int)(using Context): Unit =
+      if variance > 0 then isSolved = true
+      else if variance < 0 then
+        val approx = upperApprox
+        if approx.isConst then
+          elems = approx.elems
+          isSolved = true
 
     override def toString = s"Var$id$elems"
   end Var
@@ -307,6 +335,8 @@ object CaptureSet:
         else CompareResult.fail(this)
       else result
 
+    override def upperApprox(using Context): CaptureSet = this
+
     override def toString = s"Mapped$id($cv, elems = $elems)"
   end Mapped
 
@@ -323,6 +353,8 @@ object CaptureSet:
             .showing(i"propagating new elems $newElems backward from $this to $cv", capt)
           else r
 
+    override def upperApprox(using Context): CaptureSet = this
+
     override def toString = s"BiMapped$id($cv, elems = $elems)"
   end BiMapped
 
@@ -333,6 +365,8 @@ object CaptureSet:
 
     override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       super.addNewElems(newElems.filter(p), origin)
+
+    override def upperApprox(using Context): CaptureSet = this
 
     override def toString = s"${getClass.getSimpleName}$id($cv, elems = $elems)"
   end Filtered
