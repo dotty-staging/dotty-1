@@ -72,6 +72,9 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
     def knownType(tree: Tree) =
       tree.attachmentOrElse(RecheckedType, tree.tpe)
 
+    def needsRecompletion(tree: ValOrDefDef)(using Context): Boolean =
+      tree.tpt.hasAttachment(RecheckedType) && !tree.symbol.isConstructor
+
     def transformType(tp: Type, inferred: Boolean)(using Context): Type = tp
 
     object transformTypes extends TreeTraverser:
@@ -80,7 +83,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
         tree match
           case tree: TypeTree =>
             transformType(tree.tpe, tree.isInstanceOf[InferredTypeTree]).rememberFor(tree)
-          case tree: ValOrDefDef if tree.tpt.hasAttachment(RecheckedType) =>
+          case tree: ValOrDefDef if needsRecompletion(tree) =>
             val sym = tree.symbol
             def integrateRT(restp: Type, info: Type, psymss: List[List[Symbol]]): Type = info match
               case info: MethodOrPoly =>
@@ -90,10 +93,13 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
                 info.derivedExprType(resType = restp)
               case _ =>
                 restp
-            if !sym.isConstructor then
-              val info1 = integrateRT(knownType(tree.tpt), sym.info, sym.paramSymss)
-              recheckr.println(i"update info $sym: ${sym.info} --> $info1")
-              sym.updateInfo(info1)
+            val newInfo = integrateRT(knownType(tree.tpt), sym.info, sym.paramSymss)
+              .showing(i"update info $sym: ${sym.info} --> $result", recheckr)
+            val completer = new LazyType:
+              def complete(denot: SymDenotation)(using Context) =
+                denot.info = newInfo
+                recheckDef(tree, sym)
+            sym.updateInfo(completer)
           case tree: Bind =>
             val sym = tree.symbol
             sym.updateInfo(transformType(sym.info, inferred = true))
@@ -133,15 +139,13 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
         val exprType = recheck(expr, defn.UnitType)
         bindType
 
-    def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Type =
+    def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Unit =
       if !tree.rhs.isEmpty then recheck(tree.rhs, sym.info)
-      sym.termRef
 
-    def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Type =
+    def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Unit =
       val rhsCtx = linkConstructorParams(sym)
       if !tree.rhs.isEmpty && !sym.isInlineMethod && !sym.isEffectivelyErased then
         inContext(rhsCtx) { recheck(tree.rhs, recheck(tree.tpt)) }
-      sym.termRef
 
     def recheckTypeDef(tree: TypeDef, sym: Symbol)(using Context): Type =
       recheck(tree.rhs)
@@ -281,6 +285,13 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
     def recheckStats(stats: List[Tree])(using Context): Unit =
       stats.foreach(recheck(_))
 
+    def recheckDef(tree: ValOrDefDef, sym: Symbol)(using Context): Unit =
+      inContext(ctx.localContext(tree, sym)) {
+        tree match
+          case tree: ValDef => recheckValDef(tree, sym)
+          case tree: DefDef => recheckDefDef(tree, sym)
+      }
+
     /** Recheck tree without adapting it, returning its new type.
      *  @param tree        the original tree
      *  @param pt          the expected result type
@@ -293,11 +304,12 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
           case tree: Ident => recheckIdent(tree)
           case tree: Select => recheckSelect(tree)
           case tree: Bind => recheckBind(tree, pt)
-          case tree: ValDef =>
+          case tree: ValOrDefDef =>
             if tree.isEmpty then NoType
-            else recheckValDef(tree, sym)(using ctx.localContext(tree, sym))
-          case tree: DefDef =>
-            recheckDefDef(tree, sym)(using ctx.localContext(tree, sym))
+            else
+              if needsRecompletion(tree) then sym.ensureCompleted()
+              else recheckDef(tree, sym)
+              sym.termRef
           case tree: TypeDef =>
             tree.rhs match
               case impl: Template =>

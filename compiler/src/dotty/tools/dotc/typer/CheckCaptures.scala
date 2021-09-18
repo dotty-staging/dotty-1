@@ -267,10 +267,10 @@ class CheckCaptures extends Recheck:
       if tree.symbol.is(Method) then includeCallCaptures(tree.symbol, tree.srcPos)
       super.recheckIdent(tree)
 
-    override def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Type =
+    override def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Unit =
       super.recheckValDef(tree, sym)
 
-    override def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Type =
+    override def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Unit =
       val saved = curEnv
       val localSet = capturedVars(sym)
       if !localSet.isAlwaysEmpty then curEnv = Env(sym, localSet, false, curEnv)
