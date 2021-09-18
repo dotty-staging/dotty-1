@@ -7,6 +7,7 @@ import Types.*, Symbols.*, Flags.*, Contexts.*, Decorators.*
 import config.Printers.capt
 import Annotations.Annotation
 import annotation.threadUnsafe
+import annotation.constructorOnly
 import annotation.internal.sharable
 import reporting.trace
 import printing.{Showable, Printer}
@@ -58,11 +59,11 @@ sealed abstract class CaptureSet extends Showable:
   protected def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult
 
   /** If this is a variable, add `cs` as a super set */
-  protected def addSuper(cs: CaptureSet): this.type
+  protected def addSuper(cs: CaptureSet)(using Context, VarState): CompareResult
 
   /** If `cs` is a variable, add this capture set as one of its super sets */
-  protected def addSub(cs: CaptureSet): this.type =
-    cs.addSuper(this)
+  protected def addSub(cs: CaptureSet)(using Context): this.type =
+    cs.addSuper(this)(using ctx, UnrecordedState)
     this
 
   /** Try to include all references of `elems` that are not yet accounted by this
@@ -86,13 +87,16 @@ sealed abstract class CaptureSet extends Showable:
     }
 
   /** The subcapturing test */
-  def subCaptures(that: CaptureSet, frozen: Boolean)(using Context): CompareResult =
+  final def subCaptures(that: CaptureSet, frozen: Boolean)(using Context): CompareResult =
     subCaptures(that)(using ctx, if frozen then FrozenState else VarState())
 
   private def subCaptures(that: CaptureSet)(using Context, VarState): CompareResult =
     val result = that.tryInclude(elems, this)
-    if result == CompareResult.OK then addSuper(that) else varState.abort()
-    result
+    if result == CompareResult.OK then
+      addSuper(that)
+    else
+      varState.abort()
+      result
 
   def =:= (that: CaptureSet)(using Context): Boolean =
        this.subCaptures(that, frozen = true) == CompareResult.OK
@@ -201,7 +205,7 @@ object CaptureSet:
     def addNewElems(elems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       CompareResult.fail(this)
 
-    def addSuper(cs: CaptureSet) = this
+    def addSuper(cs: CaptureSet)(using Context, VarState) = CompareResult.OK
 
     override def toString = elems.toString
   end Const
@@ -244,7 +248,14 @@ object CaptureSet:
       else
         CompareResult.fail(this)
 
-    def addSuper(cs: CaptureSet) = { deps += cs; this }
+    def addSuper(cs: CaptureSet)(using Context, VarState): CompareResult =
+      if (cs eq this) || cs.elems.contains(defn.captureRoot.termRef) then
+        CompareResult.OK
+      else if recordDepsState() then
+        deps += cs
+        CompareResult.OK
+      else
+        CompareResult.fail(this)
 
     override def toString = s"Var$id$elems"
   end Var
@@ -254,7 +265,7 @@ object CaptureSet:
    */
   class Mapped private[CaptureSet] (
       cv: Var, tm: TypeMap, variance: Int, initial: CaptureSet
-    ) extends Var(initial.elems):
+    )(using @constructorOnly ctx: Context) extends Var(initial.elems):
     addSub(cv)
     addSub(initial)
     val stack = if debugSets then (new Throwable).getStackTrace().take(20) else null
@@ -271,21 +282,21 @@ object CaptureSet:
           mapRefs(newElems, tm, variance)
         else
           if variance <= 0 && !origin.isConst && (origin ne initial) then
-            report.error(i"trying to add elems $newElems to $this from unrecognized source of mapped set $this$whereCreated")
+            report.warning(i"trying to add elems $newElems to $this from unrecognized source of mapped set $this$whereCreated")
           Const(newElems)
       val result = super.addNewElems(added.elems, origin)
       if result == CompareResult.OK then
         added match
           case added: Var =>
-            added.recordDepsState()
-            addSub(added)
+            if added.recordDepsState() then addSub(added)
+            else CompareResult.fail(this)
           case _ =>
       result
 
     override def toString = s"Mapped$id($cv, elems = $elems)"
   end Mapped
 
-  class BiMapped private[CaptureSet] (cv: Var, bimap: BiTypeMap, initialElems: Refs) extends Var(initialElems):
+  class BiMapped private[CaptureSet] (cv: Var, bimap: BiTypeMap, initialElems: Refs)(using @constructorOnly ctx: Context) extends Var(initialElems):
     addSub(cv)
 
     override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
@@ -302,7 +313,7 @@ object CaptureSet:
   end BiMapped
 
   /** A variable with elements given at any time as { x <- cv.elems | p(x) } */
-  class Filtered private[CaptureSet] (cv: Var, p: CaptureRef => Boolean)
+  class Filtered private[CaptureSet] (cv: Var, p: CaptureRef => Boolean)(using @constructorOnly ctx: Context)
   extends Var(cv.elems.filter(p)):
     addSub(cv)
 
@@ -368,6 +379,12 @@ object CaptureSet:
   object FrozenState extends VarState:
     override def putElems(v: Var, refs: Refs) = false
     override def putDeps(v: Var, deps: Deps) = false
+    override def abort(): Unit = ()
+
+  @sharable
+  object UnrecordedState extends VarState:
+    override def putElems(v: Var, refs: Refs) = true
+    override def putDeps(v: Var, deps: Deps) = true
     override def abort(): Unit = ()
 
   def varState(using state: VarState): VarState = state

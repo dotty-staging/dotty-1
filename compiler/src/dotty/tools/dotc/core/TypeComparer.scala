@@ -615,14 +615,19 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
           case _ =>
             isSubType(info1, info2)
 
-        tp1 match
-          case tp1: RefinedType
-          if ctx.phase == Phases.checkCapturesPhase
-              && defn.isFunctionOrPolyType(tp1)
-              && defn.isFunctionOrPolyType(tp2) =>
-            isSubInfo(tp1.refinedInfo, tp2.refinedInfo)
-          case _ =>
-            compareRefined
+        if ctx.phase == Phases.checkCapturesPhase then
+          if defn.isFunctionType(tp2) then
+            tp1.widenDealias match
+              case tp1: RefinedType =>
+                return isSubInfo(tp1.refinedInfo, tp2.refinedInfo)
+              case _ =>
+          else if tp2.parent.typeSymbol == defn.PolyFunctionClass then
+            tp1.member(nme.apply).info match
+              case info1: PolyType =>
+                return isSubInfo(info1, tp2.refinedInfo)
+              case _ =>
+
+        compareRefined
       case tp2: RecType =>
         def compareRec = tp1.safeDealias match {
           case tp1: RecType =>
