@@ -75,6 +75,28 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
     def transformType(tp: Type, inferred: Boolean)(using Context): Type = tp
 
     object transformTypes extends TreeTraverser:
+
+      class SubstParams(from: List[Symbol], to: MethodOrPoly)(using Context)
+      extends DeepTypeMap, BiTypeMap:
+        private val paramRefs = to.paramRefs
+        private val fromRefs = from.map(_.namedType)
+
+        def apply(t: Type): Type = t match
+          case t: NamedType =>
+            val sym = t.symbol
+            def recur(from: List[Symbol], to: List[Type]): Type =
+              if from.isEmpty then t
+              else if sym eq from.head then to.head
+              else recur(from.tail, to.tail)
+            recur(from, paramRefs)
+          case _ =>
+            mapOver(t)
+
+        def inverse(t: Type): Type = t match
+          case t: ParamRef if t.binder eq to => fromRefs(t.paramNum)
+          case _ => mapOver(t)
+      end SubstParams
+
       def traverse(tree: Tree)(using Context) =
         traverseChildren(tree)
         tree match
@@ -85,7 +107,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
             def integrateRT(restp: Type, info: Type, psymss: List[List[Symbol]]): Type = info match
               case info: MethodOrPoly =>
                 info.derivedLambdaType(resType =
-                  integrateRT(restp.subst(psymss.head, info.paramRefs), info.resType, psymss.tail))
+                  integrateRT(SubstParams(psymss.head, info)(restp), info.resType, psymss.tail))
               case info: ExprType =>
                 info.derivedExprType(resType = restp)
               case _ =>
