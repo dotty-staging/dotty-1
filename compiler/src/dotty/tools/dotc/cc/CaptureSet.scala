@@ -294,8 +294,7 @@ object CaptureSet:
       }
 
     def solve(variance: Int)(using Context): Unit =
-      if variance > 0 then isSolved = true
-      else if variance < 0 then
+      if variance < 0 then
         val approx = upperApprox
         if approx.isConst then
           elems = approx.elems
