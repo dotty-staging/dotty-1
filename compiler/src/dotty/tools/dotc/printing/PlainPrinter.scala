@@ -18,11 +18,12 @@ import config.Config
 import cc.{CapturingType, CaptureSet}
 
 class PlainPrinter(_ctx: Context) extends Printer {
+
   /** The context of all public methods in Printer and subclasses.
    *  Overridden in RefinedPrinter.
    */
-  protected def curCtx: Context = _ctx.addMode(Mode.Printing)
-  protected given [DummyToEnforceDef]: Context = curCtx
+  def printerContext: Context = _ctx.addMode(Mode.Printing)
+  protected given [DummyToEnforceDef]: Context = printerContext
 
   protected def printDebug = ctx.settings.YprintDebug.value
 

@@ -315,8 +315,11 @@ object CaptureSet:
       deps.foreach(_.propagateSolved())
 
     override def toText(printer: Printer): Text =
+      def debug = inContext(printer.printerContext) {
+        ctx.settings.YccDebug.value
+      }
       super.toText(printer)
-      ~ (id.toString ~ getClass.getSimpleName.take(1) provided !isConst)
+      ~ (id.toString ~ getClass.getSimpleName.take(1) provided !isConst && debug)
 
     override def toString = s"Var$id$elems"
   end Var

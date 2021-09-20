@@ -34,11 +34,11 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
 
   /** A stack of enclosing DefDef, TypeDef, or ClassDef, or ModuleDefs nodes */
   private var enclosingDef: untpd.Tree = untpd.EmptyTree
-  private var myCtx: Context = super.curCtx
+  private var myCtx: Context = super.printerContext
   private var printPos = ctx.settings.YprintPos.value
   private val printLines = ctx.settings.printLines.value
 
-  override protected def curCtx: Context = myCtx
+  override def printerContext: Context = myCtx
 
   def withEnclosingDef(enclDef: Tree[? >: Untyped])(op: => Text): Text = {
     val savedCtx = myCtx
