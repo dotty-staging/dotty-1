@@ -5460,7 +5460,12 @@ object Types {
    *  BiTypeMaps should map capture references to capture references.
    */
   trait BiTypeMap extends TypeMap:
+    thisMap =>
     def inverse(tp: Type): Type
+
+    def inverseTypeMap(using Context) = new BiTypeMap:
+      def apply(tp: Type) = thisMap.inverse(tp)
+      def inverse(tp: Type) = thisMap.apply(tp)
 
     def forward(ref: CaptureRef): CaptureRef = this(ref) match
       case result: CaptureRef if result.canBeTracked => result

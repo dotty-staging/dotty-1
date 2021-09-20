@@ -203,13 +203,25 @@ class CheckCaptures extends Recheck:
         tp
     end transformType
 
-    def interpolateVars(using Context) = new TypeTraverser:
+    private def interpolateVars(using Context) = new TypeTraverser:
       override def traverse(t: Type) =
         t match
-          case CapturingType(_, refs: CaptureSet.Var, _) if !refs.isConst =>
-          	refs.solve(variance)
+          case CapturingType(parent, refs: CaptureSet.Var, _) =>
+            //if variance < 0 then println(i"solving $t")
+            refs.solve(variance)
+            traverse(parent)
+          case t @ RefinedType(_, nme.apply, rinfo) if defn.isFunctionOrPolyType(t) =>
+            traverse(rinfo)
+          case tp: TypeVar =>
+          case tp: TypeRef =>
+            traverse(tp.prefix)
           case _ =>
-        traverseChildren(t)
+            traverseChildren(t)
+
+    private def interpolateVarsIn(tpt: Tree)(using Context): Unit =
+      if tpt.isInstanceOf[InferredTypeTree] then
+        //println(i"solving vars in ${knownType(tpt)}, ${knownType(tpt).toString}")
+        interpolateVars.traverse(knownType(tpt))
 
     private var curEnv: Env = Env(NoSymbol, CaptureSet.empty, false, null)
 
@@ -277,7 +289,7 @@ class CheckCaptures extends Recheck:
 
     override def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Unit =
       try super.recheckValDef(tree, sym)
-      finally interpolateVars.traverse(sym.info)
+      finally interpolateVarsIn(tree.tpt)
 
     override def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Unit =
       val saved = curEnv
@@ -285,7 +297,7 @@ class CheckCaptures extends Recheck:
       if !localSet.isAlwaysEmpty then curEnv = Env(sym, localSet, false, curEnv)
       try super.recheckDefDef(tree, sym)
       finally
-        interpolateVars.traverse(sym.info)
+        interpolateVarsIn(tree.tpt)
         curEnv = saved
 
     override def recheckClassDef(tree: TypeDef, impl: Template, cls: ClassSymbol)(using Context): Type =

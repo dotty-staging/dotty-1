@@ -189,21 +189,19 @@ class PlainPrinter(_ctx: Context) extends Printer {
           (" <: " ~ toText(bound) provided !bound.isAny)
         }.close
       case CapturingType(parent, refs, boxed) =>
-        def refsId =
-          if !refs.isConst && ctx.settings.YccDebug.value
-          then refs.asVar.id.toString
-          else ""
         def box = Str("box ") provided boxed
         if printDebug && !refs.isConst then
           changePrec(GlobalPrec)(box ~ s"$refs " ~ toText(parent))
+        else if ctx.settings.YccDebug.value then
+          changePrec(GlobalPrec)(box ~ refs.toText(this) ~ " " ~ toText(parent))
         else if !refs.isConst && refs.elems.isEmpty then
-          changePrec(GlobalPrec)("?" ~ refsId ~ " " ~ toText(parent))
+          changePrec(GlobalPrec)("?" ~ " " ~ toText(parent))
         else if Config.printCaptureSetsAsPrefix then
           changePrec(GlobalPrec)(
             box ~ "{"
             ~ Text(refs.elems.toList.map(toTextCaptureRef), ", ")
-            ~ "}" ~ refsId
-            ~ " " ~ toText(parent))
+            ~ "} "
+            ~ toText(parent))
         else
           changePrec(InfixPrec)(toText(parent) ~ " retains " ~ box ~ toText(refs.toRetainsTypeArg))
       case tp: PreviousErrorType if ctx.settings.XprintTypes.value =>

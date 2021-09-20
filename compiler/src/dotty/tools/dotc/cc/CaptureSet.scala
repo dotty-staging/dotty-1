@@ -115,6 +115,7 @@ sealed abstract class CaptureSet extends Showable:
       case Nil =>
         addSuper(that)
     recur(elems.toList)
+      .showing(i"subcaptures $this <:< $that = ${result.show}", capt)
 
   def =:= (that: CaptureSet)(using Context): Boolean =
        this.subCaptures(that, frozen = true) == CompareResult.OK
@@ -180,7 +181,9 @@ sealed abstract class CaptureSet extends Showable:
    *  The upper approximation is meaningful only if it is constant. If not,
    *  `upperApprox` can return an arbitrary capture set variable.
    */
-  def upperApprox(using Context): CaptureSet
+  protected def upperApprox(origin: CaptureSet)(using Context): CaptureSet
+
+  protected def propagateSolved()(using Context): Unit = ()
 
   def toRetainsTypeArg(using Context): Type =
     assert(isConst)
@@ -230,7 +233,7 @@ object CaptureSet:
 
     def addSuper(cs: CaptureSet)(using Context, VarState) = CompareResult.OK
 
-    def upperApprox(using Context): CaptureSet = this
+    def upperApprox(origin: CaptureSet)(using Context): CaptureSet = this
 
     override def toString = elems.toString
   end Const
@@ -284,32 +287,52 @@ object CaptureSet:
       else
         CompareResult.fail(this)
 
-    def upperApprox(using Context): CaptureSet =
+    def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
       if isConst then this
       else (universal /: deps) { (acc, sup) =>
-        if acc.isConst then
-          val supApprox = sup.upperApprox
-          if supApprox.isConst then acc ** supApprox else supApprox
-        else acc
+        assert(acc.isConst)
+        val supApprox = sup.upperApprox(this)
+        assert(supApprox.isConst)
+        acc ** supApprox
       }
 
     def solve(variance: Int)(using Context): Unit =
-      if variance < 0 then
-        val approx = upperApprox
+      if variance < 0 && !isConst then
+        val approx = upperApprox(empty)
+        //println(i"solving var $this $approx ${approx.isConst} deps = ${deps.toList}")
         if approx.isConst then
-          elems = approx.elems
-          isSolved = true
+          val newElems = approx.elems -- elems
+          if newElems.isEmpty
+              || addNewElems(newElems, empty)(using ctx, VarState()) == CompareResult.OK then
+            markSolved()
+
+    def markSolved()(using Context): Unit =
+      isSolved = true
+      deps.foreach(_.propagateSolved())
+
+    override def toText(printer: Printer): Text =
+      super.toText(printer)
+      ~ (id.toString ~ getClass.getSimpleName.take(1) provided !isConst)
 
     override def toString = s"Var$id$elems"
   end Var
 
-  /** A variable that changes when `cv` changes, where all additional new elements are mapped
+  abstract class DerivedVar(initialElems: Refs)(using @constructorOnly ctx: Context)
+  extends Var(initialElems):
+    def source: Var
+
+    addSub(source)
+
+    override def propagateSolved()(using Context) =
+      if source.isConst && !isConst then markSolved()
+  end DerivedVar
+
+  /** A variable that changes when `source` changes, where all additional new elements are mapped
    *  using   ∪ { f(x) | x <- elems }
    */
-  class Mapped private[CaptureSet] (
-      cv: Var, tm: TypeMap, variance: Int, initial: CaptureSet
-    )(using @constructorOnly ctx: Context) extends Var(initial.elems):
-    addSub(cv)
+  class Mapped private[CaptureSet]
+    (val source: Var, tm: TypeMap, variance: Int, initial: CaptureSet)(using @constructorOnly ctx: Context)
+  extends DerivedVar(initial.elems):
     addSub(initial)
     val stack = if debugSets then (new Throwable).getStackTrace().take(20) else null
 
@@ -321,7 +344,7 @@ object CaptureSet:
 
     override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       val added =
-        if origin eq cv then
+        if origin eq source then
           mapRefs(newElems, tm, variance)
         else
           if variance <= 0 && !origin.isConst && (origin ne initial) then
@@ -334,49 +357,62 @@ object CaptureSet:
         else CompareResult.fail(this)
       else result
 
-    override def upperApprox(using Context): CaptureSet = this
+    override def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
+      if isConst then this
+      else if source eq origin then universal
+      else source.upperApprox(this).map(tm)
 
-    override def toString = s"Mapped$id($cv, elems = $elems)"
+    override def propagateSolved()(using Context) =
+      if initial.isConst then super.propagateSolved()
+
+    override def toString = s"Mapped$id($source, elems = $elems)"
   end Mapped
 
-  class BiMapped private[CaptureSet] (cv: Var, bimap: BiTypeMap, initialElems: Refs)(using @constructorOnly ctx: Context) extends Var(initialElems):
-    addSub(cv)
+  class BiMapped private[CaptureSet]
+    (val source: Var, bimap: BiTypeMap, initialElems: Refs)(using @constructorOnly ctx: Context)
+  extends DerivedVar(initialElems):
 
     override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
-      if origin eq cv then
+      if origin eq source then
         super.addNewElems(newElems.map(bimap.forward), origin)
       else
         val r = super.addNewElems(newElems, origin)
         if r == CompareResult.OK then
-          cv.tryInclude(newElems.map(bimap.backward), this)
-            .showing(i"propagating new elems $newElems backward from $this to $cv", capt)
+          source.tryInclude(newElems.map(bimap.backward), this)
+            .showing(i"propagating new elems $newElems backward from $this to $source", capt)
           else r
 
-    override def upperApprox(using Context): CaptureSet = this
+    override def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
+      if isConst then this
+      else if source eq origin then super.upperApprox(this).map(bimap.inverseTypeMap)
+      else source.upperApprox(this).map(bimap)
 
-    override def toString = s"BiMapped$id($cv, elems = $elems)"
+    override def toString = s"BiMapped$id($source, elems = $elems)"
   end BiMapped
 
-  /** A variable with elements given at any time as { x <- cv.elems | p(x) } */
-  class Filtered private[CaptureSet] (cv: Var, p: CaptureRef => Boolean)(using @constructorOnly ctx: Context)
-  extends Var(cv.elems.filter(p)):
-    addSub(cv)
+  /** A variable with elements given at any time as { x <- source.elems | p(x) } */
+  class Filtered private[CaptureSet]
+    (val source: Var, p: CaptureRef => Boolean)(using @constructorOnly ctx: Context)
+  extends DerivedVar(source.elems.filter(p)):
 
     override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       super.addNewElems(newElems.filter(p), origin)
 
-    override def upperApprox(using Context): CaptureSet = this
+    override def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
+      if isConst then this
+      else if source eq origin then universal
+      else source.upperApprox(this).filter(p)
 
-    override def toString = s"${getClass.getSimpleName}$id($cv, elems = $elems)"
+    override def toString = s"${getClass.getSimpleName}$id($source, elems = $elems)"
   end Filtered
 
-  /** A variable with elements given at any time as { x <- cv.elems | !other.accountsFor(x) } */
-  class Diff(cv: Var, other: Const)(using Context)
-  extends Filtered(cv, !other.accountsFor(_))
+  /** A variable with elements given at any time as { x <- source.elems | !other.accountsFor(x) } */
+  class Diff(source: Var, other: Const)(using Context)
+  extends Filtered(source, !other.accountsFor(_))
 
-  /** A variable with elements given at any time as { x <- cv.elems | other.accountsFor(x) } */
-  class Intersected(cv: Var, other: CaptureSet)(using Context)
-  extends Filtered(cv, other.accountsFor(_)):
+  /** A variable with elements given at any time as { x <- source.elems | other.accountsFor(x) } */
+  class Intersected(source: Var, other: CaptureSet)(using Context)
+  extends Filtered(source, other.accountsFor(_)):
     addSub(other)
 
   def extrapolateCaptureRef(r: CaptureRef, tm: TypeMap, variance: Int)(using Context): CaptureSet =
