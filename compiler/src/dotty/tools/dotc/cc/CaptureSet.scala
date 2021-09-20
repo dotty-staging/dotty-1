@@ -287,14 +287,18 @@ object CaptureSet:
       else
         CompareResult.fail(this)
 
-    def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
-      if isConst then this
-      else (universal /: deps) { (acc, sup) =>
-        assert(acc.isConst)
-        val supApprox = sup.upperApprox(this)
-        assert(supApprox.isConst)
-        acc ** supApprox
-      }
+    private var computingApprox = false
+
+    final def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
+      if computingApprox then universal
+      else if isConst then this
+      else
+        computingApprox = true
+        try computeApprox(origin).ensuring(_.isConst)
+        finally computingApprox = false
+
+    protected def computeApprox(origin: CaptureSet)(using Context): CaptureSet =
+      (universal /: deps) { (acc, sup) => acc ** sup.upperApprox(this) }
 
     def solve(variance: Int)(using Context): Unit =
       if variance < 0 && !isConst then
@@ -357,9 +361,8 @@ object CaptureSet:
         else CompareResult.fail(this)
       else result
 
-    override def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
-      if isConst then this
-      else if source eq origin then universal
+    override def computeApprox(origin: CaptureSet)(using Context): CaptureSet =
+      if source eq origin then universal
       else source.upperApprox(this).map(tm)
 
     override def propagateSolved()(using Context) =
@@ -382,9 +385,8 @@ object CaptureSet:
             .showing(i"propagating new elems $newElems backward from $this to $source", capt)
           else r
 
-    override def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
-      if isConst then this
-      else if source eq origin then super.upperApprox(this).map(bimap.inverseTypeMap)
+    override def computeApprox(origin: CaptureSet)(using Context): CaptureSet =
+      if source eq origin then super.computeApprox(this).map(bimap.inverseTypeMap)
       else source.upperApprox(this).map(bimap)
 
     override def toString = s"BiMapped$id($source, elems = $elems)"
@@ -398,9 +400,8 @@ object CaptureSet:
     override def addNewElems(newElems: Refs, origin: CaptureSet)(using Context, VarState): CompareResult =
       super.addNewElems(newElems.filter(p), origin)
 
-    override def upperApprox(origin: CaptureSet)(using Context): CaptureSet =
-      if isConst then this
-      else if source eq origin then universal
+    override def computeApprox(origin: CaptureSet)(using Context): CaptureSet =
+      if source eq origin then universal
       else source.upperApprox(this).filter(p)
 
     override def toString = s"${getClass.getSimpleName}$id($source, elems = $elems)"
