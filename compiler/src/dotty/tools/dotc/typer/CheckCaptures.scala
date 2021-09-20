@@ -63,7 +63,7 @@ object CheckCaptures:
   def checkWellformedPost(tp: Type, pos: SrcPos)(using Context): Unit = tp match
     case CapturingType(parent, refs, _) =>
       for ref <- refs.elems do
-        if ref.captureSet.subCaptures(CaptureSet.empty, frozen = true) == CompareResult.OK then
+        if ref.captureSetOfInfo.elems.isEmpty then
           report.error(em"$ref cannot be tracked since its capture set is empty", pos)
         else if parent.captureSet.accountsFor(ref) then
           report.warning(em"redundant capture: $parent already accounts for $ref", pos)
