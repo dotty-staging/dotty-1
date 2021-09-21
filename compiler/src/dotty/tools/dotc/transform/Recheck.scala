@@ -72,6 +72,10 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
     def knownType(tree: Tree) =
       tree.attachmentOrElse(RecheckedType, tree.tpe)
 
+    def isUpdated(sym: Symbol)(using Context) =
+      val symd = sym.denot
+      symd.validFor.firstPhaseId == thisPhase.id && (sym.originDenotation ne symd)
+
     def transformType(tp: Type, inferred: Boolean)(using Context): Type = tp
 
     object transformTypes extends TreeTraverser:
@@ -104,16 +108,27 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
             transformType(tree.tpe, tree.isInstanceOf[InferredTypeTree]).rememberFor(tree)
           case tree: ValOrDefDef =>
             val sym = tree.symbol
-            def integrateRT(restp: Type, info: Type, psymss: List[List[Symbol]]): Type = info match
-              case info: MethodOrPoly =>
-                info.derivedLambdaType(resType =
-                  integrateRT(SubstParams(psymss.head, info)(restp), info.resType, psymss.tail))
+            def integrateRT(restp: Type, info: Type, psymss: List[List[Symbol]], pinfoss: List[List[Type]]): Type = info match
+              case mt: MethodOrPoly =>
+                val psyms = psymss.head
+                val subst = SubstParams(psyms, mt)
+                mt.derivedLambdaType(
+                  paramInfos =
+                    if psyms.exists(isUpdated) then pinfoss.head.asInstanceOf[List[mt.PInfo]]
+                    else mt.paramInfos,
+                  resType = integrateRT(
+                    subst(restp), mt.resType, psymss.tail, pinfoss.tail.nestedMap(subst)))
               case info: ExprType =>
                 info.derivedExprType(resType = restp)
               case _ =>
                 restp
             if tree.tpt.hasAttachment(RecheckedType) && !sym.isConstructor then
-              val newInfo = integrateRT(knownType(tree.tpt), sym.info, sym.paramSymss)
+              val newInfo = integrateRT(
+                  knownType(tree.tpt),
+                  sym.info,
+                  sym.paramSymss,
+                  sym.paramSymss.nestedMap(_.info)
+                )
                 .showing(i"update info $sym: ${sym.info} --> $result", recheckr)
               if newInfo ne sym.info then
                 val completer = new LazyType:
@@ -331,10 +346,7 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
           case tree: ValOrDefDef =>
             if tree.isEmpty then NoType
             else
-              val isUpdated =
-                val symd = sym.denot
-                symd.validFor.firstPhaseId == thisPhase.id && (sym.originDenotation ne symd)
-              if isUpdated then sym.ensureCompleted()
+              if isUpdated(sym) then sym.ensureCompleted()
               else recheckDef(tree, sym)
               sym.termRef
           case tree: TypeDef =>
