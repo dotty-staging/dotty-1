@@ -358,7 +358,8 @@ object CaptureSet:
           mapRefs(newElems, tm, variance)
         else
           if variance <= 0 && !origin.isConst && (origin ne initial) then
-            report.warning(i"trying to add elems $newElems to $this from unrecognized source of mapped set $this$whereCreated")
+            report.warning(i"trying to add elems $newElems from unrecognized source $origin of mapped set $this$whereCreated")
+            return CompareResult.fail(this)
           Const(newElems)
       val result = super.addNewElems(added.elems, origin)
       if result == CompareResult.OK then
