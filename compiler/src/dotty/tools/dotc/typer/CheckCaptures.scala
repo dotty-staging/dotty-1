@@ -203,11 +203,11 @@ class CheckCaptures extends Recheck:
         tp
     end transformType
 
-    private def interpolateVars(using Context) = new TypeTraverser:
+    private def interpolator(using Context) = new TypeTraverser:
       override def traverse(t: Type) =
         t match
           case CapturingType(parent, refs: CaptureSet.Var, _) =>
-            //if variance < 0 then println(i"solving $t")
+            if variance < 0 then capt.println(i"solving $t")
             refs.solve(variance)
             traverse(parent)
           case t @ RefinedType(_, nme.apply, rinfo) if defn.isFunctionOrPolyType(t) =>
@@ -220,8 +220,8 @@ class CheckCaptures extends Recheck:
 
     private def interpolateVarsIn(tpt: Tree)(using Context): Unit =
       if tpt.isInstanceOf[InferredTypeTree] then
-        //println(i"solving vars in ${knownType(tpt)}, ${knownType(tpt).toString}")
-        interpolateVars.traverse(knownType(tpt))
+        interpolator.traverse(knownType(tpt))
+          .showing(i"solved vars in ${knownType(tpt)}", capt)
 
     private var curEnv: Env = Env(NoSymbol, CaptureSet.empty, false, null)
 
@@ -289,7 +289,13 @@ class CheckCaptures extends Recheck:
 
     override def recheckValDef(tree: ValDef, sym: Symbol)(using Context): Unit =
       try super.recheckValDef(tree, sym)
-      finally interpolateVarsIn(tree.tpt)
+      finally
+        if !sym.is(Param) then
+          // parameters with inferred types belong to anonymous methods. We need to wait
+          // for more info from the context, so we cannot interpolate. Note that we cannot
+          // expect to have all necessary info available at the point where the anonymous
+          // function is compiled since we do not propagate expected types into blocks.
+          interpolateVarsIn(tree.tpt)
 
     override def recheckDefDef(tree: DefDef, sym: Symbol)(using Context): Unit =
       val saved = curEnv

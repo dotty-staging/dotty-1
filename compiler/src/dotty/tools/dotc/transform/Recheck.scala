@@ -234,6 +234,9 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
     def recheckBlock(stats: List[Tree], expr: Tree, pt: Type)(using Context): Type =
       recheckStats(stats)
       val exprType = recheck(expr)
+        // The expected type `pt` is not propagated. Doing so would allow variables in the
+        // expected type to contain references to local symbols of the block, so the
+        // local symbols could escape that way.
       TypeOps.avoid(exprType, localSyms(stats).filterConserve(_.isTerm))
 
     def recheckBlock(tree: Block, pt: Type)(using Context): Type =
