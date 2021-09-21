@@ -264,16 +264,16 @@ class CheckCaptures extends Recheck:
         checkSubset(targetSet, curEnv.captured, pos)
 
     def assertSub(cs1: CaptureSet, cs2: CaptureSet)(using Context) =
-      assert(cs1.subCaptures(cs2, frozen = false) == CompareResult.OK, i"$cs1 is not a subset of $cs2")
+      assert(cs1.subCaptures(cs2, frozen = false).isOK, i"$cs1 is not a subset of $cs2")
 
     def checkElem(elem: CaptureRef, cs: CaptureSet, pos: SrcPos)(using Context) =
       val res = elem.singletonCaptureSet.subCaptures(cs, frozen = false)
-      if res != CompareResult.OK then
+      if !res.isOK then
         report.error(i"$elem cannot be referenced here; it is not included in allowed capture set ${res.blocking}", pos)
 
     def checkSubset(cs1: CaptureSet, cs2: CaptureSet, pos: SrcPos)(using Context) =
       val res = cs1.subCaptures(cs2, frozen = false)
-      if res != CompareResult.OK then
+      if !res.isOK then
         report.error(i"references $cs1 are not all included in allowed capture set ${res.blocking}", pos)
 
     override def recheckClosure(tree: Closure, pt: Type)(using Context): Type =

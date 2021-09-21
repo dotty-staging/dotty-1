@@ -166,7 +166,7 @@ object TypeOps:
         simplify(l, theMap) | simplify(r, theMap)
       case CapturingType(parent, refs, _) =>
         if !ctx.mode.is(Mode.Type)
-            && refs.subCaptures(parent.captureSet, frozen = true) == CompareResult.OK then
+            && refs.subCaptures(parent.captureSet, frozen = true).isOK then
           simplify(parent, theMap)
         else
           mapOver

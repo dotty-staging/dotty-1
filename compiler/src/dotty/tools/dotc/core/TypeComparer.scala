@@ -491,7 +491,7 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
             // under -Ycheck. Test case is i7965.scala.
 
       case CapturingType(parent1, refs1, _) =>
-        if subCaptures(refs1, tp2.captureSet, frozenConstraint) == CaptureSet.CompareResult.OK then
+        if subCaptures(refs1, tp2.captureSet, frozenConstraint).isOK then
           recur(parent1, tp2)
         else
           thirdTry

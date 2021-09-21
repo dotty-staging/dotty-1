@@ -1849,7 +1849,7 @@ object Types {
       else CapturingType(this, ref.singletonCaptureSet, this.isBoxedCapturing)
 
     def capturing(cs: CaptureSet)(using Context): Type =
-      if cs.isConst && cs.subCaptures(captureSet, frozen = true) == CompareResult.OK then this
+      if cs.isConst && cs.subCaptures(captureSet, frozen = true).isOK then this
       else this match
         case CapturingType(parent, cs1, boxed) => parent.capturing(cs1 ++ cs)
         case _ => CapturingType(this, cs, this.isBoxedCapturing)

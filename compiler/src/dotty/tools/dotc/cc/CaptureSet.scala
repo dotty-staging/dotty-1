@@ -93,8 +93,7 @@ sealed abstract class CaptureSet extends Showable:
   def accountsFor(x: CaptureRef)(using ctx: Context): Boolean =
     reporting.trace(i"$this accountsFor $x, ${x.captureSetOfInfo}?", show = true) {
       elems.contains(x)
-      || !x.isRootCapability
-          && x.captureSetOfInfo.subCaptures(this, frozen = true) == CompareResult.OK
+      || !x.isRootCapability && x.captureSetOfInfo.subCaptures(this, frozen = true).isOK
     }
 
   /** The subcapturing test */
@@ -105,9 +104,9 @@ sealed abstract class CaptureSet extends Showable:
     def recur(elems: List[CaptureRef]): CompareResult = elems match
       case elem :: elems1 =>
         var result = that.tryInclude(elem, this)
-        if result != CompareResult.OK && !elem.isRootCapability && summon[VarState] != FrozenState then
+        if !result.isOK && !elem.isRootCapability && summon[VarState] != FrozenState then
           result = elem.captureSetOfInfo.subCaptures(that)
-        if result == CompareResult.OK then
+        if result.isOK then
           recur(elems1)
         else
           varState.abort()
@@ -118,15 +117,15 @@ sealed abstract class CaptureSet extends Showable:
       .showing(i"subcaptures $this <:< $that = ${result.show}", capt)
 
   def =:= (that: CaptureSet)(using Context): Boolean =
-       this.subCaptures(that, frozen = true) == CompareResult.OK
-    && that.subCaptures(this, frozen = true) == CompareResult.OK
+       this.subCaptures(that, frozen = true).isOK
+    && that.subCaptures(this, frozen = true).isOK
 
   /** The smallest capture set (via <:<) that is a superset of both
    *  `this` and `that`
    */
   def ++ (that: CaptureSet)(using Context): CaptureSet =
-    if this.subCaptures(that, frozen = true) == CompareResult.OK then that
-    else if that.subCaptures(this, frozen = true) == CompareResult.OK then this
+    if this.subCaptures(that, frozen = true).isOK then that
+    else if that.subCaptures(this, frozen = true).isOK then this
     else if this.isConst && that.isConst then Const(this.elems ++ that.elems)
     else Var(this.elems ++ that.elems).addSub(this).addSub(that)
 
@@ -138,8 +137,8 @@ sealed abstract class CaptureSet extends Showable:
   /** The largest capture set (via <:<) that is a subset of both `this` and `that`
    */
   def **(that: CaptureSet)(using Context): CaptureSet =
-    if this.subCaptures(that, frozen = true) == CompareResult.OK then this
-    else if that.subCaptures(this, frozen = true) == CompareResult.OK then that
+    if this.subCaptures(that, frozen = true).isOK then this
+    else if that.subCaptures(this, frozen = true).isOK then that
     else if this.isConst && that.isConst then Const(elems.intersect(that.elems))
     else if that.isConst then Intersected(this.asVar, that)
     else Intersected(that.asVar, this)
@@ -273,7 +272,7 @@ object CaptureSet:
         val depsIt = deps.iterator
         while depsIt.hasNext do
           val result = depsIt.next.tryInclude(newElems, this)
-          if result != CompareResult.OK then return result
+          if !result.isOK then return result
         CompareResult.OK
       else
         CompareResult.fail(this)
@@ -306,8 +305,7 @@ object CaptureSet:
         //println(i"solving var $this $approx ${approx.isConst} deps = ${deps.toList}")
         if approx.isConst then
           val newElems = approx.elems -- elems
-          if newElems.isEmpty
-              || addNewElems(newElems, empty)(using ctx, VarState()) == CompareResult.OK then
+          if newElems.isEmpty || addNewElems(newElems, empty)(using ctx, VarState()).isOK then
             markSolved()
 
     def markSolved()(using Context): Unit =
@@ -362,7 +360,7 @@ object CaptureSet:
             return CompareResult.fail(this)
           Const(newElems)
       val result = super.addNewElems(added.elems, origin)
-      if result == CompareResult.OK then
+      if result.isOK then
         if added.isConst then result
         else if added.asVar.recordDepsState() then { addSub(added); result }
         else CompareResult.fail(this)
@@ -387,7 +385,7 @@ object CaptureSet:
         super.addNewElems(newElems.map(bimap.forward), origin)
       else
         val r = super.addNewElems(newElems, origin)
-        if r == CompareResult.OK then
+        if r.isOK then
           source.tryInclude(newElems.map(bimap.backward), this)
             .showing(i"propagating new elems $newElems backward from $this to $source", capt)
           else r
@@ -449,7 +447,7 @@ object CaptureSet:
     extension (result: Type)
       def isOK: Boolean = result eq OK
       def blocking: CaptureSet = result
-      def show: String = if result == OK then "OK" else result.toString
+      def show: String = if result.isOK then "OK" else result.toString
       inline def andAlso(op: => Type) = if result.isOK then op else result
 
   class VarState:
