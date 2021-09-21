@@ -314,12 +314,15 @@ object CaptureSet:
       isSolved = true
       deps.foreach(_.propagateSolved())
 
-    override def toText(printer: Printer): Text =
-      def debug = inContext(printer.printerContext) {
-        ctx.settings.YccDebug.value
-      }
-      super.toText(printer)
-      ~ (id.toString ~ getClass.getSimpleName.take(1) provided !isConst && debug)
+    protected def ids(using Context): String =
+      val trail = this.match
+        case dv: DerivedVar => dv.source.ids
+        case _ => ""
+      s"$id${getClass.getSimpleName.take(1)}$trail"
+
+    override def toText(printer: Printer): Text = inContext(printer.printerContext) {
+      super.toText(printer) ~ (Str(ids) provided !isConst && ctx.settings.YccDebug.value)
+    }
 
     override def toString = s"Var$id$elems"
   end Var
