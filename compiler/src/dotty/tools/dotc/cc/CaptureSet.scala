@@ -393,8 +393,9 @@ object CaptureSet:
           else r
 
     override def computeApprox(origin: CaptureSet)(using Context): CaptureSet =
-      if source eq origin then super.computeApprox(this).map(bimap.inverseTypeMap)
-      else source.upperApprox(this).map(bimap)
+      val supApprox = super.computeApprox(this)
+      if source eq origin then supApprox.map(bimap.inverseTypeMap)
+      else source.upperApprox(this).map(bimap) ** supApprox
 
     override def toString = s"BiMapped$id($source, elems = $elems)"
   end BiMapped
