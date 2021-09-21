@@ -269,11 +269,9 @@ object CaptureSet:
       if !isConst && recordElemsState() then
         elems ++= newElems
         // assert(id != 2 || elems.size != 2, this)
-        val depsIt = deps.iterator
-        while depsIt.hasNext do
-          val result = depsIt.next.tryInclude(newElems, this)
-          if !result.isOK then return result
-        CompareResult.OK
+        (CompareResult.OK /: deps) { (r, dep) =>
+          r.andAlso(dep.tryInclude(newElems, this))
+        }
       else
         CompareResult.fail(this)
 
@@ -359,12 +357,12 @@ object CaptureSet:
             report.warning(i"trying to add elems $newElems from unrecognized source $origin of mapped set $this$whereCreated")
             return CompareResult.fail(this)
           Const(newElems)
-      val result = super.addNewElems(added.elems, origin)
-      if result.isOK then
-        if added.isConst then result
-        else if added.asVar.recordDepsState() then { addSub(added); result }
-        else CompareResult.fail(this)
-      else result
+      super.addNewElems(added.elems, origin)
+        .andAlso {
+          if added.isConst then CompareResult.OK
+          else if added.asVar.recordDepsState() then { addSub(added); CompareResult.OK }
+          else CompareResult.fail(this)
+        }
 
     override def computeApprox(origin: CaptureSet)(using Context): CaptureSet =
       if source eq origin then universal
@@ -384,11 +382,11 @@ object CaptureSet:
       if origin eq source then
         super.addNewElems(newElems.map(bimap.forward), origin)
       else
-        val r = super.addNewElems(newElems, origin)
-        if r.isOK then
-          source.tryInclude(newElems.map(bimap.backward), this)
-            .showing(i"propagating new elems $newElems backward from $this to $source", capt)
-          else r
+        super.addNewElems(newElems, origin)
+          .andAlso {
+            source.tryInclude(newElems.map(bimap.backward), this)
+              .showing(i"propagating new elems $newElems backward from $this to $source", capt)
+          }
 
     override def computeApprox(origin: CaptureSet)(using Context): CaptureSet =
       val supApprox = super.computeApprox(this)
@@ -448,7 +446,7 @@ object CaptureSet:
       def isOK: Boolean = result eq OK
       def blocking: CaptureSet = result
       def show: String = if result.isOK then "OK" else result.toString
-      inline def andAlso(op: => Type) = if result.isOK then op else result
+      def andAlso(op: Context ?=> Type)(using Context): Type = if result.isOK then op else result
 
   class VarState:
     private val elemsMap: util.EqHashMap[Var, Refs] = new util.EqHashMap
