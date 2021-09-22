@@ -80,25 +80,34 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
 
     object transformTypes extends TreeTraverser:
 
-      class SubstParams(from: List[Symbol], to: MethodOrPoly)(using Context)
+      // Substitute parameter symbols in `from` to paramRefs in corresponding
+      // method or poly types `to`. We use a single BiTypeMap to do everything.
+      class SubstParams(from: List[List[Symbol]], to: List[LambdaType])(using Context)
       extends DeepTypeMap, BiTypeMap:
-        private val paramRefs = to.paramRefs
-        private val fromRefs = from.map(_.namedType)
 
         def apply(t: Type): Type = t match
           case t: NamedType =>
             val sym = t.symbol
-            def recur(from: List[Symbol], to: List[Type]): Type =
-              if from.isEmpty then t
-              else if sym eq from.head then to.head
-              else recur(from.tail, to.tail)
-            recur(from, paramRefs)
+            def outer(froms: List[List[Symbol]], tos: List[LambdaType]): Type =
+              def inner(from: List[Symbol], to: List[ParamRef]): Type =
+                if from.isEmpty then outer(froms.tail, tos.tail)
+                else if sym eq from.head then to.head
+                else inner(from.tail, to.tail)
+              if tos.isEmpty then t
+              else inner(froms.head, tos.head.paramRefs)
+            outer(from, to)
           case _ =>
             mapOver(t)
 
         def inverse(t: Type): Type = t match
-          case t: ParamRef if t.binder eq to => fromRefs(t.paramNum)
-          case _ => mapOver(t)
+          case t: ParamRef =>
+            def recur(from: List[LambdaType], to: List[List[Symbol]]): Type =
+              if from.isEmpty then t
+              else if t.binder eq from.head then to.head(t.paramNum).namedType
+              else recur(from.tail, to.tail)
+            recur(to, from)
+          case _ =>
+            mapOver(t)
       end SubstParams
 
       def traverse(tree: Tree)(using Context) =
@@ -108,27 +117,37 @@ abstract class Recheck extends Phase, IdentityDenotTransformer:
             transformType(tree.tpe, tree.isInstanceOf[InferredTypeTree]).rememberFor(tree)
           case tree: ValOrDefDef =>
             val sym = tree.symbol
-            def integrateRT(restp: Type, info: Type, psymss: List[List[Symbol]], pinfoss: List[List[Type]]): Type = info match
-              case mt: MethodOrPoly =>
-                val psyms = psymss.head
-                val subst = SubstParams(psyms, mt)
-                mt.derivedLambdaType(
-                  paramInfos =
-                    if psyms.exists(isUpdated) then pinfoss.head.asInstanceOf[List[mt.PInfo]]
-                    else mt.paramInfos,
-                  resType = integrateRT(
-                    subst(restp), mt.resType, psymss.tail, pinfoss.tail.nestedMap(subst)))
-              case info: ExprType =>
-                info.derivedExprType(resType = restp)
-              case _ =>
-                restp
+
+            // replace an existing symbol info with inferred types
+            def integrateRT(
+                info: Type,                     // symbol info to replace
+                psymss: List[List[Symbol]],     // the local (type and trem) parameter symbols corresponding to `info`
+                prevPsymss: List[List[Symbol]], // the local parameter symbols seen previously in reverse order
+                prevLambdas: List[LambdaType]   // the outer method and polytypes generated previously in reverse order
+              ): Type =
+              info match
+                case mt: MethodOrPoly =>
+                  val psyms = psymss.head
+                  mt.companion(mt.paramNames)(
+                    mt1 =>
+                      if !psyms.exists(isUpdated) && !mt.isParamDependent && prevLambdas.isEmpty then
+                        mt.paramInfos
+                      else
+                        val subst = SubstParams(psyms :: prevPsymss, mt1 :: prevLambdas)
+                        psyms.map(psym => subst(psym.info).asInstanceOf[mt.PInfo]),
+                    mt1 =>
+                      integrateRT(mt.resType, psymss.tail, psyms :: prevPsymss, mt1 :: prevLambdas)
+                  )
+                case info: ExprType =>
+                  info.derivedExprType(resType =
+                    integrateRT(info.resType, psymss, prevPsymss, prevLambdas))
+                case _ =>
+                  val restp = knownType(tree.tpt)
+                  if prevLambdas.isEmpty then restp
+                  else SubstParams(prevPsymss, prevLambdas)(restp)
+
             if tree.tpt.hasAttachment(RecheckedType) && !sym.isConstructor then
-              val newInfo = integrateRT(
-                  knownType(tree.tpt),
-                  sym.info,
-                  sym.paramSymss,
-                  sym.paramSymss.nestedMap(_.info)
-                )
+              val newInfo = integrateRT(sym.info, sym.paramSymss, Nil, Nil)
                 .showing(i"update info $sym: ${sym.info} --> $result", recheckr)
               if newInfo ne sym.info then
                 val completer = new LazyType:
