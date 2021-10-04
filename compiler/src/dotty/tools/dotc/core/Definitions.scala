@@ -849,6 +849,17 @@ class Definitions {
 
   @tu lazy val XMLTopScopeModule: Symbol = requiredModule("scala.xml.TopScope")
 
+  @tu lazy val MainAnnot: ClassSymbol = requiredClass("scala.annotation.MainAnnotation")
+    @tu lazy val MainAnnot_command: Symbol = MainAnnot.requiredMethod("command")
+  @tu lazy val MainAnnotParameterInfos: ClassSymbol = requiredClass("scala.annotation.MainAnnotation.ParameterInfos")
+    @tu lazy val MainAnnotationParameterInfos_withDocumentation: Symbol = MainAnnotParameterInfos.requiredMethod("withDocumentation")
+    @tu lazy val MainAnnotationParameterInfos_withAnnotations: Symbol = MainAnnotParameterInfos.requiredMethod("withAnnotations")
+  @tu lazy val MainAnnotParameterAnnotation: ClassSymbol = requiredClass("scala.annotation.MainAnnotation.ParameterAnnotation")
+  @tu lazy val MainAnnotCommand: ClassSymbol = requiredClass("scala.annotation.MainAnnotation.Command")
+    @tu lazy val MainAnnotCommand_argGetter: Symbol = MainAnnotCommand.requiredMethod("argGetter")
+    @tu lazy val MainAnnotCommand_varargGetter: Symbol = MainAnnotCommand.requiredMethod("varargGetter")
+    @tu lazy val MainAnnotCommand_run: Symbol = MainAnnotCommand.requiredMethod("run")
+
   @tu lazy val CommandLineParserModule: Symbol = requiredModule("scala.util.CommandLineParser")
     @tu lazy val CLP_ParseError: ClassSymbol = CommandLineParserModule.requiredClass("ParseError").typeRef.symbol.asClass
     @tu lazy val CLP_parseArgument: Symbol = CommandLineParserModule.requiredMethod("parseArgument")
@@ -904,7 +915,6 @@ class Definitions {
   @tu lazy val InlineParamAnnot: ClassSymbol = requiredClass("scala.annotation.internal.InlineParam")
   @tu lazy val ErasedParamAnnot: ClassSymbol = requiredClass("scala.annotation.internal.ErasedParam")
   @tu lazy val InvariantBetweenAnnot: ClassSymbol = requiredClass("scala.annotation.internal.InvariantBetween")
-  @tu lazy val MainAnnot: ClassSymbol = requiredClass("scala.main")
   @tu lazy val MigrationAnnot: ClassSymbol = requiredClass("scala.annotation.migration")
   @tu lazy val NowarnAnnot: ClassSymbol = requiredClass("scala.annotation.nowarn")
   @tu lazy val TransparentTraitAnnot: ClassSymbol = requiredClass("scala.annotation.transparentTrait")
