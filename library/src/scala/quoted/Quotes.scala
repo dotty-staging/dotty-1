@@ -464,6 +464,15 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
 
     /** Methods of the module object `val ClassDef` */
     trait ClassDefModule { this: ClassDef.type =>
+      /** Create a class definition tree
+       *
+       *  @param cls The class symbol. A new class symbol can be created using `Symbol.newClass`.
+       *  @param parents The parents trees class. The trees must align with the parent types of `cls`.
+       *                 Parents can be `TypeTree`s if they don't have term parameter,
+       *                 otherwise the can be `Term` containing the `New` applied to the parameters of the extended class.
+       *  @param body List of members of the class. The members must align with the members of `cls`.
+       */
+      @experimental def apply(cls: Symbol, parents: List[Tree /* Term | TypeTree */], body: List[Statement]): ClassDef
       def copy(original: Tree)(name: String, constr: DefDef, parents: List[Tree /* Term | TypeTree */], selfOpt: Option[ValDef], body: List[Statement]): ClassDef
       def unapply(cdef: ClassDef): (String, DefDef, List[Tree /* Term | TypeTree */], Option[ValDef], List[Statement])
     }
@@ -2534,6 +2543,11 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
         def typeSymbol: Symbol
         def termSymbol: Symbol
         def isSingleton: Boolean
+
+       /** This type seen as if it were the type of a member of prefix type `self` declared in class `member.owner`.
+        *
+        *  Also see `typeRef` and `termRef`
+        */
         def memberType(member: Symbol): TypeRepr
 
         /** The base classes of this type with the class itself as first element. */
@@ -3543,19 +3557,73 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
       /** The class Symbol of a global class definition */
       def classSymbol(fullName: String): Symbol
 
+      /** Generates a new class symbol for a class with a parameterless constructor.
+       *
+       *  Example usage:
+       *  ```scala
+       *  val name: String = "myClass"
+       *  val parents = List(TypeTree.of[Object], TypeTree.of[Foo])
+       *  def decls(cls: Symbol): List[Symbol] =
+       *    List(Symbol.newMethod(cls, "foo", MethodType(Nil)(_ => Nil, _ => TypeRepr.of[Unit])))
+       *
+       *  val cls = Symbol.newClass(Symbol.spliceOwner, name, parents = parents.map(_.tpe), decls, selfInfo = None)
+       *  val fooSym = cls.declaredMethod("foo").head
+       *
+       *  val fooDef = DefDef(fooSym, argss => Some('{println(s"Calling foo")}.asTerm))
+       *  val clsDef = ClassDef(cls, parents, body = List(fooDef))
+       *  val newCls = Typed(Apply(Select(New(TypeIdent(cls)), cls.primaryConstructor), Nil), TypeTree.of[Foo])
+       *
+       *  Block(List(clsDef), newCls).asExprOf[Foo]
+       *  ```
+       *  constructs the equivalent to
+       *   ```scala
+       *  '{
+       *    class myClass() extends Object with Foo {
+       *      def foo(): Unit = println("Calling foo")
+       *    }
+       *    new myClass(): Foo
+       *  }
+       *  ```
+       *
+       *  @param parent The owner of the class
+       *  @param name The name of the class
+       *  @param parents The parent classes of the class. The first parent must not be a trait.
+       *  @param decls The member declarations of the class provided the symbol of this class
+       *  @param selfType The self type of the class if it has one
+       *
+       *  This symbol starts without an accompanying definition.
+       *  It is the meta-programmer's responsibility to provide exactly one corresponding definition by passing
+       *  this symbol to the ClassDef constructor.
+       *
+       *  @note As a macro can only splice code into the point at which it is expanded, all generated symbols must be
+       *        direct or indirect children of the reflection context's owner.
+       */
+      @experimental def newClass(parent: Symbol, name: String, parents: List[TypeRepr], decls: Symbol => List[Symbol], selfType: Option[TypeRepr]): Symbol
+
       /** Generates a new method symbol with the given parent, name and type.
-      *
-      *  This symbol starts without an accompanying definition.
-      *  It is the meta-programmer's responsibility to provide exactly one corresponding definition by passing
-      *  this symbol to the DefDef constructor.
-      *
-      *  @note As a macro can only splice code into the point at which it is expanded, all generated symbols must be
-      *        direct or indirect children of the reflection context's owner.
-      */
+       *
+       *  To define a member method of a class, use the `newMethod` within the `decls` function of `newClass`.
+       *
+       *  @param parent The owner of the method
+       *  @param name The name of the method
+       *  @param tpe The type of the method (MethodType, PolyType, ByNameType)
+       *
+       *  This symbol starts without an accompanying definition.
+       *  It is the meta-programmer's responsibility to provide exactly one corresponding definition by passing
+       *  this symbol to the DefDef constructor.
+       *
+       *  @note As a macro can only splice code into the point at which it is expanded, all generated symbols must be
+       *        direct or indirect children of the reflection context's owner.
+       */
       def newMethod(parent: Symbol, name: String, tpe: TypeRepr): Symbol
 
       /** Works as the other newMethod, but with additional parameters.
       *
+      *  To define a member method of a class, use the `newMethod` within the `decls` function of `newClass`.
+      *
+      *  @param parent The owner of the method
+      *  @param name The name of the method
+      *  @param tpe The type of the method (MethodType, PolyType, ByNameType)
       *  @param flags extra flags to with which the symbol should be constructed
       *  @param privateWithin the symbol within which this new method symbol should be private. May be noSymbol.
       */
@@ -3569,6 +3637,9 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
       *
       *  Note: Also see reflect.let
       *
+      *  @param parent The owner of the /var/lazy val
+      *  @param name The name of the val/var/lazy val
+      *  @param tpe The type of the val/var/lazy val
       *  @param flags extra flags to with which the symbol should be constructed
       *  @param privateWithin the symbol within which this new method symbol should be private. May be noSymbol.
       *  @note As a macro can only splice code into the point at which it is expanded, all generated symbols must be
@@ -3582,7 +3653,10 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
       *  It is the meta-programmer's responsibility to provide exactly one corresponding definition by passing
       *  this symbol to the BindDef constructor.
       *
+      *  @param parent The owner of the binding
+      *  @param name The name of the binding
       *  @param flags extra flags to with which the symbol should be constructed
+      *  @param tpe The type of the binding
       *  @note As a macro can only splice code into the point at which it is expanded, all generated symbols must be
       *        direct or indirect children of the reflection context's owner.
       */
@@ -3644,9 +3718,11 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
          *
          *      symbol.tree.tpe
          *
-         *  It should be replaced by the following code:
+         *  It should be replaced by one of the following:
          *
          *      tp.memberType(symbol)
+         *      symbol.typeRef
+         *      symbol.termRef
          *
          */
         def tree: Tree
@@ -3817,6 +3893,19 @@ trait Quotes { self: runtime.QuoteUnpickler & runtime.QuoteMatching =>
 
         /** Case class or case object children of a sealed trait or cases of an `enum`. */
         def children: List[Symbol]
+
+        /** Type reference to the symbol usable in the scope of its owner.
+         *
+         *  To get a reference to a symbol from a specific prefix `tp`, use `tp.memberType(symbol)` instead.
+         *
+         *  @pre symbol.isType returns true
+         */
+        @experimental
+        def typeRef: TypeRef
+
+        /** Term reference to the symbol usable in the scope of its owner. */
+        @experimental
+        def termRef: TermRef
       end extension
     }
 
