@@ -2869,8 +2869,8 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
   def matchCases(scrut: Type, cases: List[Type])(using Context): Type = {
     def paramInstances = new TypeAccumulator[Array[Type]] {
       def apply(inst: Array[Type], t: Type) = t match {
-        case t @ TypeParamRef(b, n) if b `eq` caseLambda =>
-          inst(n) = approximation(t, fromBelow = variance >= 0).simplified
+        case t: TypeVar if t.origin.binder `eq` caseLambda =>
+          inst(t.origin.paramNum) = approximation(t.origin, fromBelow = variance >= 0).simplified
           inst
         case _ =>
           foldOver(inst, t)
@@ -2879,7 +2879,7 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
 
     def instantiateParams(inst: Array[Type]) = new TypeMap {
       def apply(t: Type) = t match {
-        case t @ TypeParamRef(b, n) if b `eq` caseLambda => inst(n)
+        case t: TypeVar if t.origin.binder `eq` caseLambda => inst(t.origin.paramNum)
         case t: LazyRef => apply(t.ref)
         case _ => mapOver(t)
       }
@@ -2894,8 +2894,9 @@ class TrackingTypeComparer(initctx: Context) extends TypeComparer(initctx) {
     def matchCase(cas: Type): Option[Type] = trace(i"match case $cas vs $scrut", matchTypes) {
       val cas1 = cas match {
         case cas: HKTypeLambda =>
-          caseLambda = constrained(cas)
-          caseLambda.resultType
+          val (tl, targs) = constrained(cas, ast.tpd.EmptyTree, true)
+          caseLambda = tl
+          tl.instantiate(targs.map(_.tpe))
         case _ =>
           cas
       }
