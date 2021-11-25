@@ -1,5 +1,5 @@
 scala> 	class Foo extends Bar // with one tab
--- [E006] Not Found Error: -----------------------------------------------------
+━━┳━ [E006] Not Found Error: -----------------------------------------------------
 1 | 	class Foo extends Bar // with one tab
   | 	                  ^^^
   | 	                  Not found: type Bar
@@ -7,7 +7,7 @@ scala> 	class Foo extends Bar // with one tab
   | longer explanation available when compiling with `-explain`
 1 error found
 scala>                                                                               class Foo extends Bar // with spaces
--- [E006] Not Found Error: -----------------------------------------------------
+━━┳━ [E006] Not Found Error: -----------------------------------------------------
 1 |                                                                               class Foo extends Bar // with spaces
   |                                                                                                 ^^^
   |                                                       Not found: type Bar
@@ -15,7 +15,7 @@ scala>                                                                          
   | longer explanation available when compiling with `-explain`
 1 error found
 scala>                                                                                  class Foo extends Bar // with tabs
--- [E006] Not Found Error: -----------------------------------------------------
+━━┳━ [E006] Not Found Error: -----------------------------------------------------
 1 |                                                                                  class Foo extends Bar // with tabs
   |                                                                                                    ^^^
   |                                                       Not found: type Bar

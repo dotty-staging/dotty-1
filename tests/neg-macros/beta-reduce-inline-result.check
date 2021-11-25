@@ -1,8 +1,27 @@
 
--- [E007] Type Mismatch Error: tests/neg-macros/beta-reduce-inline-result/Test_2.scala:11:41 ---------------------------
+<<<<<<< HEAD
+━━┳━ [E007] Type Mismatch Error: tests/neg-macros/beta-reduce-inline-result/Test_2.scala:11:41 ---------------------------
 11 |  val x2: 4   = Macros.betaReduce(dummy1)(3) // error
    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |                Found:    Int
    |                Required: (4 : Int)
+<<<<<<< HEAD
    |
    | longer explanation available when compiling with `-explain`
+=======
+   |--------------------------------------------------------------------------------------------------------------------
+   | longer explanation available when compiling with `-explain`
+   ·--------------------------------------------------------------------------------------------------------------------
+>>>>>>> 0958dc5505 (Improve -explain rendering)
+=======
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│ [E007] Type Mismatch Error: tests/neg-macros/beta-reduce-inline-result/Test_2.scala:11:41
+└──┬───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+11 │  val x2: 4   = Macros.betaReduce(dummy1)(3) // error
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │                Found:    Int
+   │                Required: (4 : Int)
+   ╞═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+   │ longer explanation available when compiling with `-explain`
+   └───────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>>>>>>> b17faa7d88 (Stylize error messages)

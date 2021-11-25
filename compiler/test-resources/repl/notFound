@@ -1,5 +1,5 @@
 scala>  Foo
--- [E006] Not Found Error: -----------------------------------------------------
+━━┳━ [E006] Not Found Error: -----------------------------------------------------
 1 |  Foo
   |  ^^^
   |  Not found: Foo
@@ -7,7 +7,7 @@ scala>  Foo
   | longer explanation available when compiling with `-explain`
 1 error found
 scala>  Bar
--- [E006] Not Found Error: -----------------------------------------------------
+━━┳━ [E006] Not Found Error: -----------------------------------------------------
 1 |  Bar
   |  ^^^
   |  Not found: Bar

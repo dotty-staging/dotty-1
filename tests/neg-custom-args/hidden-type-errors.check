@@ -1,4 +1,4 @@
--- [E007] Type Mismatch Error: tests/neg-custom-args/hidden-type-errors/Test.scala:6:24 --------------------------------
+━━┳━ [E007] Type Mismatch Error: tests/neg-custom-args/hidden-type-errors/Test.scala:6:24 --------------------------------
 6 |   val x = X.doSomething("XXX") // error
   |           ^^^^^^^^^^^^^^^^^^^^
   |           Found:    String
@@ -15,7 +15,7 @@ I tried to show that
 conforms to
   Int
 but the comparison trace ended with `false`:
-          
+
   ==> String  <:  Int
     ==> String  <:  Int (recurring)
       ==> String  <:  Int (recurring)

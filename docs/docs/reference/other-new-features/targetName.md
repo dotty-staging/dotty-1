@@ -107,7 +107,7 @@ Here, the original methods `g` and `f` do not override each other since they hav
 different names. But once we switch to target names, there is a clash that is reported by the compiler:
 
 ```
--- [E120] Naming Error: test.scala:4:6 -----------------------------------------
+━━┳━ [E120] Naming Error: test.scala:4:6 -----------------------------------------
 4 |class B extends A:
   |      ^
   |      Name clash between defined and inherited member:

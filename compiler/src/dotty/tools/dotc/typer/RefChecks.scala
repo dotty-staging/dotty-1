@@ -620,7 +620,8 @@ object RefChecks {
           def showDclAndLocation(sym: Symbol) =
             s"${sym.showDcl} in ${sym.owner.showLocated}"
           def undefined(msg: String) =
-            abstractClassError(false, s"${showDclAndLocation(member)} is not defined $msg")
+            val msg1 = if msg == "" then "" else s" $msg"
+            abstractClassError(false, s"${showDclAndLocation(member)} is not defined$msg1")
           val underlying = member.underlyingSymbol
 
           // Give a specific error message for abstract vars based on why it fails:

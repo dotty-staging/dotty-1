@@ -1,6 +1,24 @@
--- [E155] Syntax Error: tests/neg-macros/type-splice-in-val-pattern.scala:5:14 -----------------------------------------
+<<<<<<< HEAD
+━━┳━ [E155] Syntax Error: tests/neg-macros/type-splice-in-val-pattern.scala:5:14 -----------------------------------------
 5 |    val '[ *:[$t] ] = ??? // error
   |              ^^
   |              Type splices cannot be used in val patterns. Consider using `match` instead.
+<<<<<<< HEAD
   |
   | longer explanation available when compiling with `-explain`
+=======
+  |---------------------------------------------------------------------------------------------------------------------
+  | longer explanation available when compiling with `-explain`
+  ·---------------------------------------------------------------------------------------------------------------------
+>>>>>>> 0958dc5505 (Improve -explain rendering)
+=======
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+│ [E155] Syntax Error: tests/neg-macros/type-splice-in-val-pattern.scala:5:14
+└─┬────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+5 │    val '[ *:[$t] ] = ??? // error
+  │              ^^
+  │              Type splices cannot be used in val patterns. Consider using `match` instead.
+  ╞════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+  │ longer explanation available when compiling with `-explain`
+  └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+>>>>>>> b17faa7d88 (Stylize error messages)

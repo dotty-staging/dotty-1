@@ -8,7 +8,7 @@ object Test {
       x
     case Pair(a, b) =>
       (eval(a), eval(a)) // error:
-        // -- [E007] Type Mismatch Error: tests/neg/gadt-eval.scala:10:6 ------------------
+        // ━━┳━ [E007] Type Mismatch Error: tests/neg/gadt-eval.scala:10:6 ------------------
         // 10 |      (eval(a), eval(a))
         // |      ^^^^^^^^^^^^^^^^^^
         // |    found:    (A$1, A$1)
@@ -22,7 +22,7 @@ object Test {
       e.value
     case e: Pair[t1, t2] =>
       (eval(e.fst), eval(e.fst)) // error:
-        //-- [E007] Type Mismatch Error: tests/neg/gadt-eval.scala:24:6 ------------------
+        //━━┳━ [E007] Type Mismatch Error: tests/neg/gadt-eval.scala:24:6 ------------------
         //24 |      (eval(e.fst), eval(e.fst))
         //   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^
         //   |     found:    (t1, t1)

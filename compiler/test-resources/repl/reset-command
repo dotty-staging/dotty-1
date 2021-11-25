@@ -18,7 +18,7 @@ def resetNoArgsStillWorks: Int
 scala>:reset
 
 scala> resetNoArgsStillWorks
--- [E006] Not Found Error: -----------------------------------------------------
+━━┳━ [E006] Not Found Error: -----------------------------------------------------
 1 | resetNoArgsStillWorks
   | ^^^^^^^^^^^^^^^^^^^^^
   | Not found: resetNoArgsStillWorks

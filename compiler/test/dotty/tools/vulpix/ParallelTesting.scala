@@ -511,10 +511,9 @@ trait ParallelTesting extends RunnerOrchestration { self =>
       val brokenClassPattern = """^class file (.*) is broken.*""".r
       val warnPattern = """^.*Warning: (.*\.scala):(\d+):(\d+).*""".r
       val summaryPattern = """\d+ (?:warning|error)s? found""".r
-      val indent = "    "
       var diagnostics = List.empty[Diagnostic.Error]
-      def barLine(start: Boolean) = s"$indent${if start then "╭" else "╰"}${"┄" * pageWidth}${if start then "╮" else "╯"}\n"
-      def errorLine(line: String) = s"$indent┆${String.format(s"%-${pageWidth}s", stripAnsi(line))}┆\n"
+      def barLine(start: Boolean) = s"${if start then "╭" else "╰"}${"┄" * (pageWidth)}\n"
+      def errorLine(line: String) = s"┆$line\n"
       def stripAnsi(str: String): String = str.replaceAll("\u001b\\[\\d+m", "")
       def addToLast(str: String): Unit =
         diagnostics match
@@ -536,7 +535,7 @@ trait ParallelTesting extends RunnerOrchestration { self =>
             val span = Spans.Span(offset)
             val sourcePos = SourcePosition(sourceFile, span)
             addToLast(barLine(start = false))
-            diagnostics ::= Diagnostic.Error(s"Compilation of $filePath with Scala $compilerVersion failed at line: $line, column: $column.\nFull error output:\n${barLine(start = true)}${errorLine(error)}", sourcePos)
+            diagnostics ::= Diagnostic.Error(s"Compilation with Scala $compilerVersion failed. Full error output:\n${barLine(start = true)}${errorLine(error)}", sourcePos)
           case error @ brokenClassPattern(filePath) =>
             inError = true
             diagnostics ::= Diagnostic.Error(s"$error\nFull error output:\n${barLine(start = true)}${errorLine(error)}", NoSourcePosition)

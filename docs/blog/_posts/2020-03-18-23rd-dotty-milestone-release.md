@@ -69,7 +69,7 @@ import scala.compiletime.ops.int._
 
 Above `t4` will fail to compile with the following error:
 
-  -- [E007] Type Mismatch Error: /Users/kmetiuk/Projects/scala3/pg/release/snip_3.scala:7:20
+  ━━┳━ [E007] Type Mismatch Error: /Users/kmetiuk/Projects/scala3/pg/release/snip_3.scala:7:20
 7 |  val t67: 1 << 4 = 0 // error
   |                    ^
   |                    Found:    (0 : Int)

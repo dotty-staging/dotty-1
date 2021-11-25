@@ -37,7 +37,7 @@ def f: Int = if ??? then 1
 Above, the `if` expression returns a `Unit` since an `else` clause is missing. Previously, the user would have gotten the following error:
 
 ```
--- [E007] Type Mismatch Error: ...
+━━┳━ [E007] Type Mismatch Error: ...
 12 |def f: Int = if ??? then 1
    |             ^^^^^^^^^^^^^
    |             Found:    Unit

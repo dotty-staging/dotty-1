@@ -43,7 +43,7 @@ trait MessageRendering {
     def render(offsetAndLine: (Int, String)): String = {
       val (offset1, line) = offsetAndLine
       val lineNbr = (pos.source.offsetToLine(offset1) + 1).toString
-      val prefix = String.format(s"%${offset - 2}s |", lineNbr)
+      val prefix = String.format(s"%${offset - 2}s ┃", lineNbr)
       maxLen = math.max(maxLen, prefix.length)
       val lnum = hl(" " * math.max(0, maxLen - prefix.length - 1) + prefix)
       lnum + line.stripLineEnd
@@ -76,18 +76,21 @@ trait MessageRendering {
   /** Generate box containing the report title
    *
    *  ```
-   *  -- Error: source.scala ---------------------
+   *  ━━┳━ title ━━━━━━━━━━
    *  ```
    */
   private def boxTitle(title: String)(using Context, Level, Offset): String =
     val pageWidth = ctx.settings.pageWidth.value
-    val line = "-" * (pageWidth - title.length - 4)
-    hl(s"-- $title $line")
+    val prefix =  "━" * (offset - 1) + "┳━ "
+    val suffix =
+      if prefix.length + title.length + 1 >= pageWidth then ""
+      else " " + "━" * (pageWidth - offset  - title.length - 4)
+    hl(s"$prefix$title$suffix")
 
   /** The position markers aligned under the error
    *
    *  ```
-   *    |         ^^^^^
+   *    ┃         ^^^^^
    *  ```
    */
   private def positionMarker(pos: SourcePosition)(using Context, Level, Offset): String = {
@@ -102,40 +105,41 @@ trait MessageRendering {
   /** The horizontal line with the given offset
    *
    *  ```
-   *    |
+   *    ┃
    *  ```
    */
   private def offsetBox(using Context, Level, Offset): String =
     val prefix = " " * (offset - 1)
-    hl(s"$prefix|")
+    hl(s"$prefix┃")
 
   /** The end of a box section
    *
    *  ```
-   *    |---------------
+   *    ┠──────────────
    *  ```
    *  Or if there `soft` is true,
    *  ```
-   *    |···············
+   *    ┠┄┄┄┄┄┄┄┄┄┄┄┄┄┄
    *  ```
    */
   private def newBox(soft: Boolean = false)(using Context, Level, Offset): String =
     val pageWidth = ctx.settings.pageWidth.value
     val prefix = " " * (offset - 1)
-    val line = (if soft then "·" else "-") * (pageWidth - offset)
-    hl(s"$prefix|$line")
+    val line = if soft then "┄" else "─"
+    val length = (pageWidth - offset - 1)
+    hl(s"${prefix}┠${line * length}")
 
   /** The end of a box section
    *
    *  ```
-   *    ·----------------
+   *    ┖──────────────
    *  ```
    */
   private def endBox(using Context, Level, Offset): String =
     val pageWidth = ctx.settings.pageWidth.value
     val prefix = " " * (offset - 1)
-    val line = "-" * (pageWidth - offset)
-    hl(s"${prefix}·$line")
+    val line = "-" * (pageWidth - offset - 1)
+    hl(s"${prefix}┖$line")
 
   /** The error message (`msg`) aligned under `pos`
     *
@@ -144,7 +148,7 @@ trait MessageRendering {
   private def errorMsg(pos: SourcePosition, msg: String)(using Context, Level, Offset): String = {
     val padding = msg.linesIterator.foldLeft(pos.startColumnPadding) { (pad, line) =>
       val lineLength = stripColor(line).length
-      val maxPad = math.max(0, ctx.settings.pageWidth.value - offset - lineLength) - offset
+      val maxPad = math.max(1, ctx.settings.pageWidth.value - offset - lineLength)
 
       if (maxPad < pad.length) " " * maxPad
       else pad
@@ -241,7 +245,6 @@ trait MessageRendering {
             sb.append(EOL).append(newBox(soft = true))
             sb.append(EOL).append(offsetBox).append(i"This location contains code that was inlined from $pos")
             sb.append(EOL).append((srcBefore ::: marker :: srcAfter).mkString(EOL))
-          sb.append(EOL).append(endBox)
       }
       else sb.append(msg.message)
     }
@@ -256,11 +259,9 @@ trait MessageRendering {
       dia.msg.explanation.split(EOL).foreach { line =>
         sb.append(EOL).append(offsetBox).append(if line.isEmpty then "" else " ").append(line)
       }
-      sb.append(EOL).append(endBox)
     else if dia.msg.canExplain then
       sb.append(EOL).append(offsetBox)
       sb.append(EOL).append(offsetBox).append(" longer explanation available when compiling with `-explain`")
-
     sb.toString
   }
 
@@ -295,8 +296,8 @@ private object Highlight {
  *
  *  ```
  *  -- Error: ... ------------
- *  4 |  foo
- *    |  ^^^
+ *  4 ┃  foo
+ *    ┃  ^^^
  *  ^^^ // size of this offset
  *  ```
  */

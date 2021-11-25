@@ -25,7 +25,7 @@ Wrong number of errors encountered when compiling out/VulpixMetaTests/neg/missin
 [error]     ...
 [info] Test dotty.tools.vulpix.VulpixMetaTests.compilePos started
 Testing tests/vulpix-tests/meta/pos/does-not-compile.scala
--- [E006] Unbound Identifier Error: /home/olivier/workspace/dotty/tests/vulpix-tests/meta/pos/does-not-compile.scala:2:2 SKIP
+━━┳━ [E006] Unbound Identifier Error: /home/olivier/workspace/dotty/tests/vulpix-tests/meta/pos/does-not-compile.scala:2:2 SKIP
 2 |  a // Does not compile
   |  ^
   |  not found: a

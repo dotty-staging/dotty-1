@@ -4,7 +4,7 @@ scala> xml"
   |    ^
   |    unclosed string literal
 scala> xml""
--- [E008] Not Found Error: -----------------------------------------------------
+━━┳━ [E008] Not Found Error: -----------------------------------------------------
 1 | xml""
   | ^^^^^
   | value xml is not a member of StringContext

@@ -5,7 +5,7 @@ scala> object o { val xs = List(1, 2, 3) }
 // defined object o
 scala> import o._
 scala> buf += xs
--- [E007] Type Mismatch Error: -------------------------------------------------
+━━┳━ [E007] Type Mismatch Error: -------------------------------------------------
 1 | buf += xs
   |        ^^
   |        Found:    (o.xs : List[Int])
@@ -16,13 +16,13 @@ scala> buf += xs
 scala> buf ++= xs
 val res0: scala.collection.mutable.ListBuffer[Int] = ListBuffer(1, 2, 3)
 scala> import util.foobar
--- [E008] Not Found Error: -----------------------------------------------------
+━━┳━ [E008] Not Found Error: -----------------------------------------------------
 1 | import util.foobar
   |             ^^^^^^
   |             value foobar is not a member of util
 1 error found
 scala> import util.foobar.bar
--- [E008] Not Found Error: -----------------------------------------------------
+━━┳━ [E008] Not Found Error: -----------------------------------------------------
 1 | import util.foobar.bar
   |        ^^^^^^^^^^^
   |        value foobar is not a member of util
