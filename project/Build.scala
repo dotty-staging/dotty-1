@@ -469,6 +469,7 @@ object Build {
           "-Ddotty.tests.classes.scalaAsm=" + findLib(attList, "scala-asm"),
           "-Ddotty.tests.classes.scalaXml=" + findLib(attList, "scala-xml"),
           "-Ddotty.tests.classes.jlineTerminal=" + findLib(attList, "jline-terminal"),
+          "-Xss2m",
           "-Ddotty.tests.classes.jlineReader=" + findLib(attList, "jline-reader")
         )
 
