@@ -718,6 +718,13 @@ object Trees {
     def forwardTo: Tree[T] = tpt
   }
 
+  /** tpt(args) */
+  case class AppliedTermRefTree[-T >: Untyped] private[ast] (tpt: Tree[T], args: List[Tree[T]])(implicit @constructorOnly src: SourceFile)
+    extends ProxyTree[T] with TypTree[T] {
+    type ThisTree[-T >: Untyped] = AppliedTermRefTree[T]
+    def forwardTo: Tree[T] = tpt
+  }
+
   /** [typeparams] -> tpt
    *
    *  Note: the type of such a tree is not necessarily a `HKTypeLambda`, it can
@@ -1086,6 +1093,7 @@ object Trees {
     type SingletonTypeTree = Trees.SingletonTypeTree[T]
     type RefinedTypeTree = Trees.RefinedTypeTree[T]
     type AppliedTypeTree = Trees.AppliedTypeTree[T]
+    type AppliedTermRefTree = Trees.AppliedTermRefTree[T]
     type LambdaTypeTree = Trees.LambdaTypeTree[T]
     type TermLambdaTypeTree = Trees.TermLambdaTypeTree[T]
     type MatchTypeTree = Trees.MatchTypeTree[T]
@@ -1263,6 +1271,10 @@ object Trees {
         case tree: AppliedTypeTree if (tpt eq tree.tpt) && (args eq tree.args) => tree
         case _ => finalize(tree, untpd.AppliedTypeTree(tpt, args)(sourceFile(tree)))
       }
+      def AppliedTermRefTree(tree: Tree)(tpt: Tree, args: List[Tree])(using Context): AppliedTermRefTree = tree match {
+        case tree: AppliedTermRefTree if (tpt eq tree.tpt) && (args eq tree.args) => tree
+        case _ => finalize(tree, untpd.AppliedTermRefTree(tpt, args)(sourceFile(tree)))
+      }
       def LambdaTypeTree(tree: Tree)(tparams: List[TypeDef], body: Tree)(using Context): LambdaTypeTree = tree match {
         case tree: LambdaTypeTree if (tparams eq tree.tparams) && (body eq tree.body) => tree
         case _ => finalize(tree, untpd.LambdaTypeTree(tparams, body)(sourceFile(tree)))
@@ -1429,6 +1441,8 @@ object Trees {
               cpy.RefinedTypeTree(tree)(transform(tpt), transformSub(refinements))
             case AppliedTypeTree(tpt, args) =>
               cpy.AppliedTypeTree(tree)(transform(tpt), transform(args))
+            case AppliedTermRefTree(tpt, args) =>
+              cpy.AppliedTermRefTree(tree)(transform(tpt), transform(args))
             case LambdaTypeTree(tparams, body) =>
               inContext(localCtx(tree)) {
                 cpy.LambdaTypeTree(tree)(transformSub(tparams), transform(body))
@@ -1573,6 +1587,8 @@ object Trees {
             case RefinedTypeTree(tpt, refinements) =>
               this(this(x, tpt), refinements)
             case AppliedTypeTree(tpt, args) =>
+              this(this(x, tpt), args)
+            case AppliedTermRefTree(tpt, args) =>
               this(this(x, tpt), args)
             case LambdaTypeTree(tparams, body) =>
               inContext(localCtx(tree)) {

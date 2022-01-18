@@ -1616,7 +1616,7 @@ object Parsers {
       else
         def singletonArgs(t: Tree): Tree =
           if in.token == LPAREN && in.featureEnabled(Feature.dependent)
-          then singletonArgs(AppliedTypeTree(t, inParens(commaSeparated(singleton))))
+          then singletonArgs(AppliedTermRefTree(t, inParens(commaSeparated(singleton))))
           else t
         singletonArgs(simpleType1())
 

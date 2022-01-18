@@ -1901,13 +1901,26 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     assignType(cpy.RefinedTypeTree(tree)(tpt1, refinements1), tpt1, refinements1, refineCls)
   }
 
+  def typedAppliedTermRefTree(tree: untpd.AppliedTermRefTree)(using Context): Tree = {
+    val tpt1 = typedAheadType(tree.tpt)
+    val primaryConstructor = tpt1.symbol.primaryConstructor
+    if primaryConstructor == NoSymbol then return errorTree(tree, i"")
+    val params = primaryConstructor.paramSymss
+    if params.size != 1 then return errorTree(tree, i"")
+    if params(0).size != tree.args.size then return errorTree(tree, i"")
+    val refinements = params(0).zip(tree.args).map(
+      (sym, arg) => untpd.ValDef(sym.asTerm.name, typed(arg), EmptyTree)
+    )
+    val refineClsDef = desugar.refinedTypeToClass(tpt1, refinements).withSpan(tree.span)
+    val refineCls = createSymbol(refineClsDef).asClass
+    val TypeDef(_, impl: Template) = typed(refineClsDef)
+    val refinements1 = impl.body
+    assignType(cpy.RefinedTypeTree(tree)(tpt1, refinements1), tpt1, refinements1, refineCls)
+  }
+
   def typedAppliedTypeTree(tree: untpd.AppliedTypeTree)(using Context): Tree = {
     tree.args match
-      case arg :: _ if arg.isTerm =>
-        if Feature.dependentEnabled then
-          return errorTree(tree, i"Not yet implemented: T(...)")
-        else
-          return errorTree(tree, dependentStr)
+      case arg :: _ if arg.isTerm => return errorTree(tree, dependentStr)
       case _ =>
 
     val tpt1 = withoutMode(Mode.Pattern) {
@@ -2826,6 +2839,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           case tree: untpd.SingletonTypeTree => typedSingletonTypeTree(tree)
           case tree: untpd.RefinedTypeTree => typedRefinedTypeTree(tree)
           case tree: untpd.AppliedTypeTree => typedAppliedTypeTree(tree)
+          case tree: untpd.AppliedTermRefTree => typedAppliedTermRefTree(tree)
           case tree: untpd.LambdaTypeTree => typedLambdaTypeTree(tree)(using ctx.localContext(tree, NoSymbol).setNewScope)
           case tree: untpd.TermLambdaTypeTree => typedTermLambdaTypeTree(tree)(using ctx.localContext(tree, NoSymbol).setNewScope)
           case tree: untpd.MatchTypeTree => typedMatchTypeTree(tree, pt)
