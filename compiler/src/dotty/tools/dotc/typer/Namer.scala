@@ -1756,7 +1756,6 @@ class Namer { typer: Typer =>
       paramFn: Type => Type,
       fallbackProto: Type
     )(using Context): Type =
-
     /** A type for this definition that might be inherited from elsewhere:
      *  If this is a setter parameter, the corresponding getter type.
      *  If this is a class member, the conjunction of all result types
@@ -1852,6 +1851,7 @@ class Namer { typer: Typer =>
     var rhsCtx = ctx.fresh.addMode(Mode.InferringReturnType)
     if sym.isInlineMethod then rhsCtx = rhsCtx.addMode(Mode.InlineableBody)
     if sym.is(ExtensionMethod) then rhsCtx = rhsCtx.addMode(Mode.InExtensionMethod)
+    if sym.is(Dependent) then rhsCtx.addMode(Mode.Dependent)
     val typeParams = paramss.collect { case TypeSymbols(tparams) => tparams }.flatten
     if (typeParams.nonEmpty) {
       // we'll be typing an expression from a polymorphic definition's body,
@@ -1880,10 +1880,13 @@ class Namer { typer: Typer =>
         AnnotatedType(defaultTp, Annotation(defn.UncheckedVarianceAnnot))
       else
         // don't strip @uncheckedVariance annot for default getters
-        TypeOps.simplify(tp.widenTermRefExpr,
-            if defaultTp.exists then TypeOps.SimplifyKeepUnchecked() else null) match
-          case ctp: ConstantType if sym.isInlineVal => ctp
-          case tp => TypeComparer.widenInferred(tp, pt)
+        val typeMap = if defaultTp.exists then TypeOps.SimplifyKeepUnchecked() else null
+        if rhsCtx.mode.is(Mode.Dependent) then
+          TypeOps.simplify(tp, typeMap)
+        else
+          TypeOps.simplify(tp.widenTermRefExpr, typeMap) match
+            case ctp: ConstantType if sym.isInlineVal => ctp
+            case tp => TypeComparer.widenInferred(tp, pt)
 
     // Replace aliases to Unit by Unit itself. If we leave the alias in
     // it would be erased to BoxedUnit.

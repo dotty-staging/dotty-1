@@ -14,9 +14,17 @@ object NamerOps:
    *  @param ctor the constructor
    */
   def effectiveResultType(ctor: Symbol, paramss: List[List[Symbol]])(using Context): Type =
-    paramss match
+    val base = paramss match
       case TypeSymbols(tparams) :: _ => ctor.owner.typeRef.appliedTo(tparams.map(_.typeRef))
       case _ => ctor.owner.typeRef
+
+    val enclosingClass = ctor.enclosingClass
+    if enclosingClass.flagsUNSAFE.is(Dependent) then
+      paramss(0).foldLeft(base)((acc, termParam) =>
+        RefinedType(acc, termParam.name, termParam.termRef)
+      )
+    else
+      base
 
   /** If isConstructor, make sure it has at least one non-implicit parameter list
    *  This is done by adding a () in front of a leading old style implicit parameter,

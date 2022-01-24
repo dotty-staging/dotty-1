@@ -431,6 +431,9 @@ object Flags {
   /** Symbol is a constructor proxy (either companion, or apply method) */
   val (ConstructorProxy @ _, _, _) = newFlags(62, "<constructor proxy>") // (could be merged with Lifted)
 
+  /** A precise method */
+  val (Dependent @ _, _, _) = newFlags(63, "dependent")
+
 // --------- Combined Flag Sets and Conjunctions ----------------------
 
   /** All possible flags */
@@ -444,7 +447,7 @@ object Flags {
 
   /** Flags representing source modifiers */
   private val CommonSourceModifierFlags: FlagSet =
-    commonFlags(Private, Protected, Final, Case, Implicit, Given, Override, JavaStatic, Transparent, Erased)
+    commonFlags(Private, Protected, Final, Case, Implicit, Given, Override, JavaStatic, Transparent, Erased, Dependent)
 
   val TypeSourceModifierFlags: FlagSet =
     CommonSourceModifierFlags.toTypeFlags | Abstract | Sealed | Opaque | Open
@@ -466,7 +469,8 @@ object Flags {
     Scala2SpecialFlags, MutableOrOpen, Opaque, Touched, JavaStatic,
     OuterOrCovariant, LabelOrContravariant, CaseAccessor,
     Extension, NonMember, Implicit, Given, Permanent, Synthetic, Exported,
-    SuperParamAliasOrScala2x, Inline, Macro, ConstructorProxy, Invisible)
+    SuperParamAliasOrScala2x, Inline, Macro, ConstructorProxy, Invisible,
+    Dependent)
 
   /** Flags that are not (re)set when completing the denotation, or, if symbol is
    *  a top-level class or object, when completing the denotation once the class

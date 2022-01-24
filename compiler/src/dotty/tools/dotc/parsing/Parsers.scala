@@ -2863,6 +2863,7 @@ object Parsers {
           case nme.open => Mod.Open()
           case nme.transparent => Mod.Transparent()
           case nme.infix => Mod.Infix()
+          case nme.dependent => Mod.Dependent()
         }
     }
 
@@ -2919,7 +2920,7 @@ object Parsers {
      *                  |  AccessModifier
      *                  |  override
      *                  |  opaque
-     *  LocalModifier  ::= abstract | final | sealed | open | implicit | lazy | erased | inline | transparent
+     *  LocalModifier  ::= abstract | final | sealed | open | implicit | lazy | erased | inline | transparent | infix | dependent
      */
     def modifiers(allowed: BitSet = modifierTokens, start: Modifiers = Modifiers()): Modifiers = {
       @tailrec

@@ -2223,12 +2223,14 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
   def typedValDef(vdef: untpd.ValDef, sym: Symbol)(using Context): Tree = {
     val ValDef(name, tpt, _) = vdef
     completeAnnotations(vdef, sym)
+    val rhsCtx = ctx.fresh
+    if sym.is(Dependent) then rhsCtx.addMode(Mode.Dependent)
     if (sym.isOneOf(GivenOrImplicit)) checkImplicitConversionDefOK(sym)
     if sym.is(Module) then checkNoModuleClash(sym)
     val tpt1 = checkSimpleKinded(typedType(tpt))
     val rhs1 = vdef.rhs match {
       case rhs @ Ident(nme.WILDCARD) => rhs withType tpt1.tpe
-      case rhs => typedExpr(rhs, tpt1.tpe.widenExpr)
+      case rhs => typedExpr(rhs, tpt1.tpe.widenExpr)(using rhsCtx)
     }
     val vdef1 = assignType(cpy.ValDef(vdef)(name, tpt1, rhs1), sym)
     postProcessInfo(sym)
@@ -2290,6 +2292,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
 
     if sym.isInlineMethod then rhsCtx.addMode(Mode.InlineableBody)
     if sym.is(ExtensionMethod) then rhsCtx.addMode(Mode.InExtensionMethod)
+    if sym.is(Dependent) then rhsCtx.addMode(Mode.Dependent)
     val rhs1 = PrepareInlineable.dropInlineIfError(sym,
       if sym.isScala2Macro then typedScala2MacroBody(ddef.rhs)(using rhsCtx)
       else typedExpr(ddef.rhs, tpt1.tpe.widenExpr)(using rhsCtx))

@@ -323,7 +323,8 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
             case Select(nu: New, nme.CONSTRUCTOR) if isCheckable(nu) =>
               // need to check instantiability here, because the type of the New itself
               // might be a type constructor.
-              ctx.typer.checkClassType(tree.tpe, tree.srcPos, traitReq = false, stablePrefixReq = true)
+              // TODO(mbovel): understand what is going on here, could refinement be acceptable?
+              ctx.typer.checkClassType(tree.tpe, tree.srcPos, traitReq = false, stablePrefixReq = true, refinementOK = true)
               if !nu.tpe.isLambdaSub then
                 // Check the constructor type as well; it could be an illegal singleton type
                 // which would not be reflected as `tree.tpe`

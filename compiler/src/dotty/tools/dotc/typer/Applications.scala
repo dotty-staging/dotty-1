@@ -809,6 +809,28 @@ trait Applications extends Compatibility {
       isPureExpr(arg)
       || arg.isInstanceOf[RefTree | Apply | TypeApply] && arg.symbol.name.is(DefaultGetterName)
 
+    def preciseType(app: Apply): Type =
+      val funSym = app.fun.symbol
+
+      /*if funSym.isConstructor then
+        val classSym = funSym.enclosingClass
+        // TODO(mbovel): return NoType if no params
+        // TODO(mbovel): handle multiple param lists
+        // TODO(mbovel): might not want to recreate this RefinedType every time? Should do in Namer?
+        funSym.paramSymss(0).zip(app.args).foldLeft(app.tpe) { case (acc, (termParam, arg)) =>
+          // TODO(mbovel): simpler check… how to do that properly?
+          if (classSym.typeRef.nonPrivateMember(termParam.name).exists)
+            RefinedType(acc, termParam.name, arg.tpe)
+          else acc
+        }
+      else*/
+      app.fun match
+        case Select(arg0, funRef) if funSym == defn.Int_+ && app.args.length == 1  =>
+          AppliedType(defn.CompiletimeOpsInt_Add, List(arg0.tpe, app.args(0).tpe))
+        case Select(arg0, funRef) if funSym == defn.Int_* && app.args.length == 1  =>
+          AppliedType(defn.CompiletimeOpsInt_Multiply, List(arg0.tpe, app.args(0).tpe))
+        case _ => NoType
+
     val result:   Tree = {
       var typedArgs = typedArgBuf.toList
       def app0 = cpy.Apply(app)(normalizedFun, typedArgs) // needs to be a `def` because typedArgs can change later
@@ -852,7 +874,12 @@ trait Applications extends Compatibility {
           end if
           if (sameSeq(typedArgs, args)) // trick to cut down on tree copying
             typedArgs = args.asInstanceOf[List[Tree]]
-          assignType(app0, normalizedFun, typedArgs)
+          val tpdApp = assignType(app0, normalizedFun, typedArgs)
+          if ctx.mode.is(Mode.Dependent) then
+            preciseType(tpdApp) match
+              case NoType => tpdApp
+              case ptp => tpdApp.cast(ptp)
+          else tpdApp
         }
       wrapDefs(liftedDefs, app1)
     }

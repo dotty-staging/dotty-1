@@ -64,6 +64,7 @@ class CompilationTests {
       compileFile("tests/pos-custom-args/i10383.scala", defaultOptions.and("-source", "future", "-deprecation", "-Xfatal-warnings")),
       compileFile("tests/pos-custom-args/i13044.scala", defaultOptions.and("-Xmax-inlines:33")),
       compileFile("tests/pos-custom-args/jdk-8-app.scala", defaultOptions.and("-release:8")),
+      compileFile("tests/pos-custom-args/precise-functions.scala", defaultOptions.and("-language:experimental.dependent")),
     ).checkCompile()
   }
 
