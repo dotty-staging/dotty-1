@@ -3,7 +3,7 @@ package dotc
 
 import core._
 import Contexts._
-import SymDenotations.ClassDenotation
+import SymDenotations.{ClassDenotation, NoDenotation}
 import Symbols._
 import util.{FreshNameCreator, SourceFile, NoSource}
 import util.Spans.Span
@@ -44,6 +44,8 @@ class CompilationUnit protected (val source: SourceFile) {
    *  The information is used in phase `Inlining` in order to avoid traversing trees that need no transformations.
    */
   var needsInlining: Boolean = false
+
+  var hasMacroAnnotations: Boolean = false
 
   /** Set to `true` if inliner added anonymous mirrors that need to be completed */
   var needsMirrorSupport: Boolean = false
@@ -119,6 +121,7 @@ object CompilationUnit {
       force.traverse(unit1.tpdTree)
       unit1.needsStaging = force.containsQuote
       unit1.needsInlining = force.containsInline
+      unit1.hasMacroAnnotations = force.containsMacroAnnotation
     }
     unit1
   }
@@ -147,6 +150,7 @@ object CompilationUnit {
     var containsQuote = false
     var containsInline = false
     var containsCaptureChecking = false
+    var containsMacroAnnotation = false
     def traverse(tree: Tree)(using Context): Unit = {
       if (tree.symbol.isQuote)
         containsQuote = true
@@ -160,6 +164,9 @@ object CompilationUnit {
                 Feature.handleGlobalLanguageImport(prefix, imported)
             case _ =>
         case _ =>
+      for annot <- tree.symbol.annotations do
+        if annot.tree.symbol.denot != NoDenotation && annot.tree.symbol.owner.derivesFrom(defn.QuotedMacroAnnotationClass) then
+          ctx.compilationUnit.hasMacroAnnotations = true
       traverseChildren(tree)
     }
   }
