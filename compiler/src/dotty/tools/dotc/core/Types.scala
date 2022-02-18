@@ -3966,13 +3966,22 @@ object Types {
         case ExprType(resType) => ExprType(addAnnotation(resType, cls))
         case _ => AnnotatedType(tp, Annotation(cls))
 
+      def wrapConvertible(tp: Type) =
+        AppliedType(defn.ConvertibleToType.typeRef, tp :: Nil)
+
       def addConvertibleTo(tp: Type): Type = tp match
+        case tp @ AppliedType(tycon, args) if tycon.typeSymbol == defn.RepeatedParamClass =>
+          tp.derivedAppliedType(tycon, addConvertibleTo(args.head) :: Nil)
+        case tp @ AppliedType(tycon, args) if defn.isFunctionType(tp) =>
+          wrapConvertible(tp.derivedAppliedType(tycon, args.init :+ addConvertibleTo(args.last)))
+        case tp @ RefinedType(parent, rname, rinfo) if defn.isFunctionType(tp) =>
+          wrapConvertible(tp.derivedRefinedType(parent, rname, addConvertibleTo(rinfo)))
+        case tp: MethodType =>
+          tp.derivedLambdaType(resType = addConvertibleTo(tp.resType))
         case ExprType(resType) =>
           ExprType(addConvertibleTo(resType))
-        case tp @ AppliedType(tycon, arg :: Nil) if tycon.typeSymbol == defn.RepeatedParamClass =>
-          tp.derivedAppliedType(tycon, addConvertibleTo(arg) :: Nil)
         case _ =>
-          AppliedType(defn.ConvertibleToType.typeRef, tp :: Nil)
+          wrapConvertible(tp)
 
       def paramInfo(param: Symbol) =
         var paramType = param.info.annotatedToRepeated

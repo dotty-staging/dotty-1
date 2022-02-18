@@ -11,6 +11,11 @@ given Conversion[String, Text] = Text(_)
   f("abc", "def", "xyz", "uvw")  // ok
   f("abc", "def", "xyz", Text("uvw"))  // ok
 
+  def g(x: convertibleTo () => Text) =
+    println(x().str)
+
+  g(() => "hi")
+
 trait A[X]:
   def f(x: X): Unit = ()
 
