@@ -982,13 +982,10 @@ trait Checking {
    */
   def checkImplicitConversionUseOK(tree: Tree, expected: Type)(using Context): Unit =
     val sym = tree.symbol
-    def isConvertibleParam(tp: Type) = tp match
-      case AnnotatedType(_, annot) => annot.symbol == defn.ConvertibleAnnot
-      case _ => false
     if sym.name == nme.apply
        && sym.owner.derivesFrom(defn.ConversionClass)
        && !sym.info.isErroneous
-       && !isConvertibleParam(expected)
+       && !expected.isConvertibleParam
     then
       def conv = methPart(tree) match
         case Select(qual, _) => qual.symbol.orElse(sym.owner)

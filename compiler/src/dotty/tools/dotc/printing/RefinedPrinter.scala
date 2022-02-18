@@ -219,6 +219,7 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
           case _ =>
             val tsym = tycon.typeSymbol
             if tycon.isRepeatedParam then toTextLocal(args.head) ~ "*"
+            else if tp.isConvertibleParam then "convertibleTo " ~ toText(args.head)
             else if defn.isFunctionSymbol(tsym) then
               toTextFunction(args, tsym.name.isContextFunction, tsym.name.isErasedFunction,
                 isPure = ctx.settings.Ycc.value && !tsym.name.isImpureFunction)

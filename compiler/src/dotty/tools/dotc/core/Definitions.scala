@@ -644,6 +644,9 @@ class Definitions {
 
   @tu lazy val RepeatedParamClass: ClassSymbol = enterSpecialPolyClass(tpnme.REPEATED_PARAM_CLASS, Covariant, Seq(ObjectType, SeqType))
 
+  @tu lazy val ConvertibleToType: TypeSymbol = enterAliasType(
+    tpnme.CONVERTIBLE_TO, HKTypeLambda(TypeBounds.empty :: Nil)(_.paramRefs(0)))
+
   // fundamental classes
   @tu lazy val StringClass: ClassSymbol = requiredClass("java.lang.String")
   def StringType: Type = StringClass.typeRef
@@ -976,7 +979,6 @@ class Definitions {
   @tu lazy val CaptureCheckedAnnot: ClassSymbol = requiredClass("scala.annotation.internal.CaptureChecked")
   @tu lazy val ChildAnnot: ClassSymbol = requiredClass("scala.annotation.internal.Child")
   @tu lazy val ContextResultCountAnnot: ClassSymbol = requiredClass("scala.annotation.internal.ContextResultCount")
-  @tu lazy val ConvertibleAnnot: ClassSymbol = requiredClass("scala.annotation.internal.$convertible")
   @tu lazy val ProvisionalSuperClassAnnot: ClassSymbol = requiredClass("scala.annotation.internal.ProvisionalSuperClass")
   @tu lazy val DeprecatedAnnot: ClassSymbol = requiredClass("scala.deprecated")
   @tu lazy val DeprecatedOverridingAnnot: ClassSymbol = requiredClass("scala.deprecatedOverriding")
@@ -1958,6 +1960,7 @@ class Definitions {
       orType,
       RepeatedParamClass,
       ByNameParamClass2x,
+      ConvertibleToType,
       AnyValClass,
       NullClass,
       NothingClass,

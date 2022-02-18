@@ -28,6 +28,10 @@ class ParserOps[T](p: Parser[T]):
         case Success(x, in1) => Success(f(x), in1)
         case fail: Failure => fail
     )
+  def ~> [U](q: => convertibleTo Parser[U]): Parser[U] =
+    (p ~ q).map(_(1))
+  def <~ [U](q: => convertibleTo Parser[U]): Parser[T] =
+    (p ~ q).map(_(0))
   def parseAll(in: Input): ParseResult[T] =
     p.parse(in) match
       case succ @ Success(x, in1) =>
@@ -80,12 +84,11 @@ def Expr: Parser[Double] =
 def Term: Parser[Double] =
   (Factor ~ rep("*" ~ Factor | "/" ~ Factor)).map(reduce)
 def Factor: Parser[Double] =
-    Number
-  | ("(" ~ Expr ~ ")").map{ case "(" ~~ e ~~ ")" => e }
+  Number | "(" ~> Expr <~ ")"
 def Number: Parser[Double] =
   token(_.toDoubleOption.isDefined, "number").map(_.toDouble)
 
-def ops: Parser[String] = "+" | "-"
+def ops: Parser[String] = "+" | "-" | "*" | "/"
 
 @main def Test =
   println(Expr.parseAll("2 * ( 3 + 4 - 2 / 1 )".split(" ").toList))

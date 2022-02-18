@@ -397,6 +397,10 @@ object Types {
     def isRepeatedParam(using Context): Boolean =
       typeSymbol eq defn.RepeatedParamClass
 
+    /** Is this a parameter type that allows implicit argument converson? */
+    def isConvertibleParam(using Context): Boolean =
+      typeSymbol eq defn.ConvertibleToType
+
     /** Is this the type of a method that has a repeated parameter type as
      *  last parameter type?
      */
@@ -3958,23 +3962,26 @@ object Types {
      *   - add @$convertibe to parameters that have an @allowConversions annotation
      */
     def fromSymbols(params: List[Symbol], resultType: Type)(using Context): MethodType =
-      def addAnnotation(tp: Type, cls: ClassSymbol, underStar: Boolean): Type = tp match
+      def addAnnotation(tp: Type, cls: ClassSymbol): Type = tp match
+        case ExprType(resType) => ExprType(addAnnotation(resType, cls))
+        case _ => AnnotatedType(tp, Annotation(cls))
+
+      def addConvertibleTo(tp: Type): Type = tp match
         case ExprType(resType) =>
-          ExprType(addAnnotation(resType, cls, underStar))
-        case tp @ AppliedType(tycon, arg :: Nil)
-        if tycon.typeSymbol == defn.RepeatedParamClass && underStar =>
-          tp.derivedAppliedType(tycon, addAnnotation(arg, cls, underStar) :: Nil)
+          ExprType(addConvertibleTo(resType))
+        case tp @ AppliedType(tycon, arg :: Nil) if tycon.typeSymbol == defn.RepeatedParamClass =>
+          tp.derivedAppliedType(tycon, addConvertibleTo(arg) :: Nil)
         case _ =>
-          AnnotatedType(tp, Annotation(cls))
+          AppliedType(defn.ConvertibleToType.typeRef, tp :: Nil)
 
       def paramInfo(param: Symbol) =
         var paramType = param.info.annotatedToRepeated
         if param.is(Inline) then
-          paramType = addAnnotation(paramType, defn.InlineParamAnnot, underStar = false)
+          paramType = addAnnotation(paramType, defn.InlineParamAnnot)
         if param.is(Erased) then
-          paramType = addAnnotation(paramType, defn.ErasedParamAnnot, underStar = false)
+          paramType = addAnnotation(paramType, defn.ErasedParamAnnot)
         if param.hasAnnotation(defn.AllowConversionsAnnot) then
-          paramType = addAnnotation(paramType, defn.ConvertibleAnnot, underStar = true)
+          paramType = addConvertibleTo(paramType)
         paramType
 
       apply(params.map(_.name.asTermName))(

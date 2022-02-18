@@ -285,6 +285,8 @@ object StdNames {
     val CAPTURE_ROOT: N             = "*"
     val CONSTRUCTOR: N              = "<init>"
     val STATIC_CONSTRUCTOR: N       = "<clinit>"
+    val CONVERTIBLE_TO: N           = "<convertible-to>"
+    val DEFAULT_CASE: N             = "defaultCase$"
     val EVT2U: N                    = "evt2u$"
     val EQEQ_LOCAL_VAR: N           = "eqEqTemp$"
     val LAZY_FIELD_OFFSET: N        = "OFFSET$"
