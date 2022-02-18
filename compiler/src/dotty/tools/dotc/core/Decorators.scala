@@ -74,7 +74,7 @@ object Decorators {
   /** Implements filterConserve, zipWithConserve methods
    *  on lists that avoid duplication of list nodes where feasible.
    */
-  implicit class ListDecorator[T](val xs: List[T]) extends AnyVal {
+  extension [T](xs: List[T])
 
     final def mapconserve[U](f: T => U): List[U] = {
       @tailrec
@@ -203,11 +203,10 @@ object Decorators {
     }
 
     /** Union on lists seen as sets */
-    def | (ys: List[T]): List[T] = xs ::: (ys filterNot (xs contains _))
+    def setUnion (ys: List[T]): List[T] = xs ::: ys.filterNot(xs contains _)
 
     /** Intersection on lists seen as sets */
-    def & (ys: List[T]): List[T] = xs filter (ys contains _)
-  }
+    def setIntersect (ys: List[T]): List[T] = xs.filter(ys contains _)
 
   extension [T, U](xss: List[List[T]])
     def nestedMap(f: T => U): List[List[U]] = xss match

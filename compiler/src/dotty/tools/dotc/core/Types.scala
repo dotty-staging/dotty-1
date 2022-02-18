@@ -548,7 +548,7 @@ object Types {
       case tp: ClassInfo =>
         tp.cls :: Nil
       case AndType(l, r) =>
-        l.parentSymbols(include) | r.parentSymbols(include)
+        l.parentSymbols(include).setUnion(r.parentSymbols(include))
       case OrType(l, r) =>
         l.parentSymbols(include) intersect r.parentSymbols(include) // TODO does not conform to spec
       case _ =>
