@@ -435,6 +435,8 @@ object StdNames {
     val compiletime : N         = "compiletime"
     val conforms_ : N           = "$conforms"
     val contents: N             = "contents"
+    val convertible_ : N        = "$convertible"
+    val convertibleTo: N        = "convertibleTo"
     val copy: N                 = "copy"
     val currentMirror: N        = "currentMirror"
     val create: N               = "create"

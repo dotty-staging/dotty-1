@@ -1879,6 +1879,11 @@ object Types {
 
     def dropRepeatedAnnot(using Context): Type = dropAnnot(defn.RepeatedAnnot)
 
+    /** A translation from types of original parameter ValDefs to the types
+     *  of parameters in MethodTypes.
+     *  Translates `Seq[T] @repeated` or `Array[T] @repeated` to `<repeated>[T]`.
+     *  That way, repeated arguments are made manifest without risk of dropped annotations.
+     */
     def annotatedToRepeated(using Context): Type = this match {
       case tp @ ExprType(tp1) => tp.derivedExprType(tp1.annotatedToRepeated)
       case AnnotatedType(tp, annot) if annot matches defn.RepeatedAnnot =>
@@ -3949,27 +3954,33 @@ object Types {
      *  and inline parameters:
      *   - replace @repeated annotations on Seq or Array types by <repeated> types
      *   - add @inlineParam to inline parameters
+     *   - add @erasedParam to erased parameters
+     *   - add @$convertibe to parameters that have an @allowConversions annotation
      */
-    def fromSymbols(params: List[Symbol], resultType: Type)(using Context): MethodType = {
-      def translateInline(tp: Type): Type = tp match {
-        case ExprType(resType) => ExprType(AnnotatedType(resType, Annotation(defn.InlineParamAnnot)))
-        case _ => AnnotatedType(tp, Annotation(defn.InlineParamAnnot))
-      }
-      def translateErased(tp: Type): Type = tp match {
-        case ExprType(resType) => ExprType(AnnotatedType(resType, Annotation(defn.ErasedParamAnnot)))
-        case _ => AnnotatedType(tp, Annotation(defn.ErasedParamAnnot))
-      }
-      def paramInfo(param: Symbol) = {
+    def fromSymbols(params: List[Symbol], resultType: Type)(using Context): MethodType =
+      def addAnnotation(tp: Type, cls: ClassSymbol, underStar: Boolean): Type = tp match
+        case ExprType(resType) =>
+          ExprType(addAnnotation(resType, cls, underStar))
+        case tp @ AppliedType(tycon, arg :: Nil)
+        if tycon.typeSymbol == defn.RepeatedParamClass && underStar =>
+          tp.derivedAppliedType(tycon, addAnnotation(arg, cls, underStar) :: Nil)
+        case _ =>
+          AnnotatedType(tp, Annotation(cls))
+
+      def paramInfo(param: Symbol) =
         var paramType = param.info.annotatedToRepeated
-        if (param.is(Inline)) paramType = translateInline(paramType)
-        if (param.is(Erased)) paramType = translateErased(paramType)
+        if param.is(Inline) then
+          paramType = addAnnotation(paramType, defn.InlineParamAnnot, underStar = false)
+        if param.is(Erased) then
+          paramType = addAnnotation(paramType, defn.ErasedParamAnnot, underStar = false)
+        if param.hasAnnotation(defn.AllowConversionsAnnot) then
+          paramType = addAnnotation(paramType, defn.ConvertibleAnnot, underStar = true)
         paramType
-      }
 
       apply(params.map(_.name.asTermName))(
          tl => params.map(p => tl.integrate(params, paramInfo(p))),
          tl => tl.integrate(params, resultType))
-    }
+    end fromSymbols
 
     final def apply(paramNames: List[TermName])(paramInfosExp: MethodType => List[Type], resultTypeExp: MethodType => Type)(using Context): MethodType =
       checkValid(unique(new CachedMethodType(paramNames)(paramInfosExp, resultTypeExp, self)))

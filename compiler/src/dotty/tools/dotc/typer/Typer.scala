@@ -3342,7 +3342,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           case SearchSuccess(found, _, _, isExtension) =>
             if isExtension then return found
             else
-              checkImplicitConversionUseOK(found)
+              checkImplicitConversionUseOK(found, selProto)
               return withoutMode(Mode.ImplicitsEnabled)(typedSelect(tree, pt, found))
           case failure: SearchFailure =>
             if failure.isAmbiguous then
@@ -3957,7 +3957,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
             case SearchSuccess(found, _, _, isExtension) =>
               if isExtension then found
               else
-                checkImplicitConversionUseOK(found)
+                checkImplicitConversionUseOK(found, pt)
                 withoutMode(Mode.ImplicitsEnabled)(readapt(found))
             case failure: SearchFailure =>
               if (pt.isInstanceOf[ProtoType] && !failure.isAmbiguous) then

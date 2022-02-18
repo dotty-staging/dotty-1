@@ -1906,6 +1906,11 @@ object Parsers {
       else
         core()
 
+    private def convertibleTo(tp: () => Tree) =
+      if in.isIdent(nme.convertibleTo) && canStartTypeTokens.contains(in.lookahead.token)
+      then atSpan(in.skipToken()) { ConvertibleTo(tp()) }
+      else tp()
+
     /** FunArgType ::=  Type
      *               |  `=>' Type
      *               |  [CaptureSet] `->' Type
@@ -1918,10 +1923,10 @@ object Parsers {
      */
     def paramType(): Tree = paramTypeOf(paramValueType)
 
-    /** ParamValueType ::= Type [`*']
+    /** ParamValueType ::= [`convertibleTo`] Type [`*']
      */
     def paramValueType(): Tree = {
-      val t = toplevelTyp()
+      val t = convertibleTo(toplevelTyp)
       if (isIdent(nme.raw.STAR)) {
         in.nextToken()
         atSpan(startOffset(t)) { PostfixOp(t, Ident(tpnme.raw.STAR)) }

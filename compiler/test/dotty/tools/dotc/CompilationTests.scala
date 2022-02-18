@@ -139,6 +139,8 @@ class CompilationTests {
       compileFilesInDir("tests/neg-custom-args/erased", defaultOptions.and("-language:experimental.erasedDefinitions")),
       compileFilesInDir("tests/neg-custom-args/allow-double-bindings", allowDoubleBindings),
       compileFilesInDir("tests/neg-custom-args/allow-deep-subtypes", allowDeepSubtypes),
+      compileFilesInDir("tests/neg-custom-args/explicit-nulls", defaultOptions.and("-Yexplicit-nulls")),
+      compileFilesInDir("tests/neg-custom-args/feature", defaultOptions.and("-Xfatal-warnings", "-feature")),
       compileFilesInDir("tests/neg-custom-args/no-experimental", defaultOptions.and("-Yno-experimental")),
       compileFilesInDir("tests/neg-custom-args/captures", defaultOptions.and("-Ycc")),
       compileDir("tests/neg-custom-args/impl-conv", defaultOptions.and("-Xfatal-warnings", "-feature")),

@@ -967,6 +967,7 @@ class Definitions {
   @tu lazy val RefiningAnnotationClass: ClassSymbol = requiredClass("scala.annotation.RefiningAnnotation")
 
   // Annotation classes
+  @tu lazy val AllowConversionsAnnot: ClassSymbol = requiredClass("scala.annotation.allowConversions")
   @tu lazy val AnnotationDefaultAnnot: ClassSymbol = requiredClass("scala.annotation.internal.AnnotationDefault")
   @tu lazy val BeanPropertyAnnot: ClassSymbol = requiredClass("scala.beans.BeanProperty")
   @tu lazy val BooleanBeanPropertyAnnot: ClassSymbol = requiredClass("scala.beans.BooleanBeanProperty")
@@ -975,6 +976,7 @@ class Definitions {
   @tu lazy val CaptureCheckedAnnot: ClassSymbol = requiredClass("scala.annotation.internal.CaptureChecked")
   @tu lazy val ChildAnnot: ClassSymbol = requiredClass("scala.annotation.internal.Child")
   @tu lazy val ContextResultCountAnnot: ClassSymbol = requiredClass("scala.annotation.internal.ContextResultCount")
+  @tu lazy val ConvertibleAnnot: ClassSymbol = requiredClass("scala.annotation.internal.$convertible")
   @tu lazy val ProvisionalSuperClassAnnot: ClassSymbol = requiredClass("scala.annotation.internal.ProvisionalSuperClass")
   @tu lazy val DeprecatedAnnot: ClassSymbol = requiredClass("scala.deprecated")
   @tu lazy val DeprecatedOverridingAnnot: ClassSymbol = requiredClass("scala.deprecatedOverriding")

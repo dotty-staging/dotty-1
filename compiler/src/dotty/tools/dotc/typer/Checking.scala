@@ -977,14 +977,18 @@ trait Checking {
         sym.srcPos)
 
   /** If `tree` is an application of a new-style implicit conversion (using the apply
-   *  method of a `scala.Conversion` instance), check that implicit conversions are
-   *  enabled.
+   *  method of a `scala.Conversion` instance), check that the expected type is
+   *  a convertible formal parameter type or that implicit conversions are enabled.
    */
-  def checkImplicitConversionUseOK(tree: Tree)(using Context): Unit =
+  def checkImplicitConversionUseOK(tree: Tree, expected: Type)(using Context): Unit =
     val sym = tree.symbol
+    def isConvertibleParam(tp: Type) = tp match
+      case AnnotatedType(_, annot) => annot.symbol == defn.ConvertibleAnnot
+      case _ => false
     if sym.name == nme.apply
        && sym.owner.derivesFrom(defn.ConversionClass)
        && !sym.info.isErroneous
+       && !isConvertibleParam(expected)
     then
       def conv = methPart(tree) match
         case Select(qual, _) => qual.symbol.orElse(sym.owner)
@@ -1515,7 +1519,7 @@ trait NoChecking extends ReChecking {
   override def checkStable(tp: Type, pos: SrcPos, kind: String)(using Context): Unit = ()
   override def checkClassType(tp: Type, pos: SrcPos, traitReq: Boolean, stablePrefixReq: Boolean)(using Context): Type = tp
   override def checkImplicitConversionDefOK(sym: Symbol)(using Context): Unit = ()
-  override def checkImplicitConversionUseOK(tree: Tree)(using Context): Unit = ()
+  override def checkImplicitConversionUseOK(tree: Tree, expected: Type)(using Context): Unit = ()
   override def checkFeasibleParent(tp: Type, pos: SrcPos, where: => String = "")(using Context): Type = tp
   override def checkAnnotArgs(tree: Tree)(using Context): tree.type = tree
   override def checkNoTargetNameConflict(stats: List[Tree])(using Context): Unit = ()
