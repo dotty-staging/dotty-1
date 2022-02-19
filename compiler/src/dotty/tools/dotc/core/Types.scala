@@ -399,7 +399,7 @@ object Types {
 
     /** Is this a parameter type that allows implicit argument converson? */
     def isConvertibleParam(using Context): Boolean =
-      typeSymbol eq defn.ConvertibleToType
+      typeSymbol eq defn.IntoType
 
     /** Is this the type of a method that has a repeated parameter type as
      *  last parameter type?
@@ -3967,19 +3967,19 @@ object Types {
         case _ => AnnotatedType(tp, Annotation(cls))
 
       def wrapConvertible(tp: Type) =
-        AppliedType(defn.ConvertibleToType.typeRef, tp :: Nil)
+        AppliedType(defn.IntoType.typeRef, tp :: Nil)
 
-      def addConvertibleTo(tp: Type): Type = tp match
+      def addInto(tp: Type): Type = tp match
         case tp @ AppliedType(tycon, args) if tycon.typeSymbol == defn.RepeatedParamClass =>
-          tp.derivedAppliedType(tycon, addConvertibleTo(args.head) :: Nil)
+          tp.derivedAppliedType(tycon, addInto(args.head) :: Nil)
         case tp @ AppliedType(tycon, args) if defn.isFunctionType(tp) =>
-          wrapConvertible(tp.derivedAppliedType(tycon, args.init :+ addConvertibleTo(args.last)))
+          wrapConvertible(tp.derivedAppliedType(tycon, args.init :+ addInto(args.last)))
         case tp @ RefinedType(parent, rname, rinfo) if defn.isFunctionType(tp) =>
-          wrapConvertible(tp.derivedRefinedType(parent, rname, addConvertibleTo(rinfo)))
+          wrapConvertible(tp.derivedRefinedType(parent, rname, addInto(rinfo)))
         case tp: MethodType =>
-          tp.derivedLambdaType(resType = addConvertibleTo(tp.resType))
+          tp.derivedLambdaType(resType = addInto(tp.resType))
         case ExprType(resType) =>
-          ExprType(addConvertibleTo(resType))
+          ExprType(addInto(resType))
         case _ =>
           wrapConvertible(tp)
 
@@ -3990,7 +3990,7 @@ object Types {
         if param.is(Erased) then
           paramType = addAnnotation(paramType, defn.ErasedParamAnnot)
         if param.hasAnnotation(defn.AllowConversionsAnnot) then
-          paramType = addConvertibleTo(paramType)
+          paramType = addInto(paramType)
         paramType
 
       apply(params.map(_.name.asTermName))(

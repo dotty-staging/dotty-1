@@ -644,8 +644,7 @@ class Definitions {
 
   @tu lazy val RepeatedParamClass: ClassSymbol = enterSpecialPolyClass(tpnme.REPEATED_PARAM_CLASS, Covariant, Seq(ObjectType, SeqType))
 
-  @tu lazy val ConvertibleToType: TypeSymbol = enterAliasType(
-    tpnme.CONVERTIBLE_TO, HKTypeLambda(TypeBounds.empty :: Nil)(_.paramRefs(0)))
+  @tu lazy val IntoType: TypeSymbol = enterAliasType(tpnme.INTO, HKTypeLambda(TypeBounds.empty :: Nil)(_.paramRefs(0)))
 
   // fundamental classes
   @tu lazy val StringClass: ClassSymbol = requiredClass("java.lang.String")
@@ -1960,7 +1959,7 @@ class Definitions {
       orType,
       RepeatedParamClass,
       ByNameParamClass2x,
-      ConvertibleToType,
+      IntoType,
       AnyValClass,
       NullClass,
       NothingClass,

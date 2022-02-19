@@ -11,7 +11,7 @@ object Test:
   f("abc", "def", "xyz", "uvw")  // error // error // error // error
   f("abc", "def", "xyz", Text("uvw"))  // error // error // error
 
-  def g(x: convertibleTo Text) =
+  def g(x: into Text) =
     println(x.str)
 
 
@@ -21,7 +21,7 @@ object Test:
 
   def h1[X](x: X)(y: X): Unit = ()
 
-  def h(x: convertibleTo Text) =
+  def h(x: into Text) =
     val y = h1(x)
     y("abc")  // error, inference through type variable does not propagate
 

@@ -4,14 +4,14 @@ given Conversion[String, Text] = Text(_)
 
 @main def Test =
 
-  def f(x: convertibleTo Text, y: => convertibleTo Text, zs: convertibleTo Text*) =
+  def f(x: into Text, y: => into Text, zs: into Text*) =
     println(s"${x.str} ${y.str} ${zs.map(_.str).mkString(" ")}")
 
   f("abc", "def")  // ok
   f("abc", "def", "xyz", "uvw")  // ok
   f("abc", "def", "xyz", Text("uvw"))  // ok
 
-  def g(x: convertibleTo () => Text) =
+  def g(x: into () => Text) =
     println(x().str)
 
   g(() => "hi")
@@ -23,7 +23,7 @@ trait B[X] extends A[X]:
   override def f(x: X) = super.f(x)
 
 trait C[X] extends A[X]:
-  override def f(x: convertibleTo X) = super.f(x)
+  override def f(x: into X) = super.f(x)
 
 class D[X] extends B[X], C[X]
 

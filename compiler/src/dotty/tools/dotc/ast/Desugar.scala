@@ -171,20 +171,20 @@ object desugar {
     val valName = normalizeName(vdef, tpt).asTermName
 
     var mods1 = vdef.mods
-    def dropConvertibleTo(tpt: Tree): Tree = tpt match
-      case ConvertibleTo(tpt1) =>
+    def dropInto(tpt: Tree): Tree = tpt match
+      case Into(tpt1) =>
         mods1 = vdef.mods.withAddedAnnotation(
           TypedSplice(
             Annotation(defn.AllowConversionsAnnot).tree.withSpan(tpt.span.startPos)))
         tpt1
       case ByNameTypeTree(tpt1) =>
-        cpy.ByNameTypeTree(tpt)(dropConvertibleTo(tpt1))
+        cpy.ByNameTypeTree(tpt)(dropInto(tpt1))
       case PostfixOp(tpt1, op) if op.name == tpnme.raw.STAR =>
-        cpy.PostfixOp(tpt)(dropConvertibleTo(tpt1), op)
+        cpy.PostfixOp(tpt)(dropInto(tpt1), op)
       case _ =>
         tpt
 
-    val vdef1 = cpy.ValDef(vdef)(name = valName, tpt = dropConvertibleTo(tpt))
+    val vdef1 = cpy.ValDef(vdef)(name = valName, tpt = dropInto(tpt))
       .withMods(mods1)
 
     if isSetterNeeded(vdef) then

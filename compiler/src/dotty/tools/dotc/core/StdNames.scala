@@ -128,6 +128,7 @@ object StdNames {
     val EXCEPTION_RESULT_PREFIX: N    = "exceptionResult"
     val EXPAND_SEPARATOR: N           = str.EXPAND_SEPARATOR
     val IMPORT: N                     = "<import>"
+    val INTO: N                       = "<into>"
     val MODULE_SUFFIX: N              = str.MODULE_SUFFIX
     val OPS_PACKAGE: N                = "<special-ops>"
     val OVERLOADED: N                 = "<overloaded>"
@@ -285,7 +286,6 @@ object StdNames {
     val CAPTURE_ROOT: N             = "*"
     val CONSTRUCTOR: N              = "<init>"
     val STATIC_CONSTRUCTOR: N       = "<clinit>"
-    val CONVERTIBLE_TO: N           = "<convertible-to>"
     val DEFAULT_CASE: N             = "defaultCase$"
     val EVT2U: N                    = "evt2u$"
     val EQEQ_LOCAL_VAR: N           = "eqEqTemp$"
@@ -438,7 +438,6 @@ object StdNames {
     val conforms_ : N           = "$conforms"
     val contents: N             = "contents"
     val convertible_ : N        = "$convertible"
-    val convertibleTo: N        = "convertibleTo"
     val copy: N                 = "copy"
     val currentMirror: N        = "currentMirror"
     val create: N               = "create"
@@ -502,6 +501,7 @@ object StdNames {
     val info: N                 = "info"
     val inlinedEquals: N        = "inlinedEquals"
     val internal: N             = "internal"
+    val into: N                 = "into"
     val isArray: N              = "isArray"
     val isDefinedAt: N          = "isDefinedAt"
     val isDefinedAtImpl: N      = "$isDefinedAt"
