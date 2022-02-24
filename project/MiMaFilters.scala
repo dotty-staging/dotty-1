@@ -7,7 +7,7 @@ object MiMaFilters {
     ProblemFilters.exclude[MissingClassProblem]("scala.annotation.MainAnnotation"),
     ProblemFilters.exclude[MissingClassProblem]("scala.annotation.MainAnnotation$"),
     ProblemFilters.exclude[MissingClassProblem]("scala.annotation.MainAnnotation$Command"),
-    ProblemFilters.exclude[MissingClassProblem]("scala.annotation.MainAnnotation$ParameterInfos"),
+    ProblemFilters.exclude[MissingClassProblem]("scala.annotation.MainAnnotation$ParameterInfo"),
     ProblemFilters.exclude[MissingClassProblem]("scala.annotation.MainAnnotation$ParameterAnnotation"),
     ProblemFilters.exclude[DirectMissingMethodProblem]("scala.runtime.Tuples.append"),
     ProblemFilters.exclude[ReversedMissingMethodProblem]("scala.quoted.Quotes#reflectModule#TypeReprMethods.substituteTypes"),

@@ -48,8 +48,8 @@ object MainAnnotation:
       new ParameterInfo(name, typeName, Some(doc), annotations)
 
     /** Copy this ParameterInfo and sets the annotations */
-    def withAnnotations(annots: ParameterAnnotation*): ParameterInfo =
-      new ParameterInfo(name, typeName, documentation, annots)
+    def withAnnotations(annotations: ParameterAnnotation*): ParameterInfo =
+      new ParameterInfo(name, typeName, documentation, annotations)
 
     override def toString: String = s"$name: $typeName"
   }
