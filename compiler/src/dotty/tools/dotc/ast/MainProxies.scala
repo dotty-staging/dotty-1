@@ -265,9 +265,9 @@ object MainProxies {
             for (doc <- documentation.argDocs.get(param))
               assignations = (defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal(Constant(doc)))) :: assignations
 
-            val instanciatedAnnots = paramAnnotations(n).map(instanciateAnnotation).toList
-            if instanciatedAnnots.nonEmpty then
-              assignations = (defn.MainAnnotationParameterInfo_withAnnotations -> instanciatedAnnots) :: assignations
+            val instantiatedAnnots = paramAnnotations(n).map(instantiateAnnotation).toList
+            if instantiatedAnnots.nonEmpty then
+              assignations = (defn.MainAnnotationParameterInfo_withAnnotations -> instantiatedAnnots) :: assignations
 
             assignations.foldLeft[Tree](paramInfosTree){ case (tree, (setterSym, values)) => Apply(Select(tree, setterSym.name), values) }
           }
@@ -290,7 +290,7 @@ object MainProxies {
     end createArgs
 
     /** Turns an annotation (e.g. `@main(40)`) into an instance of the class (e.g. `new scala.main(40)`). */
-    def instanciateAnnotation(annot: Annotation): Tree =
+    def instantiateAnnotation(annot: Annotation): Tree =
       val argss = {
         def recurse(t: tpd.Tree, acc: List[List[Tree]]): List[List[Tree]] = t match {
           case Apply(t, args: List[tpd.Tree]) => recurse(t, extractArgs(args) :: acc)
@@ -308,7 +308,7 @@ object MainProxies {
       }
 
       New(TypeTree(annot.symbol.typeRef), argss)
-    end instanciateAnnotation
+    end instantiateAnnotation
 
     var result: List[TypeDef] = Nil
     if (!mainFun.owner.isStaticOwner)
@@ -344,7 +344,7 @@ object MainProxies {
         cmdName,
         TypeTree(),
         Apply(
-          Select(instanciateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
+          Select(instantiateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
           Ident(nme.args) :: Literal(Constant(mainFun.showName)) :: Literal(Constant(documentation.mainDoc)) :: parameterInfoss
         )
       )
