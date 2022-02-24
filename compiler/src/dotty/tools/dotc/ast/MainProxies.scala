@@ -211,7 +211,7 @@ object MainProxies {
     mainMethods(EmptyTree, stats).flatMap(mainAnnotationProxy)
   }
 
-  private def mainAnnotationProxy(mainFun: Symbol, paramAnnotations: ParameterAnnotationss, defaultValueSymbols: DefaultValueSymbols, docComment: Option[Comment])(using Context): List[TypeDef] = {
+  private def mainAnnotationProxy(mainFun: Symbol, paramAnnotations: ParameterAnnotationss, defaultValueSymbols: DefaultValueSymbols, docComment: Option[Comment])(using Context): Option[TypeDef] = {
     val mainAnnot = mainFun.getAnnotation(defn.MainAnnotationClass).get
     def pos = mainFun.sourcePos
 
@@ -320,38 +320,13 @@ object MainProxies {
       New(TypeTree(annot.symbol.typeRef), argss)
     end instantiateAnnotation
 
-    var result: List[TypeDef] = Nil
-    if (!mainFun.owner.isStaticOwner)
-      report.error(s"main method is not statically accessible", pos)
-    else {
-      var args: List[ValDef] = Nil
-      var mainCall: Tree = ref(mainFun.termRef)
-      var parameterInfoss: List[Tree] = Nil
-
-      mainFun.info match {
-        case _: ExprType =>
-        case mt: MethodType =>
-          if (mt.isImplicitMethod)
-            report.error(s"main method cannot have implicit parameters", pos)
-          else mt.resType match
-            case restpe: MethodType =>
-              report.error(s"main method cannot be curried", pos)
-            case _ =>
-              args = argValDefs(mt)
-              mainCall = Apply(mainCall, argRefs(mt))
-              parameterInfoss = parameterInfos(mt)
-        case _: PolyType =>
-          report.error(s"main method cannot have type parameters", pos)
-        case _ =>
-          report.error(s"main can only annotate a method", pos)
-      }
-
+    def generateMainClass(mainCall: Tree, args: List[Tree], parameterInfos: List[Tree]): TypeDef =
       val cmd = ValDef(
         nme.cmd,
         TypeTree(),
         Apply(
           Select(instantiateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
-          Ident(nme.args) :: Literal(Constant(mainFun.showName)) :: Literal(Constant(documentation.mainDoc)) :: parameterInfoss
+          Ident(nme.args) :: Literal(Constant(mainFun.showName)) :: Literal(Constant(documentation.mainDoc)) :: parameterInfos
         )
       )
       val run = Apply(Select(Ident(nme.cmd), defn.MainAnnotationCommand_run.name), mainCall)
@@ -375,9 +350,32 @@ object MainProxies {
       val mainTempl = Template(emptyConstructor, Nil, Nil, EmptyValDef, mainMeth :: Nil)
       val mainCls = TypeDef(mainFun.name.toTypeName, mainTempl)
         .withFlags(Final | Invisible)
-      if (!ctx.reporter.hasErrors) result = mainCls.withSpan(mainAnnot.tree.span.toSynthetic) :: Nil
+      mainCls.withSpan(mainAnnot.tree.span.toSynthetic)
+    end generateMainClass
+
+    if (!mainFun.owner.isStaticOwner)
+      report.error(s"main method is not statically accessible", pos)
+      None
+    else mainFun.info match {
+      case _: ExprType =>
+        Some(generateMainClass(ref(mainFun.termRef), Nil, Nil))
+      case mt: MethodType =>
+        if (mt.isImplicitMethod)
+          report.error(s"main method cannot have implicit parameters", pos)
+          None
+        else mt.resType match
+          case restpe: MethodType =>
+            report.error(s"main method cannot be curried", pos)
+            None
+          case _ =>
+            Some(generateMainClass(Apply(ref(mainFun.termRef), argRefs(mt)), argValDefs(mt), parameterInfos(mt)))
+      case _: PolyType =>
+        report.error(s"main method cannot have type parameters", pos)
+        None
+      case _ =>
+        report.error(s"main can only annotate a method", pos)
+        None
     }
-    result
   }
 
   /** A class responsible for extracting the docstrings of a method. */
