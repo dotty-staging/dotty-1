@@ -12,6 +12,7 @@ package scala.annotation
  */
 @experimental
 trait MainAnnotation extends StaticAnnotation:
+  import MainAnnotation.*
 
   /** The class used for argument string parsing. E.g. `scala.util.CommandLineParser.FromString`,
    *  but could be something else
@@ -22,13 +23,13 @@ trait MainAnnotation extends StaticAnnotation:
   type MainResultType
 
   /** A new command with arguments from `args` */
-  def command(args: Array[String], commandName: String, documentation: String, parameterInfoss: MainAnnotation.ParameterInfos*): MainAnnotation.Command[ArgumentParser, MainResultType]
+  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[ArgumentParser, MainResultType]
 end MainAnnotation
 
 @experimental
 object MainAnnotation:
 
-  final class ParameterInfos private (
+  final class ParameterInfo private (
     /** The name of the parameter */
     val name: String,
     /** The name of the parameter's type */
@@ -38,17 +39,17 @@ object MainAnnotation:
     /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
     val annotations: Seq[ParameterAnnotation],
   ) {
-    /** ParameterInfos with a name and the type of the parameter */
+    /** ParameterInfo with a name and the type of the parameter */
     def this(name: String, typeName: String) =
       this(name, typeName, None, Seq.empty)
 
-    /** Copy this ParameterInfos and sets the documentation */
-    def withDocumentation(doc: String): ParameterInfos =
-      new ParameterInfos(name, typeName, Some(doc), annotations)
+    /** Copy this ParameterInfo and sets the documentation */
+    def withDocumentation(doc: String): ParameterInfo =
+      new ParameterInfo(name, typeName, Some(doc), annotations)
 
-    /** Copy this ParameterInfos and sets the annotations */
-    def withAnnotations(annots: ParameterAnnotation*): ParameterInfos =
-      new ParameterInfos(name, typeName, documentation, annots)
+    /** Copy this ParameterInfo and sets the annotations */
+    def withAnnotations(annots: ParameterAnnotation*): ParameterInfo =
+      new ParameterInfo(name, typeName, documentation, annots)
 
     override def toString: String = s"$name: $typeName"
   }
@@ -68,6 +69,6 @@ object MainAnnotation:
     def run(program: => MainResultType): Unit
   end Command
 
-  /** Marker trait for annotations that will be included in the ParameterInfos annotations. */
+  /** Marker trait for annotations that will be included in the ParameterInfo annotations. */
   trait ParameterAnnotation extends StaticAnnotation
 end MainAnnotation

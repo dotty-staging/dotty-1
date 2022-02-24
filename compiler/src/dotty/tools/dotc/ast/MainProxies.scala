@@ -152,10 +152,10 @@ object MainProxies {
    *           args,
    *           "f",
    *           "Lorem ipsum dolor sit amet consectetur adipiscing elit.",
-   *           new scala.annotation.MainAnnotation.ParameterInfos("x", "S")
+   *           new scala.annotation.MainAnnotation.ParameterInfo("x", "S")
    *             .withDocumentation("my param x")
    *             .withAnnotations(new scala.main.Alias("myX")),
-   *           new scala.annotation.MainAnnotation.ParameterInfos("ys", "T")
+   *           new scala.annotation.MainAnnotation.ParameterInfo("ys", "T")
    *             .withDocumentation("all my params y")
    *         )
    *
@@ -170,8 +170,8 @@ object MainProxies {
     import tpd._
 
     /**
-      * Computes the symbols of the default values of the function. Since they cannot be infered anymore at this
-      * point of the compilation, they must be explicitely passed by [[mainProxy]].
+      * Computes the symbols of the default values of the function. Since they cannot be inferred anymore at this
+      * point of the compilation, they must be explicitly passed by [[mainProxy]].
       */
     def defaultValueSymbols(scope: Tree, funSymbol: Symbol): DefaultValueSymbols =
       scope match {
@@ -239,7 +239,7 @@ object MainProxies {
       *   `val args0: () => S = cmd.argGetter[S]("x", None)`
       * part of the code.
       * For each tuple, the first element is a ref to `args0`, the second is the whole definition, the third
-      * is the ParameterInfos definition associated to this argument.
+      * is the ParameterInfo definition associated to this argument.
       */
     def createArgs(mt: MethodType, cmdName: TermName): List[(Tree, ValDef, Tree)] =
       mt.paramInfos.zip(mt.paramNames).zipWithIndex.map {
@@ -254,29 +254,29 @@ object MainProxies {
             else (argRef0, formal, defn.MainAnnotationCommand_argGetter)
           }
 
-          // The ParameterInfos
+          // The ParameterInfo
           val parameterInfos = {
             val param = paramName.toString
             val paramInfosTree = New(
-              TypeTree(defn.MainAnnotationParameterInfos.typeRef),
-              // Arguments to be passed to ParameterInfos' constructor
+              TypeTree(defn.MainAnnotationParameterInfo.typeRef),
+              // Arguments to be passed to ParameterInfo' constructor
               List(List(lit(param), lit(formalType.show)))
             )
 
             /*
-             * Assignations to be made after the creation of the ParameterInfos.
+             * Assignations to be made after the creation of the ParameterInfo.
              * For example:
              *   args0paramInfos.withDocumentation("my param x")
              * is represented by the pair
-             *   defn.MainAnnotationParameterInfos_withDocumentation -> List(lit("my param x"))
+             *   defn.MainAnnotationParameterInfo_withDocumentation -> List(lit("my param x"))
              */
             var assignations: List[(Symbol, List[Tree])] = Nil
             for (doc <- documentation.argDocs.get(param))
-              assignations = (defn.MainAnnotationParameterInfos_withDocumentation -> List(lit(doc))) :: assignations
+              assignations = (defn.MainAnnotationParameterInfo_withDocumentation -> List(lit(doc))) :: assignations
 
             val instanciatedAnnots = paramAnnotations(n).map(instanciateAnnotation).toList
             if instanciatedAnnots.nonEmpty then
-              assignations = (defn.MainAnnotationParameterInfos_withAnnotations -> instanciatedAnnots) :: assignations
+              assignations = (defn.MainAnnotationParameterInfo_withAnnotations -> instanciatedAnnots) :: assignations
 
             assignations.foldLeft[Tree](paramInfosTree){ case (tree, (setterSym, values)) => Apply(Select(tree, setterSym.name), values) }
           }

@@ -851,9 +851,9 @@ class Definitions {
 
   @tu lazy val MainAnnotationClass: ClassSymbol = requiredClass("scala.annotation.MainAnnotation")
     @tu lazy val MainAnnotation_command: Symbol = MainAnnotationClass.requiredMethod("command")
-  @tu lazy val MainAnnotationParameterInfos: ClassSymbol = requiredClass("scala.annotation.MainAnnotation.ParameterInfos")
-    @tu lazy val MainAnnotationParameterInfos_withDocumentation: Symbol = MainAnnotationParameterInfos.requiredMethod("withDocumentation")
-    @tu lazy val MainAnnotationParameterInfos_withAnnotations: Symbol = MainAnnotationParameterInfos.requiredMethod("withAnnotations")
+  @tu lazy val MainAnnotationParameterInfo: ClassSymbol = requiredClass("scala.annotation.MainAnnotation.ParameterInfo")
+    @tu lazy val MainAnnotationParameterInfo_withDocumentation: Symbol = MainAnnotationParameterInfo.requiredMethod("withDocumentation")
+    @tu lazy val MainAnnotationParameterInfo_withAnnotations: Symbol = MainAnnotationParameterInfo.requiredMethod("withAnnotations")
   @tu lazy val MainAnnotationParameterAnnotation: ClassSymbol = requiredClass("scala.annotation.MainAnnotation.ParameterAnnotation")
   @tu lazy val MainAnnotationCommand: ClassSymbol = requiredClass("scala.annotation.MainAnnotation.Command")
     @tu lazy val MainAnnotationCommand_argGetter: Symbol = MainAnnotationCommand.requiredMethod("argGetter")

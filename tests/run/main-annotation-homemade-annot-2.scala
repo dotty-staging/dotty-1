@@ -29,12 +29,12 @@ end Test
 // This is a toy example, it only works with positional args
 @experimental
 class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
-  import MainAnnotation._
+  import MainAnnotation.*
 
   override type ArgumentParser[T] = util.CommandLineParser.FromString[T]
   override type MainResultType = Any
 
-  override def command(args: Array[String], commandName: String, docComment: String, parameterInfos: MainAnnotation.ParameterInfos*) =
+  override def command(args: Array[String], commandName: String, docComment: String, parameterInfos: ParameterInfo*) =
     new Command[ArgumentParser, MainResultType]:
       private var idx = 0
 
