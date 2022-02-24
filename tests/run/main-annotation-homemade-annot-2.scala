@@ -32,10 +32,10 @@ class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
   import MainAnnotation.*
 
   override type ArgumentParser[T] = util.CommandLineParser.FromString[T]
-  override type MainResultType = Any
+  override type Result = Any
 
   override def command(args: Array[String], commandName: String, docComment: String, parameterInfos: ParameterInfo*) =
-    new Command[ArgumentParser, MainResultType]:
+    new Command[ArgumentParser, Result]:
       private var idx = 0
 
       override def argGetter[T](name: String, optDefaultGetter: Option[() => T])(using p: ArgumentParser[T]): () => T =
@@ -46,7 +46,7 @@ class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
       override def varargGetter[T](name: String)(using p: ArgumentParser[T]): () => Seq[T] =
         () => for i <- (idx until args.length) yield p.fromString(args(i))
 
-      override def run(f: => MainResultType): Unit =
+      override def run(f: => Result): Unit =
         for (_ <- 1 to runs)
           f
           if after.length > 0 then println(after.mkString(", "))

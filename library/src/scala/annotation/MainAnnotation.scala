@@ -20,10 +20,10 @@ trait MainAnnotation extends StaticAnnotation:
   type ArgumentParser[T]
 
   /** The required result type of the main function */
-  type MainResultType
+  type Result
 
   /** A new command with arguments from `args` */
-  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[ArgumentParser, MainResultType]
+  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[ArgumentParser, Result]
 end MainAnnotation
 
 @experimental
@@ -55,7 +55,7 @@ object MainAnnotation:
   }
 
   /** A class representing a command to run */
-  trait Command[ArgumentParser[_], MainResultType]:
+  trait Command[ArgumentParser[_], Result]:
 
     /** The getter for the next argument of type `T` */
     def argGetter[T](name: String, optDefaultGetter: Option[() => T])(using fromString: ArgumentParser[T]): () => T
@@ -66,7 +66,7 @@ object MainAnnotation:
     /** Run `program` if all arguments are valid,
      *  or print usage information and/or error messages.
      */
-    def run(program: => MainResultType): Unit
+    def run(program: => Result): Unit
   end Command
 
   /** Marker trait for annotations that will be included in the ParameterInfo annotations. */
