@@ -232,12 +232,16 @@ object MainProxies {
      *  ```
      */
     def parameterInfos(mt: MethodType): List[Tree] =
+      extension (tree: Tree) def withProperty(sym: Symbol, args: List[Tree]) =
+        Apply(Select(tree, sym.name), args)
+
       for ((formal, paramName), idx) <- mt.paramInfos.zip(mt.paramNames).zipWithIndex yield
         val param = paramName.toString
         val paramType =
           if formal.isRepeatedParam then formal.argTypes.head.show
           else formal.show
-        val paramInfosTree = New(
+
+        var paramInfos: Tree =  New(
           TypeTree(defn.MainAnnotationParameterInfo.typeRef),
           // Arguments to be passed to ParameterInfo' constructor
           List(List(Literal(Constant(paramName.toString)), Literal(Constant(paramType))))
@@ -250,15 +254,14 @@ object MainProxies {
           * is represented by the pair
           *   defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal("my param x")))
           */
-        var assignations: List[(Symbol, List[Tree])] = Nil
-        for (doc <- documentation.argDocs.get(param))
-          assignations = (defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal(Constant(doc)))) :: assignations
+        for doc <- documentation.argDocs.get(param) do
+          paramInfos.withProperty(defn.MainAnnotationParameterInfo_withDocumentation, List(Literal(Constant(doc))))
 
-        val instantiatedAnnots = paramAnnotations(idx).map(instantiateAnnotation).toList
-        if instantiatedAnnots.nonEmpty then
-          assignations = (defn.MainAnnotationParameterInfo_withAnnotations -> instantiatedAnnots) :: assignations
+        val paramAnnots = paramAnnotations(idx)
+        if paramAnnots.nonEmpty then
+          paramInfos.withProperty(defn.MainAnnotationParameterInfo_withAnnotations, paramAnnots.map(instantiateAnnotation).toList)
 
-        assignations.foldLeft[Tree](paramInfosTree){ case (tree, (setterSym, values)) => Apply(Select(tree, setterSym.name), values) }
+        paramInfos
     end parameterInfos
 
     /**
