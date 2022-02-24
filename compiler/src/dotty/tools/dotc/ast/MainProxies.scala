@@ -222,70 +222,82 @@ object MainProxies {
       val defDef = DefDef(nme.ANON_FUN, List(Nil), TypeTree(), value)
       Block(defDef, Closure(Nil, Ident(nme.ANON_FUN), EmptyTree))
 
+    /** Generate a list of trees containing the ParamInfo instantiations.
+     *
+     *  A ParamInfo has the following shape
+     *  ```
+     *  new scala.annotation.MainAnnotation.ParameterInfo("x", "S")
+     *    .withDocumentation("my param x")
+     *    .withAnnotations(new scala.main.Alias("myX"))
+     *  ```
+     */
+    def parameterInfos(mt: MethodType): List[Tree] =
+      for ((formal, paramName), idx) <- mt.paramInfos.zip(mt.paramNames).zipWithIndex yield
+        val param = paramName.toString
+        val paramType =
+          if formal.isRepeatedParam then formal.argTypes.head.show
+          else formal.show
+        val paramInfosTree = New(
+          TypeTree(defn.MainAnnotationParameterInfo.typeRef),
+          // Arguments to be passed to ParameterInfo' constructor
+          List(List(Literal(Constant(paramName.toString)), Literal(Constant(paramType))))
+        )
+
+        /*
+          * Assignations to be made after the creation of the ParameterInfo.
+          * For example:
+          *   args0paramInfos.withDocumentation("my param x")
+          * is represented by the pair
+          *   defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal("my param x")))
+          */
+        var assignations: List[(Symbol, List[Tree])] = Nil
+        for (doc <- documentation.argDocs.get(param))
+          assignations = (defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal(Constant(doc)))) :: assignations
+
+        val instantiatedAnnots = paramAnnotations(idx).map(instantiateAnnotation).toList
+        if instantiatedAnnots.nonEmpty then
+          assignations = (defn.MainAnnotationParameterInfo_withAnnotations -> instantiatedAnnots) :: assignations
+
+        assignations.foldLeft[Tree](paramInfosTree){ case (tree, (setterSym, values)) => Apply(Select(tree, setterSym.name), values) }
+    end parameterInfos
+
     /**
-      * Creates a list of references and definitions of arguments, the first referencing the second.
+      * Creates a list of references and definitions of arguments.
       * The goal is to create the
       *   `val args0: () => S = cmd.argGetter[S](0, None)`
       * part of the code.
-      * For each tuple, the first element is a ref to `args0`, the second is the whole definition, the third
-      * is the ParameterInfo definition associated to this argument.
       */
-    def createArgs(mt: MethodType): List[(Tree, ValDef, Tree)] =
-      mt.paramInfos.zip(mt.paramNames).zipWithIndex.map {
-        case ((formal, paramName), n) =>
-          val argName = nme.args ++ n.toString
+    def argValDefs(mt: MethodType): List[ValDef] =
+      for ((formal, paramName), idx) <- mt.paramInfos.zip(mt.paramNames).zipWithIndex yield
+          val argName = nme.args ++ idx.toString
           val isRepeated = formal.isRepeatedParam
-
-          val (argRef, formalType, getterSym) = {
-            val argRef0 = Apply(Ident(argName), Nil)
-            if formal.isRepeatedParam then
-              (repeated(argRef0), formal.argTypes.head, defn.MainAnnotationCommand_varargGetter)
-            else (argRef0, formal, defn.MainAnnotationCommand_argGetter)
-          }
-
-          // The ParameterInfo
-          val parameterInfos = {
-            val param = paramName.toString
-            val paramInfosTree = New(
-              TypeTree(defn.MainAnnotationParameterInfo.typeRef),
-              // Arguments to be passed to ParameterInfo' constructor
-              List(List(Literal(Constant(param)), Literal(Constant(formalType.show))))
-            )
-
-            /*
-             * Assignations to be made after the creation of the ParameterInfo.
-             * For example:
-             *   args0paramInfos.withDocumentation("my param x")
-             * is represented by the pair
-             *   defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal("my param x")))
-             */
-            var assignations: List[(Symbol, List[Tree])] = Nil
-            for (doc <- documentation.argDocs.get(param))
-              assignations = (defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal(Constant(doc)))) :: assignations
-
-            val instantiatedAnnots = paramAnnotations(n).map(instantiateAnnotation).toList
-            if instantiatedAnnots.nonEmpty then
-              assignations = (defn.MainAnnotationParameterInfo_withAnnotations -> instantiatedAnnots) :: assignations
-
-            assignations.foldLeft[Tree](paramInfosTree){ case (tree, (setterSym, values)) => Apply(Select(tree, setterSym.name), values) }
-          }
-
-          val defaultValueGetterOpt = defaultValueSymbols.get(n) match
+          val formalType = if isRepeated then formal.argTypes.head else formal
+          val getterSym =
+            if isRepeated then defn.MainAnnotationCommand_varargGetter
+            else defn.MainAnnotationCommand_argGetter
+          val defaultValueGetterOpt = defaultValueSymbols.get(idx) match
             case None => ref(defn.NoneModule.termRef)
             case Some(dvSym) =>
                val value = unitToValue(ref(dvSym.termRef))
                Apply(ref(defn.SomeClass.companionModule.termRef), value)
-
           val argGetter0 = TypeApply(Select(Ident(nme.cmd), getterSym.name), TypeTree(formalType) :: Nil)
           val argGetter =
-            if formal.isRepeatedParam then argGetter0
-            else Apply(argGetter0, List(Literal(Constant(n)), defaultValueGetterOpt))
+            if isRepeated then argGetter0
+            else Apply(argGetter0, List(Literal(Constant(idx)), defaultValueGetterOpt))
 
-          val argDef = ValDef(argName, TypeTree(), argGetter)
+          ValDef(argName, TypeTree(), argGetter)
+    end argValDefs
 
-          (argRef, argDef, parameterInfos)
-      }
-    end createArgs
+
+    /** Create a list of argument references that will be passed as argument to the main method.
+     *  `args0`, ...`argn*`
+     */
+    def argRefs(mt: MethodType): List[Tree] =
+      for ((formal, paramName), idx) <- mt.paramInfos.zip(mt.paramNames).zipWithIndex yield
+        val argRef = Apply(Ident(nme.args ++ idx.toString), Nil)
+        if formal.isRepeatedParam then repeated(argRef) else argRef
+    end argRefs
+
 
     /** Turns an annotation (e.g. `@main(40)`) into an instance of the class (e.g. `new scala.main(40)`). */
     def instantiateAnnotation(annot: Annotation): Tree =
@@ -319,19 +331,15 @@ object MainProxies {
       mainFun.info match {
         case _: ExprType =>
         case mt: MethodType =>
-          if (mt.isImplicitMethod) {
+          if (mt.isImplicitMethod)
             report.error(s"main method cannot have implicit parameters", pos)
-          }
-          else mt.resType match {
+          else mt.resType match
             case restpe: MethodType =>
               report.error(s"main method cannot be curried", pos)
-              Nil
             case _ =>
-              val (argRefs, argVals, paramInfoss) = createArgs(mt).unzip3
-              args = argVals
-              mainCall = Apply(mainCall, argRefs)
-              parameterInfoss = paramInfoss
-          }
+              args = argValDefs(mt)
+              mainCall = Apply(mainCall, argRefs(mt))
+              parameterInfoss = parameterInfos(mt)
         case _: PolyType =>
           report.error(s"main method cannot have type parameters", pos)
         case _ =>
