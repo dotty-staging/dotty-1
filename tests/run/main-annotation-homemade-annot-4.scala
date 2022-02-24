@@ -1,4 +1,4 @@
-import scala.annotation.MainAnnotation
+import scala.annotation.*
 
 @mainManyArgs(1, "B", 3) def foo() = println("Hello world!")
 
@@ -9,6 +9,7 @@ object Test:
     method.invoke(null, Array[String]())
 end Test
 
+@experimental
 class mainManyArgs(i1: Int, s2: String, i3: Int) extends MainAnnotation:
   override type ArgumentParser[T] = util.CommandLineParser.FromString[T]
   override type MainResultType = Any

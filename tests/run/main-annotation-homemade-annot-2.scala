@@ -1,5 +1,5 @@
 import scala.collection.mutable
-import scala.annotation.MainAnnotation
+import scala.annotation.*
 
 @myMain()("A")
 def foo1(): Unit = println("I was run!")
@@ -27,6 +27,7 @@ object Test:
 end Test
 
 // This is a toy example, it only works with positional args
+@experimental
 class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
   import MainAnnotation._
 

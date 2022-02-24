@@ -10,6 +10,7 @@ package scala.annotation
  *      or `command.argsGetter` if is a final varargs parameter,
  *    - a call to `command.run` with the closure of user-main applied to all arguments.
  */
+@experimental
 trait MainAnnotation extends StaticAnnotation:
 
   /** The class used for argument string parsing. E.g. `scala.util.CommandLineParser.FromString`,
@@ -24,8 +25,9 @@ trait MainAnnotation extends StaticAnnotation:
   def command(args: Array[String], commandName: String, documentation: String, parameterInfoss: MainAnnotation.ParameterInfos*): MainAnnotation.Command[ArgumentParser, MainResultType]
 end MainAnnotation
 
+@experimental
 object MainAnnotation:
-  // Inspired by https://github.com/scala-js/scala-js/blob/0708917912938714d52be1426364f78a3d1fd269/linker-interface/shared/src/main/scala/org/scalajs/linker/interface/StandardConfig.scala#L23-L218
+
   final class ParameterInfos private (
     /** The name of the parameter */
     val name: String,
@@ -36,13 +38,15 @@ object MainAnnotation:
     /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
     val annotations: Seq[ParameterAnnotation],
   ) {
-    // Main public constructor
+    /** ParameterInfos with a name and the type of the parameter */
     def this(name: String, typeName: String) =
       this(name, typeName, None, Seq.empty)
 
+    /** Copy this ParameterInfos and sets the documentation */
     def withDocumentation(doc: String): ParameterInfos =
       new ParameterInfos(name, typeName, Some(doc), annotations)
 
+    /** Copy this ParameterInfos and sets the annotations */
     def withAnnotations(annots: ParameterAnnotation*): ParameterInfos =
       new ParameterInfos(name, typeName, documentation, annots)
 
@@ -64,6 +68,6 @@ object MainAnnotation:
     def run(program: => MainResultType): Unit
   end Command
 
-  /** An annotation for the parameters of a MainAnnotated method. */
+  /** Marker trait for annotations that will be included in the ParameterInfos annotations. */
   trait ParameterAnnotation extends StaticAnnotation
 end MainAnnotation

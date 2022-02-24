@@ -1227,7 +1227,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
         if pos < mtpe.paramInfos.length then
           mtpe.paramInfos(pos)
             // This works only if vararg annotations match up.
-            // See neg/i14367.scala for an example where the inferred type is mispredicted. 
+            // See neg/i14367.scala for an example where the inferred type is mispredicted.
             // Nevertheless, the alternative would be to give up completely, so this is
             // defensible.
         else NoType
@@ -2581,7 +2581,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           pkg.moduleClass.info.decls.lookup(topLevelClassName).ensureCompleted()
           var stats1 = typedStats(tree.stats, pkg.moduleClass)._1
           if (!ctx.isAfterTyper)
-            stats1 = stats1 ++ typedBlockStats(MainProxies.mainProxies(stats1))._1
+            stats1 = stats1 ++ typedBlockStats(MainProxies.proxies(stats1))._1
           cpy.PackageDef(tree)(pid1, stats1).withType(pkg.termRef)
         }
       case _ =>

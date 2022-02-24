@@ -11,6 +11,12 @@ import NameKinds.DefaultGetterName
 import Annotations.Annotation
 
 object MainProxies {
+
+  /** Generate proxy classes for @main functions and @myMain functions where myMain <:< MainAnnotation */
+  def proxies(stats: List[tpd.Tree])(using Context): List[untpd.Tree] = {
+    mainAnnotationProxies(stats) ++ mainProxies(stats)
+  }
+
   /** Generate proxy classes for @main functions.
    *  A function like
    *
@@ -29,7 +35,7 @@ object MainProxies {
    *         catch case err: ParseError => showError(err)
    *       }
    */
-  def mainProxiesOld(stats: List[tpd.Tree])(using Context): List[untpd.Tree] = {
+  private def mainProxies(stats: List[tpd.Tree])(using Context): List[untpd.Tree] = {
     import tpd._
     def mainMethods(stats: List[Tree]): List[Symbol] = stats.flatMap {
       case stat: DefDef if stat.symbol.hasAnnotation(defn.MainAnnot) =>
@@ -39,11 +45,11 @@ object MainProxies {
       case _ =>
         Nil
     }
-    mainMethods(stats).flatMap(mainProxyOld)
+    mainMethods(stats).flatMap(mainProxy)
   }
 
   import untpd._
-  def mainProxyOld(mainFun: Symbol)(using Context): List[TypeDef] = {
+  private def mainProxy(mainFun: Symbol)(using Context): List[TypeDef] = {
     val mainAnnotSpan = mainFun.getAnnotation(defn.MainAnnot).get.tree.span
     def pos = mainFun.sourcePos
     val argsRef = Ident(nme.args)
@@ -160,7 +166,7 @@ object MainProxies {
    *       }
    *     }
    */
-  def mainProxies(stats: List[tpd.Tree])(using Context): List[untpd.Tree] = {
+  private def mainAnnotationProxies(stats: List[tpd.Tree])(using Context): List[untpd.Tree] = {
     import tpd._
 
     /**
@@ -183,12 +189,12 @@ object MainProxies {
     def mainMethods(scope: Tree, stats: List[Tree]): List[(Symbol, ParameterAnnotationss, DefaultValueSymbols, Option[Comment])] = stats.flatMap {
       case stat: DefDef =>
         val sym = stat.symbol
-        sym.annotations.filter(_.matches(defn.MainAnnot)) match {
+        sym.annotations.filter(_.matches(defn.MainAnnotationClass)) match {
           case Nil =>
             Nil
           case _ :: Nil =>
             val paramAnnotations = stat.paramss.flatMap(_.map(
-              valdef => valdef.symbol.annotations.filter(_.matches(defn.MainAnnotParameterAnnotation))
+              valdef => valdef.symbol.annotations.filter(_.matches(defn.MainAnnotationParameterAnnotation))
             ))
             (sym, paramAnnotations.toVector, defaultValueSymbols(scope, sym), stat.rawComment) :: Nil
           case mainAnnot :: others =>
@@ -202,11 +208,11 @@ object MainProxies {
     }
 
     // Assuming that the top-level object was already generated, all main methods will have a scope
-    mainMethods(EmptyTree, stats).flatMap(mainProxy)
+    mainMethods(EmptyTree, stats).flatMap(mainAnnotationProxy)
   }
 
-  def mainProxy(mainFun: Symbol, paramAnnotations: ParameterAnnotationss, defaultValueSymbols: DefaultValueSymbols, docComment: Option[Comment])(using Context): List[TypeDef] = {
-    val mainAnnot = mainFun.getAnnotation(defn.MainAnnot).get
+  private def mainAnnotationProxy(mainFun: Symbol, paramAnnotations: ParameterAnnotationss, defaultValueSymbols: DefaultValueSymbols, docComment: Option[Comment])(using Context): List[TypeDef] = {
+    val mainAnnot = mainFun.getAnnotation(defn.MainAnnotationClass).get
     def pos = mainFun.sourcePos
     val cmdName: TermName = Names.termName("cmd")
 
@@ -244,15 +250,15 @@ object MainProxies {
           val (argRef, formalType, getterSym) = {
             val argRef0 = Apply(Ident(argName), Nil)
             if formal.isRepeatedParam then
-              (repeated(argRef0), formal.argTypes.head, defn.MainAnnotCommand_varargGetter)
-            else (argRef0, formal, defn.MainAnnotCommand_argGetter)
+              (repeated(argRef0), formal.argTypes.head, defn.MainAnnotationCommand_varargGetter)
+            else (argRef0, formal, defn.MainAnnotationCommand_argGetter)
           }
 
           // The ParameterInfos
           val parameterInfos = {
             val param = paramName.toString
             val paramInfosTree = New(
-              TypeTree(defn.MainAnnotParameterInfos.typeRef),
+              TypeTree(defn.MainAnnotationParameterInfos.typeRef),
               // Arguments to be passed to ParameterInfos' constructor
               List(List(lit(param), lit(formalType.show)))
             )
@@ -352,11 +358,11 @@ object MainProxies {
         cmdName,
         TypeTree(),
         Apply(
-          Select(instanciateAnnotation(mainAnnot), defn.MainAnnot_command.name),
+          Select(instanciateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
           Ident(nme.args) :: lit(mainFun.showName) :: lit(documentation.mainDoc) :: parameterInfoss
         )
       )
-      val run = Apply(Select(Ident(cmdName), defn.MainAnnotCommand_run.name), mainCall)
+      val run = Apply(Select(Ident(cmdName), defn.MainAnnotationCommand_run.name), mainCall)
       val body = Block(cmd :: args, run)
       val mainArg = ValDef(nme.args, TypeTree(defn.ArrayType.appliedTo(defn.StringType)), EmptyTree)
         .withFlags(Param)
@@ -369,7 +375,7 @@ object MainProxies {
             case tree => super.transform(tree)
       }
       val annots = mainFun.annotations
-        .filterNot(_.matches(defn.MainAnnot))
+        .filterNot(_.matches(defn.MainAnnotationClass))
         .map(annot => insertTypeSplices.transform(annot.tree))
       val mainMeth = DefDef(nme.main, (mainArg :: Nil) :: Nil, TypeTree(defn.UnitType), body)
         .withFlags(JavaStatic)

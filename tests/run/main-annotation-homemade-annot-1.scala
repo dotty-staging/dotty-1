@@ -1,5 +1,5 @@
 import scala.concurrent._
-import scala.annotation.MainAnnotation
+import scala.annotation.*
 import scala.collection.mutable
 import ExecutionContext.Implicits.global
 import duration._
@@ -20,6 +20,7 @@ object Test:
     callMain(Array("1"))
 end Test
 
+@experimental
 class mainAwait(timeout: Int = 2) extends MainAnnotation:
   import MainAnnotation._
 
