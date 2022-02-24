@@ -139,8 +139,8 @@ object MainProxies {
    *       * @param x my param x
    *       * @param ys all my params y
    *       */
-   *     @main(80) def f(
-   *       @main.Alias("myX") x: S,
+   *     @myMain(80) def f(
+   *       @myMain.Alias("myX") x: S,
    *       ys: T*
    *     ) = ...
    *
@@ -148,7 +148,7 @@ object MainProxies {
    *
    *     final class f {
    *       static def main(args: Array[String]): Unit = {
-   *         val cmd = new main(80).command(
+   *         val cmd = new myMain(80).command(
    *           args,
    *           "f",
    *           "Lorem ipsum dolor sit amet consectetur adipiscing elit.",
