@@ -159,8 +159,8 @@ object MainProxies {
    *             .withDocumentation("all my params y")
    *         )
    *
-   *         val args0: () => S = cmd.argGetter[S]("x", None)
-   *         val args1: () => Seq[T] = cmd.varargGetter[T]("ys")
+   *         val args0: () => S = cmd.argGetter[S](0, None)
+   *         val args1: () => Seq[T] = cmd.varargGetter[T]
    *
    *         cmd.run(f(args0(), args1()*))
    *       }
@@ -236,7 +236,7 @@ object MainProxies {
     /**
       * Creates a list of references and definitions of arguments, the first referencing the second.
       * The goal is to create the
-      *   `val args0: () => S = cmd.argGetter[S]("x", None)`
+      *   `val args0: () => S = cmd.argGetter[S](0, None)`
       * part of the code.
       * For each tuple, the first element is a ref to `args0`, the second is the whole definition, the third
       * is the ParameterInfo definition associated to this argument.
@@ -281,23 +281,16 @@ object MainProxies {
             assignations.foldLeft[Tree](paramInfosTree){ case (tree, (setterSym, values)) => Apply(Select(tree, setterSym.name), values) }
           }
 
-          val argParams =
-            if formal.isRepeatedParam then
-              List(lit(paramName.toString))
-            else
-              val defaultValueGetterOpt = defaultValueSymbols.get(n) match {
-                case None =>
-                  none
-                case Some(dvSym) =>
-                  some(unitToValue(ref(dvSym.termRef)))
-              }
-              List(lit(paramName.toString), defaultValueGetterOpt)
+          val defaultValueGetterOpt = defaultValueSymbols.get(n) match
+            case None => none
+            case Some(dvSym) => some(unitToValue(ref(dvSym.termRef)))
 
-          val argDef = ValDef(
-            argName,
-            TypeTree(),
-            Apply(TypeApply(Select(Ident(cmdName), getterSym.name), TypeTree(formalType) :: Nil), argParams),
-          )
+          val argGetter0 = TypeApply(Select(Ident(cmdName), getterSym.name), TypeTree(formalType) :: Nil)
+          val argGetter =
+            if formal.isRepeatedParam then argGetter0
+            else Apply(argGetter0, List(lit(n), defaultValueGetterOpt))
+
+          val argDef = ValDef(argName, TypeTree(), argGetter)
 
           (argRef, argDef, parameterInfos)
       }

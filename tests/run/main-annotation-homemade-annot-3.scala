@@ -18,9 +18,9 @@ class mainNoArgs extends MainAnnotation:
 
   override def command(args: Array[String], commandName: String, docComment: String, parameterInfos: ParameterInfo*) =
     new Command[Parser, Result]:
-      override def argGetter[T](name: String, optDefaultValueGetter: Option[() => T])(using p: Parser[T]): () => T = ???
+      override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T = ???
 
-      override def varargGetter[T](name: String)(using p: Parser[T]): () => Seq[T] = ???
+      override def varargGetter[T](using p: Parser[T]): () => Seq[T] = ???
 
       override def run(f: => Result): Unit = f
   end command

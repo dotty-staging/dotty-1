@@ -57,11 +57,11 @@ object MainAnnotation:
   /** A class representing a command to run */
   trait Command[Parser[_], Result]:
 
-    /** The getter for the next argument of type `T` */
-    def argGetter[T](name: String, optDefaultGetter: Option[() => T])(using fromString: Parser[T]): () => T
+    /** The getter for the `idx`th argument of type `T` */
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using fromString: Parser[T]): () => T
 
     /** The getter for a final varargs argument of type `T*` */
-    def varargGetter[T](name: String)(using fromString: Parser[T]): () => Seq[T]
+    def varargGetter[T](using fromString: Parser[T]): () => Seq[T]
 
     /** Run `program` if all arguments are valid,
      *  or print usage information and/or error messages.
