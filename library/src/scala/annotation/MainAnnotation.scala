@@ -17,13 +17,13 @@ trait MainAnnotation extends StaticAnnotation:
   /** The class used for argument string parsing. E.g. `scala.util.CommandLineParser.FromString`,
    *  but could be something else
    */
-  type ArgumentParser[T]
+  type Parser[T]
 
   /** The required result type of the main function */
   type Result
 
   /** A new command with arguments from `args` */
-  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[ArgumentParser, Result]
+  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[Parser, Result]
 end MainAnnotation
 
 @experimental
@@ -55,13 +55,13 @@ object MainAnnotation:
   }
 
   /** A class representing a command to run */
-  trait Command[ArgumentParser[_], Result]:
+  trait Command[Parser[_], Result]:
 
     /** The getter for the next argument of type `T` */
-    def argGetter[T](name: String, optDefaultGetter: Option[() => T])(using fromString: ArgumentParser[T]): () => T
+    def argGetter[T](name: String, optDefaultGetter: Option[() => T])(using fromString: Parser[T]): () => T
 
     /** The getter for a final varargs argument of type `T*` */
-    def varargGetter[T](name: String)(using fromString: ArgumentParser[T]): () => Seq[T]
+    def varargGetter[T](name: String)(using fromString: Parser[T]): () => Seq[T]
 
     /** Run `program` if all arguments are valid,
      *  or print usage information and/or error messages.
