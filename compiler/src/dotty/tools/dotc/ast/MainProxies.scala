@@ -218,15 +218,6 @@ object MainProxies {
 
     val documentation = new Documentation(docComment)
 
-    /** A literal value (Boolean, Int, String, etc.) */
-    inline def lit(any: Any): Literal = Literal(Constant(any))
-
-    /** None */
-    inline def none: Tree = ref(defn.NoneModule.termRef)
-
-    /** Some(value) */
-    inline def some(value: Tree): Tree = Apply(ref(defn.SomeClass.companionModule.termRef), value)
-
     /** () => value */
     def unitToValue(value: Tree): Tree =
       val anonName = nme.ANON_FUN
@@ -260,7 +251,7 @@ object MainProxies {
             val paramInfosTree = New(
               TypeTree(defn.MainAnnotationParameterInfo.typeRef),
               // Arguments to be passed to ParameterInfo' constructor
-              List(List(lit(param), lit(formalType.show)))
+              List(List(Literal(Constant(param)), Literal(Constant(formalType.show))))
             )
 
             /*
@@ -268,11 +259,11 @@ object MainProxies {
              * For example:
              *   args0paramInfos.withDocumentation("my param x")
              * is represented by the pair
-             *   defn.MainAnnotationParameterInfo_withDocumentation -> List(lit("my param x"))
+             *   defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal("my param x")))
              */
             var assignations: List[(Symbol, List[Tree])] = Nil
             for (doc <- documentation.argDocs.get(param))
-              assignations = (defn.MainAnnotationParameterInfo_withDocumentation -> List(lit(doc))) :: assignations
+              assignations = (defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal(Constant(doc)))) :: assignations
 
             val instanciatedAnnots = paramAnnotations(n).map(instanciateAnnotation).toList
             if instanciatedAnnots.nonEmpty then
@@ -282,13 +273,15 @@ object MainProxies {
           }
 
           val defaultValueGetterOpt = defaultValueSymbols.get(n) match
-            case None => none
-            case Some(dvSym) => some(unitToValue(ref(dvSym.termRef)))
+            case None => ref(defn.NoneModule.termRef)
+            case Some(dvSym) =>
+               val value = unitToValue(ref(dvSym.termRef))
+               Apply(ref(defn.SomeClass.companionModule.termRef), value)
 
           val argGetter0 = TypeApply(Select(Ident(cmdName), getterSym.name), TypeTree(formalType) :: Nil)
           val argGetter =
             if formal.isRepeatedParam then argGetter0
-            else Apply(argGetter0, List(lit(n), defaultValueGetterOpt))
+            else Apply(argGetter0, List(Literal(Constant(n)), defaultValueGetterOpt))
 
           val argDef = ValDef(argName, TypeTree(), argGetter)
 
@@ -352,7 +345,7 @@ object MainProxies {
         TypeTree(),
         Apply(
           Select(instanciateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
-          Ident(nme.args) :: lit(mainFun.showName) :: lit(documentation.mainDoc) :: parameterInfoss
+          Ident(nme.args) :: Literal(Constant(mainFun.showName)) :: Literal(Constant(documentation.mainDoc)) :: parameterInfoss
         )
       )
       val run = Apply(Select(Ident(cmdName), defn.MainAnnotationCommand_run.name), mainCall)
