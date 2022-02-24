@@ -5,7 +5,7 @@ import core._
 import Symbols._, Types._, Contexts._, Decorators._, util.Spans._, Flags._, Constants._
 import StdNames.{nme, tpnme}
 import ast.Trees._
-import Names.{Name, TermName}
+import Names.Name
 import Comments.Comment
 import NameKinds.DefaultGetterName
 import Annotations.Annotation
@@ -214,15 +214,13 @@ object MainProxies {
   private def mainAnnotationProxy(mainFun: Symbol, paramAnnotations: ParameterAnnotationss, defaultValueSymbols: DefaultValueSymbols, docComment: Option[Comment])(using Context): List[TypeDef] = {
     val mainAnnot = mainFun.getAnnotation(defn.MainAnnotationClass).get
     def pos = mainFun.sourcePos
-    val cmdName: TermName = Names.termName("cmd")
 
     val documentation = new Documentation(docComment)
 
     /** () => value */
     def unitToValue(value: Tree): Tree =
-      val anonName = nme.ANON_FUN
-      val defdef = DefDef(anonName, List(Nil), TypeTree(), value)
-      Block(defdef, Closure(Nil, Ident(anonName), EmptyTree))
+      val defDef = DefDef(nme.ANON_FUN, List(Nil), TypeTree(), value)
+      Block(defDef, Closure(Nil, Ident(nme.ANON_FUN), EmptyTree))
 
     /**
       * Creates a list of references and definitions of arguments, the first referencing the second.
@@ -232,7 +230,7 @@ object MainProxies {
       * For each tuple, the first element is a ref to `args0`, the second is the whole definition, the third
       * is the ParameterInfo definition associated to this argument.
       */
-    def createArgs(mt: MethodType, cmdName: TermName): List[(Tree, ValDef, Tree)] =
+    def createArgs(mt: MethodType): List[(Tree, ValDef, Tree)] =
       mt.paramInfos.zip(mt.paramNames).zipWithIndex.map {
         case ((formal, paramName), n) =>
           val argName = nme.args ++ n.toString
@@ -278,7 +276,7 @@ object MainProxies {
                val value = unitToValue(ref(dvSym.termRef))
                Apply(ref(defn.SomeClass.companionModule.termRef), value)
 
-          val argGetter0 = TypeApply(Select(Ident(cmdName), getterSym.name), TypeTree(formalType) :: Nil)
+          val argGetter0 = TypeApply(Select(Ident(nme.cmd), getterSym.name), TypeTree(formalType) :: Nil)
           val argGetter =
             if formal.isRepeatedParam then argGetter0
             else Apply(argGetter0, List(Literal(Constant(n)), defaultValueGetterOpt))
@@ -329,7 +327,7 @@ object MainProxies {
               report.error(s"main method cannot be curried", pos)
               Nil
             case _ =>
-              val (argRefs, argVals, paramInfoss) = createArgs(mt, cmdName).unzip3
+              val (argRefs, argVals, paramInfoss) = createArgs(mt).unzip3
               args = argVals
               mainCall = Apply(mainCall, argRefs)
               parameterInfoss = paramInfoss
@@ -341,14 +339,14 @@ object MainProxies {
       }
 
       val cmd = ValDef(
-        cmdName,
+        nme.cmd,
         TypeTree(),
         Apply(
           Select(instantiateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
           Ident(nme.args) :: Literal(Constant(mainFun.showName)) :: Literal(Constant(documentation.mainDoc)) :: parameterInfoss
         )
       )
-      val run = Apply(Select(Ident(cmdName), defn.MainAnnotationCommand_run.name), mainCall)
+      val run = Apply(Select(Ident(nme.cmd), defn.MainAnnotationCommand_run.name), mainCall)
       val body = Block(cmd :: args, run)
       val mainArg = ValDef(nme.args, TypeTree(defn.ArrayType.appliedTo(defn.StringType)), EmptyTree)
         .withFlags(Param)

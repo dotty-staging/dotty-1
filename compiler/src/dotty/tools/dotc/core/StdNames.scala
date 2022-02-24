@@ -449,6 +449,7 @@ object StdNames {
     val classOf: N              = "classOf"
     val classType: N            = "classType"
     val clone_ : N              = "clone"
+    val cmd: N                  = "cmd"
     val common: N               = "common"
     val compiletime : N         = "compiletime"
     val conforms_ : N           = "$conforms"
