@@ -247,15 +247,12 @@ object MainProxies {
 
         val constructorArgs = List(param, paramTypeStr, hasDefault, isRepeated, paramDoc)
           .map(value => Literal(Constant(value)))
-
-        var paramInfos =
+        val paramInfos =
           New(TypeTree(defn.MainAnnotationParameterInfo.typeRef), List(constructorArgs))
-
         val paramAnnots = paramAnnotations(idx)
         if paramAnnots.nonEmpty then
-          paramInfos = paramInfos.withProperty(defn.MainAnnotationParameterInfo_withAnnotations, paramAnnots.map(instantiateAnnotation).toList)
-
-        paramInfos
+          paramInfos.withProperty(defn.MainAnnotationParameterInfo_withAnnotations, paramAnnots.map(instantiateAnnotation).toList)
+        else paramInfos
     end parameterInfos
 
     /**

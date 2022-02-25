@@ -24,6 +24,7 @@ trait MainAnnotation extends StaticAnnotation:
 
   /** A new command with arguments from `args` */
   def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[Parser, Result]
+
 end MainAnnotation
 
 @experimental
@@ -37,6 +38,7 @@ object MainAnnotation:
     paramDocumentation: String,
     paramAnnotations: Seq[ParameterAnnotation],
   ) {
+
     /** ParameterInfo with a name, the type of the parameter and if it has a default */
     def this(name: String, typeName: String, hasDefault: Boolean, isVarargs: Boolean, documentation: String) =
       this(name, typeName, hasDefault, isVarargs, documentation, Seq.empty)
@@ -83,4 +85,5 @@ object MainAnnotation:
 
   /** Marker trait for annotations that will be included in the ParameterInfo annotations. */
   trait ParameterAnnotation extends StaticAnnotation
+
 end MainAnnotation
