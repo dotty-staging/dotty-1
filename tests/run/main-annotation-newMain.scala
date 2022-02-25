@@ -39,24 +39,24 @@ final class newMain extends MainAnnotation:
   override def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*) =
     new Command[Parser, Result]:
 
-      private val argMarker = "--"
-      private val shortArgMarker = "-"
+      private inline val argMarker = "--"
+      private inline val shortArgMarker = "-"
 
       /**
         * The name of the special argument to display the method's help.
         * If one of the method's parameters is called the same, will be ignored.
         */
-      private val helpArg = "help"
+      private inline val helpArg = "help"
       private var helpIsOverridden = false
 
       /**
         * The short name of the special argument to display the method's help.
         * If one of the method's parameters uses the same short name, will be ignored.
         */
-      private val shortHelpArg = 'h'
+      private inline val shortHelpArg = 'h'
       private var shortHelpIsOverridden = false
 
-      private val maxUsageLineLength = 120
+      private inline val maxUsageLineLength = 120
 
       /** A map from argument canonical name (the name of the parameter in the method definition) to parameter informations */
       private val nameToParameterInfo: Map[String, ParameterInfo] = parameterInfos.map(infos => infos.name -> infos).toMap
