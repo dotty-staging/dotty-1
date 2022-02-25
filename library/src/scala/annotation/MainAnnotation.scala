@@ -86,9 +86,19 @@ object MainAnnotation:
     def run(program: () => Result): Unit
   end Command
 
-  final class CommandInfo(val name: String, val documentation: String, val parameters: Seq[ParameterInfo])
+  /** Information about the main method
+   *
+   *  @param name The name of the main method
+   *  @param documentation The documentation of the main method without the `@param` documentation (see ParameterInfo.documentaion)
+   *  @param parameters Information about the parameters of the main method
+   */
+  final class CommandInfo(
+    val name: String,
+    val documentation: String,
+    val parameters: Seq[ParameterInfo],
+  )
 
-  /** ParameterInfo with a name, the type of the parameter and if it has a default
+  /** Information about a parameter of a main method
    *
    *  @param name The name of the parameter
    *  @param typeName The name of the parameter's type
@@ -103,7 +113,7 @@ object MainAnnotation:
     val hasDefault: Boolean,
     val isVarargs: Boolean,
     val documentation: String,
-    val annotations: Seq[ParameterAnnotation]
+    val annotations: Seq[ParameterAnnotation],
   )
 
   /** Marker trait for annotations that will be included in the ParameterInfo annotations. */
