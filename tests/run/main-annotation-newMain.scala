@@ -269,7 +269,7 @@ final class newMain extends MainAnnotation:
         // First take arguments passed by name, then those passed by position
         () => (byNameGetters ++ positionalGetters).map(_())
 
-      override def run(f: => Result): Unit =
+      override def run(f: () => Result): Unit =
         // Check aliases unicity
         val nameAndCanonicalName = nameToParameterInfo.toList.flatMap {
           case (canonicalName, infos) => (canonicalName +: getAlternativeNames(infos) ++: getShortNames(infos)).map(_ -> canonicalName)
@@ -298,7 +298,7 @@ final class newMain extends MainAnnotation:
           for msg <- errors do println(s"Error: $msg")
           usage()
         else
-          f
+          f()
       end run
   end command
 end newMain

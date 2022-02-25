@@ -43,9 +43,9 @@ class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
         () => for i <- (parameterInfos.length until args.length) yield p.fromString(args(i))
 
-      override def run(f: => Result): Unit =
+      override def run(f: () => Result): Unit =
         for (_ <- 1 to runs)
-          f
+          f()
           if after.length > 0 then println(after.mkString(", "))
       end run
   end command

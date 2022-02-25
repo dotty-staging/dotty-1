@@ -22,5 +22,5 @@ class mainNoArgs extends MainAnnotation:
 
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] = ???
 
-      override def run(f: => Result): Unit = f
+      override def run(program: () => Result): Unit = program()
   end command

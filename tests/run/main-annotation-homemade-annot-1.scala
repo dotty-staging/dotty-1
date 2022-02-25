@@ -43,5 +43,5 @@ class mainAwait(timeout: Int = 2) extends MainAnnotation:
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
         () => for i <- ((parameterInfos.length-1) until args.length) yield p.fromString(args(i))
 
-      override def run(f: => Result): Unit = println(Await.result(f, Duration(timeout, SECONDS)))
+      override def run(f: () => Result): Unit = println(Await.result(f(), Duration(timeout, SECONDS)))
 end mainAwait

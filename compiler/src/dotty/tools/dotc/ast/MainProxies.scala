@@ -162,7 +162,7 @@ object MainProxies {
    *         val args0: () => S = cmd.argGetter[S](0, None)
    *         val args1: () => Seq[T] = cmd.varargGetter[T]
    *
-   *         cmd.run(f(args0(), args1()*))
+   *         cmd.run(() => f(args0(), args1()*))
    *       }
    *     }
    */
@@ -352,7 +352,7 @@ object MainProxies {
       None
     else mainFun.info match {
       case _: ExprType =>
-        Some(generateMainClass(ref(mainFun.termRef), Nil, Nil))
+        Some(generateMainClass(unitToValue(ref(mainFun.termRef)), Nil, Nil))
       case mt: MethodType =>
         if (mt.isImplicitMethod)
           report.error(s"main method cannot have implicit parameters", pos)
@@ -362,7 +362,7 @@ object MainProxies {
             report.error(s"main method cannot be curried", pos)
             None
           case _ =>
-            Some(generateMainClass(Apply(ref(mainFun.termRef), argRefs(mt)), argValDefs(mt), parameterInfos(mt)))
+            Some(generateMainClass(unitToValue(Apply(ref(mainFun.termRef), argRefs(mt))), argValDefs(mt), parameterInfos(mt)))
       case _: PolyType =>
         report.error(s"main method cannot have type parameters", pos)
         None

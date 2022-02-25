@@ -43,9 +43,9 @@ class myMain extends MainAnnotation:
         println("varargGetter()")
         () => Seq(p.make, p.make)
 
-      override def run(f: => Result): Unit =
+      override def run(f: () => Result): Unit =
         println("run()")
-        f
+        f()
         println()
   end command
 

@@ -80,7 +80,7 @@ object MainAnnotation:
     /** Run `program` if all arguments are valid,
      *  or print usage information and/or error messages.
      */
-    def run(program: => Result): Unit
+    def run(program: () => Result): Unit
   end Command
 
   /** Marker trait for annotations that will be included in the ParameterInfo annotations. */

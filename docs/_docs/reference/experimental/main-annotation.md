@@ -28,7 +28,7 @@ object foo {
     )
     val args0 = cmd.argGetter[Int](0, None) // using cmd.Parser[Int]
     val args1 = cmd.varargGetter[Int] // using cmd.Parser[Int]
-    cmd.run(sum(args0(), args1()*))
+    cmd.run(() => sum(args0(), args1()*))
   }
 }
 ```
@@ -78,9 +78,9 @@ class myMain extends MainAnnotation:
     def varargGetter[T](using parser: Parser[T]): () => Seq[T] =
       () => varargs.map(arg => parser.fromString(arg))
 
-    def run(program: => Result): Unit =
+    def run(program: () => Result): Unit =
       println("executing program")
-      val result = program
+      val result = program()
       println("result: " + result)
       println("executed program")
   end MyCommand

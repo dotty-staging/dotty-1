@@ -55,9 +55,9 @@ class myMain extends MainAnnotation:
     def varargGetter[T](using parser: Parser[T]): () => Seq[T] =
       () => varargs.map(arg => parser.fromString(arg))
 
-    def run(program: => Result): Unit =
+    def run(program: () => Result): Unit =
       println("executing program")
-      val result = program
+      val result = program()
       println("result: " + result)
       println("executed program")
   end MyCommand

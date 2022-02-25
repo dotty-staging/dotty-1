@@ -22,5 +22,5 @@ class mainManyArgs(i1: Int, s2: String, i3: Int) extends MainAnnotation:
 
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] = ???
 
-      override def run(f: => Result): Unit = f
+      override def run(program: () => Result): Unit = program()
   end command
