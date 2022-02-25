@@ -237,13 +237,14 @@ object MainProxies {
 
       for ((formal, paramName), idx) <- mt.paramInfos.zip(mt.paramNames).zipWithIndex yield
         val param = paramName.toString
-        val paramType =
-          if formal.isRepeatedParam then formal.argTypes.head.show
-          else formal.show
+        val paramType0 = if formal.isRepeatedParam then formal.argTypes.head.dealias else formal.dealias
+        val paramType = paramType0.dealias
+
+        val paramTypeStr = formal.dealias.typeSymbol.owner.showFullName + "." + paramType.show
         val hasDefault = defaultValueSymbols.contains(idx)
         val isRepeated = formal.isRepeatedParam
 
-        val constructorArgs = List(paramName.toString, paramType, hasDefault, isRepeated)
+        val constructorArgs = List(paramName.toString, paramTypeStr, hasDefault, isRepeated)
           .map(value => Literal(Constant(value)))
 
         var paramInfos =
