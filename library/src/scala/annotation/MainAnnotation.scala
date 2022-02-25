@@ -64,7 +64,15 @@ end MainAnnotation
 @experimental
 object MainAnnotation:
 
-  final class ParameterInfo private (
+  /** ParameterInfo with a name, the type of the parameter and if it has a default
+   *
+   *  @param name The name of the parameter
+   *  @param typeName The type of the parameter
+   *  @param hasDefault If the parameter has a default argument
+   *  @param isVarargs If the parameter is a varargs parameter (can only be true for the last parameter)
+   *  @param documentation The documentation of the parameter (from `@param` documentation in the main method)
+   */
+  final class ParameterInfo (
     paramName: String,
     paramTypeName: String,
     paramHasDefault: Boolean,
@@ -72,17 +80,6 @@ object MainAnnotation:
     paramDocumentation: String,
     paramAnnotations: Seq[ParameterAnnotation],
   ) {
-
-    /** ParameterInfo with a name, the type of the parameter and if it has a default
-     *
-     *  @param name The name of the parameter
-     *  @param typeName The type of the parameter
-     *  @param hasDefault If the parameter has a default argument
-     *  @param isVarargs If the parameter is a varargs parameter (can only be true for the last parameter)
-     *  @param documentation The documentation of the parameter (from `@param` documentation in the main method)
-     */
-    def this(name: String, typeName: String, hasDefault: Boolean, isVarargs: Boolean, documentation: String) =
-      this(name, typeName, hasDefault, isVarargs, documentation, Seq.empty)
 
     /** The name of the parameter */
     def name: String = paramName
@@ -101,10 +98,6 @@ object MainAnnotation:
 
     /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
     def annotations: Seq[ParameterAnnotation] = paramAnnotations
-
-    /** Copy this ParameterInfo and sets the annotations */
-    def withAnnotations(annotations: ParameterAnnotation*): ParameterInfo =
-      new ParameterInfo(paramName, typeName, paramHasDefault, paramIsVarargs, documentation, annotations)
 
     override def toString: String = s"$name: $typeName"
   }

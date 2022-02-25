@@ -152,11 +152,8 @@ object MainProxies {
    *           args,
    *           "f",
    *           "Lorem ipsum dolor sit amet consectetur adipiscing elit.",
-   *           new scala.annotation.MainAnnotation.ParameterInfo("x", "S")
-   *             .withDocumentation("my param x")
-   *             .withAnnotations(new scala.main.Alias("myX")),
-   *           new scala.annotation.MainAnnotation.ParameterInfo("ys", "T")
-   *             .withDocumentation("all my params y")
+   *           new scala.annotation.MainAnnotation.ParameterInfo("x", "S", false, false, "my param x", Seq(new scala.main.Alias("myX")))
+   *           new scala.annotation.MainAnnotation.ParameterInfo("ys", "T", false, false, "all my params y", Seq())
    *         )
    *
    *         val args0: () => S = cmd.argGetter[S](0, None)
@@ -226,9 +223,7 @@ object MainProxies {
      *
      *  A ParamInfo has the following shape
      *  ```
-     *  new scala.annotation.MainAnnotation.ParameterInfo("x", "S")
-     *    .withDocumentation("my param x")
-     *    .withAnnotations(new scala.main.Alias("myX"))
+     *  new scala.annotation.MainAnnotation.ParameterInfo("x", "S", false, false, "my param x", Seq(new scala.main.Alias("myX")))
      *  ```
      */
     def parameterInfos(mt: MethodType): List[Tree] =
@@ -244,15 +239,15 @@ object MainProxies {
         val hasDefault = defaultValueSymbols.contains(idx)
         val isRepeated = formal.isRepeatedParam
         val paramDoc = documentation.argDocs.getOrElse(param, "")
+        val paramAnnots =
+          val annotationTrees = paramAnnotations(idx).map(instantiateAnnotation).toList
+          Apply(ref(defn.SeqModule.termRef), annotationTrees)
 
         val constructorArgs = List(param, paramTypeStr, hasDefault, isRepeated, paramDoc)
           .map(value => Literal(Constant(value)))
-        val paramInfos =
-          New(TypeTree(defn.MainAnnotationParameterInfo.typeRef), List(constructorArgs))
-        val paramAnnots = paramAnnotations(idx)
-        if paramAnnots.nonEmpty then
-          paramInfos.withProperty(defn.MainAnnotationParameterInfo_withAnnotations, paramAnnots.map(instantiateAnnotation).toList)
-        else paramInfos
+
+        New(TypeTree(defn.MainAnnotationParameterInfo.typeRef), List(constructorArgs :+ paramAnnots))
+
     end parameterInfos
 
     /**

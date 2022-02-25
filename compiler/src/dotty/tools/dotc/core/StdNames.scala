@@ -467,6 +467,7 @@ object StdNames {
     val dynamics: N             = "dynamics"
     val elem: N                 = "elem"
     val elems: N                = "elems"
+    val empty: N                = "empty"
     val emptyValDef: N          = "emptyValDef"
     val end: N                  = "end"
     val ensureAccessible : N    = "ensureAccessible"

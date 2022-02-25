@@ -23,8 +23,8 @@ object foo {
       args = args,
       commandName = "sum",
       documentation = "Sum all the numbers",
-      new ParameterInfo("first", "scala.Int", hasDefault=false, isVarargs=false, "Fist number to sum"),
-      new ParameterInfo("rest", "scala.Int" , hasDefault=false, isVarargs=true, "The rest of the numbers to sum")
+      new ParameterInfo("first", "scala.Int", hasDefault=false, isVarargs=false, "Fist number to sum", Seq()),
+      new ParameterInfo("rest", "scala.Int" , hasDefault=false, isVarargs=true, "The rest of the numbers to sum", Seq())
     )
     val args0 = cmd.argGetter[Int](0, None) // using cmd.Parser[Int]
     val args1 = cmd.varargGetter[Int] // using cmd.Parser[Int]
@@ -86,4 +86,3 @@ class myMain extends MainAnnotation:
   end MyCommand
 end myMain
 ```
-
