@@ -34,14 +34,14 @@ class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
   override type Parser[T] = util.CommandLineParser.FromString[T]
   override type Result = Any
 
-  override def command(args: Array[String], commandName: String, docComment: String, parameterInfos: ParameterInfo*) =
+  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
     new Command[Parser, Result]:
 
       override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
         () => p.fromString(args(idx))
 
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
-        () => for i <- (parameterInfos.length until args.length) yield p.fromString(args(i))
+        () => for i <- (info.parameters.length until args.length) yield p.fromString(args(i))
 
       override def run(f: () => Result): Unit =
         for (_ <- 1 to runs)

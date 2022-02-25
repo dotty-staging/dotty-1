@@ -24,11 +24,15 @@ package scala.annotation
  *  object foo {
  *    def main(args: Array[String]): Unit = {
  *      val cmd = new myMain().command(
- *        args = args,
- *        commandName = "sum",
- *        documentation = "Sum all the numbers",
- *        new ParameterInfo("first", "scala.Int", hasDefault=false, isVarargs=false, "Fist number to sum"),
- *        new ParameterInfo("rest", "scala.Int" , hasDefault=false, isVarargs=true, "The rest of the numbers to sum")
+ *        info = new CommandInfo(
+ *          name = "foo.main",
+ *          documentation = "Sum all the numbers",
+ *          parameters = Seq(
+ *            new ParameterInfo("first", "scala.Int", hasDefault=false, isVarargs=false, "Fist number to sum"),
+ *            new ParameterInfo("rest", "scala.Int" , hasDefault=false, isVarargs=true, "The rest of the numbers to sum")
+ *          )
+ *        )
+ *        args = args
  *      )
  *      val args0 = cmd.argGetter[Int](0, None) // using cmd.Parser[Int]
  *      val args1 = cmd.varargGetter[Int] // using cmd.Parser[Int]
@@ -52,55 +56,15 @@ trait MainAnnotation extends StaticAnnotation:
 
   /** A new command with arguments from `args`
    *
+   *  @param info The information about the command (name, documentation and info about parameters)
    *  @param args The command line arguments
-   *  @param commandName The name of the command (name of the annotated method)
-   *  @param documentation The documentation of the command (without the `@param` documentation)
-   *  @param parameterInfos Information about all the parameters (name, type, has default, is varargs and documentation)
    */
-  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[Parser, Result]
+  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result]
 
 end MainAnnotation
 
 @experimental
 object MainAnnotation:
-
-  /** ParameterInfo with a name, the type of the parameter and if it has a default
-   *
-   *  @param name The name of the parameter
-   *  @param typeName The type of the parameter
-   *  @param hasDefault If the parameter has a default argument
-   *  @param isVarargs If the parameter is a varargs parameter (can only be true for the last parameter)
-   *  @param documentation The documentation of the parameter (from `@param` documentation in the main method)
-   */
-  final class ParameterInfo (
-    paramName: String,
-    paramTypeName: String,
-    paramHasDefault: Boolean,
-    paramIsVarargs: Boolean,
-    paramDocumentation: String,
-    paramAnnotations: Seq[ParameterAnnotation],
-  ) {
-
-    /** The name of the parameter */
-    def name: String = paramName
-
-    /** The name of the parameter's type */
-    def typeName: String = paramTypeName
-
-    /** If the parameter has a default argument */
-    def hasDefault: Boolean = paramHasDefault
-
-    /** If this is a varargs parameter. Can only be true if it is the last parameter. */
-    def isVarargs: Boolean = paramIsVarargs
-
-    /** The docstring of the parameter. */
-    def documentation: String = paramDocumentation
-
-    /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
-    def annotations: Seq[ParameterAnnotation] = paramAnnotations
-
-    override def toString: String = s"$name: $typeName"
-  }
 
   /** A class representing a command to run */
   trait Command[Parser[_], Result]:
@@ -121,6 +85,49 @@ object MainAnnotation:
      */
     def run(program: () => Result): Unit
   end Command
+
+  final class CommandInfo(val name: String, val documentation: String, val parameters: Seq[ParameterInfo])
+
+  /** ParameterInfo with a name, the type of the parameter and if it has a default
+   *
+   *  @param name The name of the parameter
+   *  @param typeName The type of the parameter
+   *  @param hasDefault If the parameter has a default argument
+   *  @param isVarargs If the parameter is a varargs parameter (can only be true for the last parameter)
+   *  @param documentation The documentation of the parameter (from `@param` documentation in the main method)
+   */
+  final class ParameterInfo (
+    paramName: String,
+    paramTypeName: String,
+    paramHasDefault: Boolean,
+    paramIsVarargs: Boolean,
+    paramDocumentation: String,
+    paramAnnotations: Seq[ParameterAnnotation],
+  ):
+
+    /** The name of the parameter */
+    def name: String = paramName
+
+    /** The name of the parameter's type */
+    def typeName: String = paramTypeName
+
+    /** If the parameter has a default argument */
+    def hasDefault: Boolean = paramHasDefault
+
+    /** If this is a varargs parameter. Can only be true if it is the last parameter. */
+    def isVarargs: Boolean = paramIsVarargs
+
+    /** The docstring of the parameter. */
+    def documentation: String = paramDocumentation
+
+    /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
+    def annotations: Seq[ParameterAnnotation] = paramAnnotations
+
+    override def toString: String = s"$name: $typeName"
+
+  end ParameterInfo
+
+
 
   /** Marker trait for annotations that will be included in the ParameterInfo annotations. */
   trait ParameterAnnotation extends StaticAnnotation

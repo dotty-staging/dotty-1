@@ -21,7 +21,7 @@ end Test
 
 @experimental
 class myMain extends MainAnnotation:
-  import MainAnnotation.{ ParameterInfo, Command }
+  import MainAnnotation.{ Command, CommandInfo, ParameterInfo }
 
   // Parser used to parse command line arguments
   type Parser[T] = util.CommandLineParser.FromString[T]
@@ -30,19 +30,19 @@ class myMain extends MainAnnotation:
   type Result = Int
 
   /** A new command with arguments from `args` */
-  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[Parser, Result] =
+  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
     if args.contains("--help") then
-      println(documentation)
+      println(info.documentation)
       System.exit(0)
-    assert(parameterInfos.forall(!_.hasDefault), "Default arguments are not supported")
+    assert(info.parameters.forall(!_.hasDefault), "Default arguments are not supported")
     val (plainArgs, varargs) =
-      if parameterInfos.last.isVarargs then
-        val numPlainArgs = parameterInfos.length - 1
+      if info.parameters.last.isVarargs then
+        val numPlainArgs = info.parameters.length - 1
         assert(numPlainArgs <= args.length, "Not enough arguments")
         (args.take(numPlainArgs), args.drop(numPlainArgs))
       else
-        assert(parameterInfos.length <= args.length, "Not enough arguments")
-        assert(parameterInfos.length >= args.length, "Too many arguments")
+        assert(info.parameters.length <= args.length, "Not enough arguments")
+        assert(info.parameters.length >= args.length, "Too many arguments")
         (args, Array.empty[String])
     new MyCommand(plainArgs, varargs)
 

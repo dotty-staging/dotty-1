@@ -16,7 +16,7 @@ class mainManyArgs(i1: Int, s2: String, i3: Int) extends MainAnnotation:
   override type Parser[T] = util.CommandLineParser.FromString[T]
   override type Result = Any
 
-  override def command(args: Array[String], commandName: String, docComment: String, parameterInfos: ParameterInfo*) =
+  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
     new Command[Parser, Result]:
       override def argGetter[T](idx: Int, optDefaultGetter: Option[() => T])(using p: Parser[T]): () => T = ???
 

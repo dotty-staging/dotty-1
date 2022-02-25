@@ -36,7 +36,7 @@ final class newMain extends MainAnnotation:
   override type Parser[T] = util.CommandLineParser.FromString[T]
   override type Result = Any
 
-  override def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*) =
+  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
     new Command[Parser, Result]:
 
       private inline val argMarker = "--"
@@ -58,17 +58,17 @@ final class newMain extends MainAnnotation:
       private inline val maxUsageLineLength = 120
 
       /** A map from argument canonical name (the name of the parameter in the method definition) to parameter informations */
-      private val nameToParameterInfo: Map[String, ParameterInfo] = parameterInfos.map(infos => infos.name -> infos).toMap
+      private val nameToParameterInfo: Map[String, ParameterInfo] = info.parameters.map(infos => infos.name -> infos).toMap
 
       private val (positionalArgs, byNameArgs, invalidByNameArgs, helpIsOverridden) = {
-        val namesToCanonicalName: Map[String, String] = parameterInfos.flatMap(
+        val namesToCanonicalName: Map[String, String] = info.parameters.flatMap(
           infos =>
             var names = getAlternativeNames(infos)
             val canonicalName = infos.name
             if nameIsValid(canonicalName) then names = canonicalName +: names
             names.map(_ -> canonicalName)
         ).toMap
-        val shortNamesToCanonicalName: Map[Char, String] = parameterInfos.flatMap(
+        val shortNamesToCanonicalName: Map[Char, String] = info.parameters.flatMap(
           infos =>
             var names = getShortNames(infos)
             val canonicalName = infos.name
@@ -140,7 +140,7 @@ final class newMain extends MainAnnotation:
 
       private def usage(): Unit =
         def argsUsage: Seq[String] =
-          for info <- parameterInfos yield
+          for info <- info.parameters yield
             val canonicalName = getNameWithMarker(info.name)
             val shortNames = getShortNames(info).map(getNameWithMarker)
             val alternativeNames = getAlternativeNames(info).map(getNameWithMarker)
@@ -163,7 +163,7 @@ final class newMain extends MainAnnotation:
           recurse(argsUsage, "", Vector()).toList
         }
 
-        val usageBeginning = s"Usage: $commandName "
+        val usageBeginning = s"Usage: ${info.name} "
         val argsOffset = usageBeginning.length
         val usages = wrapArgumentUsages(argsUsage, maxUsageLineLength - argsOffset)
 
@@ -186,14 +186,14 @@ final class newMain extends MainAnnotation:
           recurse(line, Vector()).toList
         }
 
-        if (documentation.nonEmpty)
-          println(wrapLongLine(documentation, maxUsageLineLength).mkString("\n"))
+        if (info.documentation.nonEmpty)
+          println(wrapLongLine(info.documentation, maxUsageLineLength).mkString("\n"))
         if (nameToParameterInfo.nonEmpty) {
           val argNameShift = 2
           val argDocShift = argNameShift + 2
 
           println("Arguments:")
-          for info <- parameterInfos do
+          for info <- info.parameters do
             val canonicalName = getNameWithMarker(info.name)
             val shortNames = getShortNames(info).map(getNameWithMarker)
             val alternativeNames = getAlternativeNames(info).map(getNameWithMarker)
@@ -234,7 +234,7 @@ final class newMain extends MainAnnotation:
         getAliases(paramInfos).filter(name => !nameIsValid(name) && !shortNameIsValid(name))
 
       override def argGetter[T](idx: Int, optDefaultGetter: Option[() => T])(using p: Parser[T]): () => T =
-        val name = parameterInfos(idx).name
+        val name = info.parameters(idx).name
         val parameterInfo = nameToParameterInfo(name)
         // TODO: Decide which string is associated with this arg when constructing the command.
         //       Here we should only get the string for this argument, apply it to the parser and handle parsing errors.
@@ -260,7 +260,7 @@ final class newMain extends MainAnnotation:
       end argGetter
 
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
-        val name = parameterInfos.last.name
+        val name = info.parameters.last.name
         // TODO: Decide which strings are associated with the varargs when constructing the command.
         //       Here we should only get the strings for this argument, apply them to the parser and handle parsing errors.
         //       Should be able to get the argument from its index (last).

@@ -23,16 +23,16 @@ class myMain extends MainAnnotation:
   override type Parser[T] = Make[T]
   override type Result = Any
 
-  override def command(args: Array[String], commandName: String, docs: String, parameterInfos: ParameterInfo*) =
+  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
     def paramInfoString(paramInfo: ParameterInfo) =
       import paramInfo.*
       s"    ParameterInfo(name=\"$name\", typeName=\"$typeName\", hasDefault=$hasDefault, isVarargs=$isVarargs, documentation=\"$documentation\", annotations=$annotations)"
     println(
       s"""command(
          |  ${args.mkString("Array(", ", ", ")")},
-         |  $commandName,
-         |  "$docs",
-         |  ${parameterInfos.map(paramInfoString).mkString("Seq(\n", ",\n", "\n  )*")}
+         |  ${info.name},
+         |  "${info.documentation}",
+         |  ${info.parameters.map(paramInfoString).mkString("Seq(\n", ",\n", "\n  )*")}
          |)""".stripMargin)
     new Command[Parser, Result]:
       override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =

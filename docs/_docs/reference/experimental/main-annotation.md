@@ -19,12 +19,17 @@ When a users annotates a method with an annotation that extends `MainAnnotation`
 ```scala
 object foo {
   def main(args: Array[String]): Unit = {
+
     val cmd = new myMain().command(
-      args = args,
-      commandName = "sum",
-      documentation = "Sum all the numbers",
-      new ParameterInfo("first", "scala.Int", hasDefault=false, isVarargs=false, "Fist number to sum", Seq()),
-      new ParameterInfo("rest", "scala.Int" , hasDefault=false, isVarargs=true, "The rest of the numbers to sum", Seq())
+      info = new CommandInfo(
+        name = "sum",
+        documentation = "Sum all the numbers",
+        parameters = Seq(
+          new ParameterInfo("first", "scala.Int", hasDefault=false, isVarargs=false, "Fist number to sum", Seq()),
+          new ParameterInfo("rest", "scala.Int" , hasDefault=false, isVarargs=true, "The rest of the numbers to sum", Seq())
+        )
+      ),
+      args = args
     )
     val args0 = cmd.argGetter[Int](0, None) // using cmd.Parser[Int]
     val args1 = cmd.varargGetter[Int] // using cmd.Parser[Int]
@@ -52,20 +57,20 @@ class myMain extends MainAnnotation:
   type Result = Int
 
   /** A new command with arguments from `args` */
-  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[Parser, Result] =
+  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
     if args.contains("--help") then
-      println(documentation)
+      println(info.documentation)
       // TODO: Print documentation of the parameters
       System.exit(0)
-    assert(parameterInfos.forall(!_.hasDefault), "Default arguments are not supported")
+    assert(info.parameters.forall(!_.hasDefault), "Default arguments are not supported")
     val (plainArgs, varargs) =
-      if parameterInfos.last.isVarargs then
-        val numPlainArgs = parameterInfos.length - 1
+      if info.parameters.last.isVarargs then
+        val numPlainArgs = info.parameters.length - 1
         assert(numPlainArgs <= args.length, "Not enough arguments")
         (args.take(numPlainArgs), args.drop(numPlainArgs))
       else
-        assert(parameterInfos.length <= args.length, "Not enough arguments")
-        assert(parameterInfos.length >= args.length, "Too many arguments")
+        assert(info.parameters.length <= args.length, "Not enough arguments")
+        assert(info.parameters.length >= args.length, "Too many arguments")
         (args, Array.empty[String])
     new MyCommand(plainArgs, varargs)
 

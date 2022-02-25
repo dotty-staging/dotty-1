@@ -149,11 +149,15 @@ object MainProxies {
    *     final class f {
    *       static def main(args: Array[String]): Unit = {
    *         val cmd = new myMain(80).command(
-   *           args,
-   *           "f",
-   *           "Lorem ipsum dolor sit amet consectetur adipiscing elit.",
-   *           new scala.annotation.MainAnnotation.ParameterInfo("x", "S", false, false, "my param x", Seq(new scala.main.Alias("myX")))
-   *           new scala.annotation.MainAnnotation.ParameterInfo("ys", "T", false, false, "all my params y", Seq())
+   *           info = new CommandInfo(
+   *             name = "f",
+   *             documentation = "Lorem ipsum dolor sit amet consectetur adipiscing elit.",
+   *             parameters = Seq(
+   *               new scala.annotation.MainAnnotation.ParameterInfo("x", "S", false, false, "my param x", Seq(new scala.main.Alias("myX")))
+   *               new scala.annotation.MainAnnotation.ParameterInfo("ys", "T", false, false, "all my params y", Seq())
+   *             )
+   *           )
+   *           args = args
    *         )
    *
    *         val args0: () => S = cmd.argGetter[S](0, None)
@@ -310,16 +314,22 @@ object MainProxies {
     end instantiateAnnotation
 
     def generateMainClass(mainCall: Tree, args: List[Tree], parameterInfos: List[Tree]): TypeDef =
+      val cmdInfo =
+        val nameTree = Literal(Constant(mainFun.showName))
+        val docTree = Literal(Constant(documentation.mainDoc))
+        val paramInfos = Apply(ref(defn.SeqModule.termRef), parameterInfos)
+        New(TypeTree(defn.MainAnnotationCommandInfo.typeRef), List(List(nameTree, docTree, paramInfos)))
+
       val cmd = ValDef(
         nme.cmd,
         TypeTree(),
         Apply(
           Select(instantiateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
-          Ident(nme.args) :: Literal(Constant(mainFun.showName)) :: Literal(Constant(documentation.mainDoc)) :: parameterInfos
+          List(cmdInfo, Ident(nme.args))
         )
       )
       val run = Apply(Select(Ident(nme.cmd), defn.MainAnnotationCommand_run.name), mainCall)
-      val body = Block(cmd :: args, run)
+      val body = Block(cmdInfo :: cmd :: args, run)
       val mainArg = ValDef(nme.args, TypeTree(defn.ArrayType.appliedTo(defn.StringType)), EmptyTree)
         .withFlags(Param)
       /** Replace typed `Ident`s that have been typed with a TypeSplice with the reference to the symbol.
