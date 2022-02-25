@@ -91,43 +91,20 @@ object MainAnnotation:
   /** ParameterInfo with a name, the type of the parameter and if it has a default
    *
    *  @param name The name of the parameter
-   *  @param typeName The type of the parameter
+   *  @param typeName The name of the parameter's type
    *  @param hasDefault If the parameter has a default argument
    *  @param isVarargs If the parameter is a varargs parameter (can only be true for the last parameter)
    *  @param documentation The documentation of the parameter (from `@param` documentation in the main method)
+   *  @param annotations The annotations of the parameter that extend `ParameterAnnotation`
    */
   final class ParameterInfo (
-    paramName: String,
-    paramTypeName: String,
-    paramHasDefault: Boolean,
-    paramIsVarargs: Boolean,
-    paramDocumentation: String,
-    paramAnnotations: Seq[ParameterAnnotation],
-  ):
-
-    /** The name of the parameter */
-    def name: String = paramName
-
-    /** The name of the parameter's type */
-    def typeName: String = paramTypeName
-
-    /** If the parameter has a default argument */
-    def hasDefault: Boolean = paramHasDefault
-
-    /** If this is a varargs parameter. Can only be true if it is the last parameter. */
-    def isVarargs: Boolean = paramIsVarargs
-
-    /** The docstring of the parameter. */
-    def documentation: String = paramDocumentation
-
-    /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
-    def annotations: Seq[ParameterAnnotation] = paramAnnotations
-
-    override def toString: String = s"$name: $typeName"
-
-  end ParameterInfo
-
-
+    val name: String,
+    val typeName: String,
+    val hasDefault: Boolean,
+    val isVarargs: Boolean,
+    val documentation: String,
+    val annotations: Seq[ParameterAnnotation]
+  )
 
   /** Marker trait for annotations that will be included in the ParameterInfo annotations. */
   trait ParameterAnnotation extends StaticAnnotation
