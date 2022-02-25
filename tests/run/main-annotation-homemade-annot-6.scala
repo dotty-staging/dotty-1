@@ -6,7 +6,7 @@ import scala.annotation.*
  *
  *  @param i the first parameter
  */
-@myMain def bar(i: List[Int], rest: Int*) = println(s"bar($i, ${rest.mkString(", ")})")
+@myMain def bar(@MyParamAnnot(3) i: List[Int], rest: Int*) = println(s"bar($i, ${rest.mkString(", ")})")
 
 object Test:
   def main(args: Array[String]) =
@@ -48,6 +48,9 @@ class myMain extends MainAnnotation:
         f
         println()
   end command
+
+@experimental
+case class MyParamAnnot(n: Int) extends MainAnnotation.ParameterAnnotation
 
 trait Make[T]:
   def make: T

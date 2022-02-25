@@ -258,11 +258,11 @@ object MainProxies {
           *   defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal("my param x")))
           */
         for doc <- documentation.argDocs.get(param) do
-          paramInfos.withProperty(defn.MainAnnotationParameterInfo_withDocumentation, List(Literal(Constant(doc))))
+          paramInfos = paramInfos.withProperty(defn.MainAnnotationParameterInfo_withDocumentation, List(Literal(Constant(doc))))
 
         val paramAnnots = paramAnnotations(idx)
         if paramAnnots.nonEmpty then
-          paramInfos.withProperty(defn.MainAnnotationParameterInfo_withAnnotations, paramAnnots.map(instantiateAnnotation).toList)
+          paramInfos = paramInfos.withProperty(defn.MainAnnotationParameterInfo_withAnnotations, paramAnnots.map(instantiateAnnotation).toList)
 
         paramInfos
     end parameterInfos
