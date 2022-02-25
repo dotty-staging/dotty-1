@@ -236,7 +236,9 @@ final class newMain extends MainAnnotation:
       override def argGetter[T](idx: Int, optDefaultGetter: Option[() => T])(using p: Parser[T]): () => T =
         val name = parameterInfos(idx).name
         val parameterInfo = nameToParameterInfo(name)
-
+        // TODO: Decide which string is associated with this arg when constructing the command.
+        //       Here we should only get the string for this argument, apply it to the parser and handle parsing errors.
+        //       Should be able to get the argument from its index.
         byNameArgs.get(name) match {
           case Some(Nil) =>
             throw AssertionError(s"$name present in byNameArgs, but it has no argument value")
@@ -259,7 +261,9 @@ final class newMain extends MainAnnotation:
 
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
         val name = parameterInfos.last.name
-
+        // TODO: Decide which strings are associated with the varargs when constructing the command.
+        //       Here we should only get the strings for this argument, apply them to the parser and handle parsing errors.
+        //       Should be able to get the argument from its index (last).
         val byNameGetters = byNameArgs.getOrElse(name, Seq()).map(arg => convert(name, arg))
         val positionalGetters = positionalArgs.removeAll.map(arg => convert(name, arg))
         // First take arguments passed by name, then those passed by position
