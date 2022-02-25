@@ -1,0 +1,89 @@
+---
+layout: doc-page
+title: "MainAnnotation"
+---
+
+`MainAnnotation` provides a generic way to define main annotations such as `@main`.
+
+When a users annotates a method with an annotation that extends `MainAnnotation` a class with a `main` method will be generated. The main method will contain the code needed to parse the command line arguments and run the application.
+
+```scala
+/** Sum all the numbers
+ *
+ *  @param first Fist number to sum
+ *  @param rest The rest of the numbers to sum
+ */
+@myMain def sum(first: Int, rest: Int*): Int = first + rest.sum
+```
+
+```scala
+object foo {
+  def main(args: Array[String]): Unit = {
+    val cmd = new myMain().command(
+      args = args,
+      commandName = "sum",
+      documentation = "Sum all the numbers",
+      new ParameterInfo("first", "scala.Int", hasDefault=false, isVarargs=false, "Fist number to sum"),
+      new ParameterInfo("rest", "scala.Int" , hasDefault=false, isVarargs=true, "The rest of the numbers to sum")
+    )
+    val args0 = cmd.argGetter[Int](0, None) // using cmd.Parser[Int]
+    val args1 = cmd.varargGetter[Int] // using cmd.Parser[Int]
+    cmd.run(sum(args0(), args1()*))
+  }
+}
+```
+
+The implementation of the `main` method first instantiates the annotation and then creates a `Command`.
+When creating the `Command`, the arguments can be checked and preprocessed.
+Then it defines a series of argument getters calling `argGetter` for each parameter and `varargGetter` for the last one if it is a varargs. `argGetter` gets an optional lambda that computes the default argument.
+Finally, the `run` method is called to run the application. It receives a by-name argument that contains the call the annotated method with the instantiations arguments (using the lambdas from `argGetter`/`varargGetter`).
+
+
+Example of implementation of `myMain` that takes all arguments positionally. It used `util.CommandLineParser.FromString` and expects no default arguments. For simplicity, any errors in preprocessing or parsing results in crash.
+
+```scala
+class myMain extends MainAnnotation:
+  import MainAnnotation.{ ParameterInfo, Command }
+
+  // Parser used to parse command line arguments
+  type Parser[T] = util.CommandLineParser.FromString[T]
+
+  // Result type of the annotated method
+  type Result = Int
+
+  /** A new command with arguments from `args` */
+  def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*): Command[Parser, Result] =
+    if args.contains("--help") then
+      println(documentation)
+      // TODO: Print documentation of the parameters
+      System.exit(0)
+    assert(parameterInfos.forall(!_.hasDefault), "Default arguments are not supported")
+    val (plainArgs, varargs) =
+      if parameterInfos.last.isVarargs then
+        val numPlainArgs = parameterInfos.length - 1
+        assert(numPlainArgs <= args.length, "Not enough arguments")
+        (args.take(numPlainArgs), args.drop(numPlainArgs))
+      else
+        assert(parameterInfos.length <= args.length, "Not enough arguments")
+        assert(parameterInfos.length >= args.length, "Too many arguments")
+        (args, Array.empty[String])
+    new MyCommand(plainArgs, varargs)
+
+  @experimental
+  class MyCommand(plainArgs: Seq[String], varargs: Seq[String]) extends Command[util.CommandLineParser.FromString, Int]:
+
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using parser: Parser[T]): () => T =
+      () => parser.fromString(plainArgs(idx))
+
+    def varargGetter[T](using parser: Parser[T]): () => Seq[T] =
+      () => varargs.map(arg => parser.fromString(arg))
+
+    def run(program: => Result): Unit =
+      println("executing program")
+      val result = program
+      println("result: " + result)
+      println("executed program")
+  end MyCommand
+end myMain
+```
+
