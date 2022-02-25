@@ -35,10 +35,11 @@ object MainAnnotation:
     paramDocumentation: Option[String],
     paramAnnotations: Seq[ParameterAnnotation],
     paramHasDefault: Boolean,
+    paramIsVarargs: Boolean,
   ) {
     /** ParameterInfo with a name, the type of the parameter and if it has a default */
-    def this(name: String, typeName: String, hasDefault: Boolean) =
-      this(name, typeName, None, Seq.empty, hasDefault)
+    def this(name: String, typeName: String, hasDefault: Boolean, isVarargs: Boolean) =
+      this(name, typeName, None, Seq.empty, hasDefault, isVarargs)
 
     /** The name of the parameter */
     def name: String = paramName
@@ -49,6 +50,9 @@ object MainAnnotation:
     /** If the parameter has a default value */
     def hasDefault: Boolean = paramHasDefault
 
+    /** If this is a varargs parameter. Can only be true if it is the last parameter. */
+    def isVarargs: Boolean = paramIsVarargs
+
     /** The docstring of the parameter. Defaults to None. */
     def documentation: Option[String] = paramDocumentation
 
@@ -57,11 +61,11 @@ object MainAnnotation:
 
     /** Copy this ParameterInfo and sets the documentation */
     def withDocumentation(doc: String): ParameterInfo =
-      new ParameterInfo(paramName, typeName, Some(doc), annotations, paramHasDefault)
+      new ParameterInfo(paramName, typeName, Some(doc), annotations, paramHasDefault, paramIsVarargs)
 
     /** Copy this ParameterInfo and sets the annotations */
     def withAnnotations(annotations: ParameterAnnotation*): ParameterInfo =
-      new ParameterInfo(paramName, typeName, documentation, annotations, paramHasDefault)
+      new ParameterInfo(paramName, typeName, documentation, annotations, paramHasDefault, paramIsVarargs)
 
     override def toString: String = s"$name: $typeName"
   }

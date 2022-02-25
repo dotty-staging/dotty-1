@@ -240,14 +240,14 @@ object MainProxies {
         val paramType =
           if formal.isRepeatedParam then formal.argTypes.head.show
           else formal.show
-
         val hasDefault = defaultValueSymbols.contains(idx)
+        val isRepeated = formal.isRepeatedParam
 
-        var paramInfos: Tree =  New(
-          TypeTree(defn.MainAnnotationParameterInfo.typeRef),
-          // Arguments to be passed to ParameterInfo' constructor
-          List(List(Literal(Constant(paramName.toString)), Literal(Constant(paramType)),  Literal(Constant(hasDefault))))
-        )
+        val constructorArgs = List(paramName.toString, paramType, hasDefault, isRepeated)
+          .map(value => Literal(Constant(value)))
+
+        var paramInfos =
+          New(TypeTree(defn.MainAnnotationParameterInfo.typeRef), List(constructorArgs))
 
         /*
           * Assignations to be made after the creation of the ParameterInfo.
