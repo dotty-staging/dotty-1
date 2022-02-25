@@ -243,22 +243,13 @@ object MainProxies {
         val paramTypeStr = formal.dealias.typeSymbol.owner.showFullName + "." + paramType.show
         val hasDefault = defaultValueSymbols.contains(idx)
         val isRepeated = formal.isRepeatedParam
+        val paramDoc = documentation.argDocs.getOrElse(param, "")
 
-        val constructorArgs = List(paramName.toString, paramTypeStr, hasDefault, isRepeated)
+        val constructorArgs = List(param, paramTypeStr, hasDefault, isRepeated, paramDoc)
           .map(value => Literal(Constant(value)))
 
         var paramInfos =
           New(TypeTree(defn.MainAnnotationParameterInfo.typeRef), List(constructorArgs))
-
-        /*
-          * Assignations to be made after the creation of the ParameterInfo.
-          * For example:
-          *   args0paramInfos.withDocumentation("my param x")
-          * is represented by the pair
-          *   defn.MainAnnotationParameterInfo_withDocumentation -> List(Literal("my param x")))
-          */
-        for doc <- documentation.argDocs.get(param) do
-          paramInfos = paramInfos.withProperty(defn.MainAnnotationParameterInfo_withDocumentation, List(Literal(Constant(doc))))
 
         val paramAnnots = paramAnnotations(idx)
         if paramAnnots.nonEmpty then

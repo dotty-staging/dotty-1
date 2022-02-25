@@ -26,7 +26,7 @@ class myMain extends MainAnnotation:
   override def command(args: Array[String], commandName: String, docs: String, parameterInfos: ParameterInfo*) =
     def paramInfoString(paramInfo: ParameterInfo) =
       import paramInfo.*
-      s"    ParameterInfo(name=\"$name\", typeName=\"$typeName\", hasDefault=$hasDefault, isVarargs=$isVarargs, documentation=${documentation.map("\"" + _ + "\"")}, annotations=$annotations)"
+      s"    ParameterInfo(name=\"$name\", typeName=\"$typeName\", hasDefault=$hasDefault, isVarargs=$isVarargs, documentation=\"$documentation\", annotations=$annotations)"
     println(
       s"""command(
          |  ${args.mkString("Array(", ", ", ")")},

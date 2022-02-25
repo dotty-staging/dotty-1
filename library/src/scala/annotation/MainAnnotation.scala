@@ -32,14 +32,14 @@ object MainAnnotation:
   final class ParameterInfo private (
     paramName: String,
     paramTypeName: String,
-    paramDocumentation: Option[String],
-    paramAnnotations: Seq[ParameterAnnotation],
     paramHasDefault: Boolean,
     paramIsVarargs: Boolean,
+    paramDocumentation: String,
+    paramAnnotations: Seq[ParameterAnnotation],
   ) {
     /** ParameterInfo with a name, the type of the parameter and if it has a default */
-    def this(name: String, typeName: String, hasDefault: Boolean, isVarargs: Boolean) =
-      this(name, typeName, None, Seq.empty, hasDefault, isVarargs)
+    def this(name: String, typeName: String, hasDefault: Boolean, isVarargs: Boolean, documentation: String) =
+      this(name, typeName, hasDefault, isVarargs, documentation, Seq.empty)
 
     /** The name of the parameter */
     def name: String = paramName
@@ -53,19 +53,15 @@ object MainAnnotation:
     /** If this is a varargs parameter. Can only be true if it is the last parameter. */
     def isVarargs: Boolean = paramIsVarargs
 
-    /** The docstring of the parameter. Defaults to None. */
-    def documentation: Option[String] = paramDocumentation
+    /** The docstring of the parameter. */
+    def documentation: String = paramDocumentation
 
     /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
     def annotations: Seq[ParameterAnnotation] = paramAnnotations
 
-    /** Copy this ParameterInfo and sets the documentation */
-    def withDocumentation(doc: String): ParameterInfo =
-      new ParameterInfo(paramName, typeName, Some(doc), annotations, paramHasDefault, paramIsVarargs)
-
     /** Copy this ParameterInfo and sets the annotations */
     def withAnnotations(annotations: ParameterAnnotation*): ParameterInfo =
-      new ParameterInfo(paramName, typeName, documentation, annotations, paramHasDefault, paramIsVarargs)
+      new ParameterInfo(paramName, typeName, paramHasDefault, paramIsVarargs, documentation, annotations)
 
     override def toString: String = s"$name: $typeName"
   }
