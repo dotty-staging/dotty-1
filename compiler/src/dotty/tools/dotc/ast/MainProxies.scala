@@ -159,10 +159,10 @@ object MainProxies {
    *             .withDocumentation("all my params y")
    *         )
    *
-   *         val args0: () => S = cmd.argGetter[S](0, None)
-   *         val args1: () => Seq[T] = cmd.varargGetter[T]
+   *         val args0: Option[S] = cmd.parseArg[S](0, None)
+   *         val args1: Option[Seq[T]] = cmd.parseVararg[T]
    *
-   *         cmd.run(f(args0(), args1()*))
+   *         cmd.run(f(args0.get, args1.get*))
    *       }
    *     }
    */
@@ -258,7 +258,7 @@ object MainProxies {
     /**
       * Creates a list of references and definitions of arguments.
       * The goal is to create the
-      *   `val args0: () => S = cmd.argGetter[S](0, None)`
+      *   `val args0: Option[S] = cmd.parseArg[S](0, None)`
       * part of the code.
       */
     def argValDefs(mt: MethodType): List[ValDef] =
@@ -267,28 +267,28 @@ object MainProxies {
           val isRepeated = formal.isRepeatedParam
           val formalType = if isRepeated then formal.argTypes.head else formal
           val getterSym =
-            if isRepeated then defn.MainAnnotationCommand_varargGetter
-            else defn.MainAnnotationCommand_argGetter
+            if isRepeated then defn.MainAnnotationCommand_parseVararg
+            else defn.MainAnnotationCommand_parseArg
           val defaultValueGetterOpt = defaultValueSymbols.get(idx) match
             case None => ref(defn.NoneModule.termRef)
             case Some(dvSym) =>
                val value = unitToValue(ref(dvSym.termRef))
                Apply(ref(defn.SomeClass.companionModule.termRef), value)
-          val argGetter0 = TypeApply(Select(Ident(nme.cmd), getterSym.name), TypeTree(formalType) :: Nil)
-          val argGetter =
-            if isRepeated then argGetter0
-            else Apply(argGetter0, List(Literal(Constant(idx)), defaultValueGetterOpt))
+          val parseArg0 = TypeApply(Select(Ident(nme.cmd), getterSym.name), TypeTree(formalType) :: Nil)
+          val parseArg =
+            if isRepeated then parseArg0
+            else Apply(parseArg0, List(Literal(Constant(idx)), defaultValueGetterOpt))
 
-          ValDef(argName, TypeTree(), argGetter)
+          ValDef(argName, TypeTree(), parseArg)
     end argValDefs
 
 
     /** Create a list of argument references that will be passed as argument to the main method.
-     *  `args0`, ...`argn*`
+     *  `args0.get`, ...`argn.get*`
      */
     def argRefs(mt: MethodType): List[Tree] =
       for ((formal, paramName), idx) <- mt.paramInfos.zip(mt.paramNames).zipWithIndex yield
-        val argRef = Apply(Ident(nme.args ++ idx.toString), Nil)
+        val argRef = Select(Ident(nme.args ++ idx.toString), nme.get)
         if formal.isRepeatedParam then repeated(argRef) else argRef
     end argRefs
 

@@ -7,8 +7,8 @@ command(
     ParameterInfo(name="j", typeName="java.lang.String", hasDefault=true, isVarargs=false, documentation="", annotations=List())
   )*
 )
-argGetter(0, None)
-argGetter(1, Some(2))
+parseArg(0, None)
+parseArg(1, Some(2))
 run()
 foo(42, abc)
 
@@ -21,8 +21,8 @@ command(
     ParameterInfo(name="rest", typeName="scala.Int", hasDefault=false, isVarargs=true, documentation="", annotations=List())
   )*
 )
-argGetter(0, None)
-varargGetter()
+parseArg(0, None)
+parseVararg()
 run()
 bar(List(42), 42, 42)
 

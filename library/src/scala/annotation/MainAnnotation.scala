@@ -6,7 +6,7 @@ package scala.annotation
  *  The protocol of calls from compiler-main is as follows:
  *
  *    - create a `command` with the command line arguments,
- *    - for each parameter of user-main, a call to `command.argGetter`,
+ *    - for each parameter of user-main, a call to `command.parseArg`,
  *      or `command.argsGetter` if is a final varargs parameter,
  *    - a call to `command.run` with the closure of user-main applied to all arguments.
  */
@@ -72,10 +72,10 @@ object MainAnnotation:
   trait Command[Parser[_], Result]:
 
     /** The getter for the `idx`th argument of type `T` */
-    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using Parser[T]): () => T
+    def parseArg[T](idx: Int, defaultArgument: Option[() => T])(using Parser[T]): Option[T]
 
     /** The getter for a final varargs argument of type `T*` */
-    def varargGetter[T](using Parser[T]): () => Seq[T]
+    def parseVararg[T](using Parser[T]): Option[Seq[T]]
 
     /** Run `program` if all arguments are valid,
      *  or print usage information and/or error messages.
