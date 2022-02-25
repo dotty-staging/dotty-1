@@ -121,9 +121,9 @@ final class newMain extends MainAnnotation:
       private val errors = new mutable.ArrayBuffer[String]
 
       /** Issue an error, and return an uncallable getter */
-      private def error(msg: String): None.type =
+      private def error(msg: String): () => Nothing =
         errors += msg
-        None
+        () => throw new AssertionError("trying to get invalid argument")
 
       private inline def nameIsValid(name: String): Boolean =
         name.length > 1 // TODO add more checks for illegal characters
@@ -140,8 +140,10 @@ final class newMain extends MainAnnotation:
         case s => argMarker + s
       }
 
-      private def convert[T](argName: String, arg: String, p: Parser[T]): Option[T] =
-        p.fromStringOption(arg).orElse(error(s"invalid argument for $argName: $arg"))
+      private def convert[T](argName: String, arg: String, p: Parser[T]): () => T =
+        p.fromStringOption(arg) match
+          case Some(t) => () => t
+          case None => error(s"invalid argument for $argName: $arg")
 
       private def usage(): Unit =
         def argsUsage: Seq[String] =
@@ -228,27 +230,26 @@ final class newMain extends MainAnnotation:
               argDoc.append("\n").append(shiftedDoc)
             }
 
-
             println(argDoc)
         }
       end explain
 
-      private def getAliases(paramInfo: ParameterInfo): Seq[String] =
-        paramInfo.annotations.collect{ case a: Alias => a }.flatMap(_.aliases)
+      private def getAliases(paramInfos: ParameterInfo): Seq[String] =
+        paramInfos.annotations.collect{ case a: Alias => a }.flatMap(_.aliases)
 
-      private def getAlternativeNames(paramInfo: ParameterInfo): Seq[String] =
-        getAliases(paramInfo).filter(nameIsValid(_))
+      private def getAlternativeNames(paramInfos: ParameterInfo): Seq[String] =
+        getAliases(paramInfos).filter(nameIsValid(_))
 
-      private def getShortNames(paramInfo: ParameterInfo): Seq[Char] =
-        getAliases(paramInfo).filter(shortNameIsValid(_)).map(_(0))
+      private def getShortNames(paramInfos: ParameterInfo): Seq[Char] =
+        getAliases(paramInfos).filter(shortNameIsValid(_)).map(_(0))
 
-      private def getInvalidNames(paramInfo: ParameterInfo): Seq[String | Char] =
-        getAliases(paramInfo).filter(name => !nameIsValid(name) && !shortNameIsValid(name))
+      private def getInvalidNames(paramInfos: ParameterInfo): Seq[String | Char] =
+        getAliases(paramInfos).filter(name => !nameIsValid(name) && !shortNameIsValid(name))
 
-      def parseArg[T](idx: Int, optDefaultGetter: Option[() => T])(using p: Parser[T]): Option[T] =
+      override def argGetter[T](idx: Int, optDefaultGetter: Option[() => T])(using p: Parser[T]): () => T =
         val name = parameterInfos(idx).name
-
         argKinds += (if optDefaultGetter.nonEmpty then ArgumentKind.OptionalArgument else ArgumentKind.SimpleArgument)
+        val parameterInfo = nameToParameterInfo(name)
 
         byNameArgs.get(name) match {
           case Some(Nil) =>
@@ -264,20 +265,20 @@ final class newMain extends MainAnnotation:
             if positionalArgs.length > 0 then
               convert(name, positionalArgs.dequeue, p)
             else if optDefaultGetter.nonEmpty then
-              optDefaultGetter.map(_())
+              optDefaultGetter.get
             else
               error(s"missing argument for $name")
         }
-      end parseArg
+      end argGetter
 
-      def parseVararg[T](using p: Parser[T]): Option[Seq[T]] =
-        argKinds += ArgumentKind.VarArgument
+      override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
         val name = parameterInfos.last.name
+        argKinds += ArgumentKind.VarArgument
 
         val byNameGetters = byNameArgs.getOrElse(name, Seq()).map(arg => convert(name, arg, p))
         val positionalGetters = positionalArgs.removeAll.map(arg => convert(name, arg, p))
         // First take arguments passed by name, then those passed by position
-        Some(byNameGetters.flatten ++ positionalGetters.flatten)
+        () => (byNameGetters ++ positionalGetters).map(_())
 
       override def run(f: => Result): Unit =
         // Check aliases unicity

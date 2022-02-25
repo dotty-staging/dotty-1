@@ -37,11 +37,11 @@ class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
   override def command(args: Array[String], commandName: String, docComment: String, parameterInfos: ParameterInfo*) =
     new Command[Parser, Result]:
 
-      override def parseArg[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): Option[T] =
-        Some(p.fromString(args(idx)))
+      override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
+        () => p.fromString(args(idx))
 
-      override def parseVararg[T](using p: Parser[T]): Option[Seq[T]] =
-        Some(for i <- (parameterInfos.length until args.length) yield p.fromString(args(i)))
+      override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
+        () => for i <- (parameterInfos.length until args.length) yield p.fromString(args(i))
 
       override def run(f: => Result): Unit =
         for (_ <- 1 to runs)

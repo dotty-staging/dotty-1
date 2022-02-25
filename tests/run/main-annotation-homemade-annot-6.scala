@@ -35,13 +35,13 @@ class myMain extends MainAnnotation:
          |  ${parameterInfos.map(paramInfoString).mkString("Seq(\n", ",\n", "\n  )*")}
          |)""".stripMargin)
     new Command[Parser, Result]:
-      override def parseArg[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): Option[T] =
-        println(s"parseArg($idx, ${defaultArgument.map(_())})")
-        Some(p.make)
+      override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
+        println(s"argGetter($idx, ${defaultArgument.map(_())})")
+        () => p.make
 
-      override def parseVararg[T](using p: Parser[T]): Option[Seq[T]] =
-        println("parseVararg()")
-        Some(Seq(p.make, p.make))
+      override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
+        println("varargGetter()")
+        () => Seq(p.make, p.make)
 
       override def run(f: => Result): Unit =
         println("run()")
