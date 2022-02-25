@@ -47,7 +47,6 @@ final class newMain extends MainAnnotation:
         * If one of the method's parameters is called the same, will be ignored.
         */
       private inline val helpArg = "help"
-      private var helpIsOverridden = false
 
       /**
         * The short name of the special argument to display the method's help.
@@ -61,7 +60,7 @@ final class newMain extends MainAnnotation:
       /** A map from argument canonical name (the name of the parameter in the method definition) to parameter informations */
       private val nameToParameterInfo: Map[String, ParameterInfo] = parameterInfos.map(infos => infos.name -> infos).toMap
 
-      private val (positionalArgs, byNameArgs, invalidByNameArgs) = {
+      private val (positionalArgs, byNameArgs, invalidByNameArgs, helpIsOverridden) = {
         val namesToCanonicalName: Map[String, String] = parameterInfos.flatMap(
           infos =>
             var names = getAlternativeNames(infos)
@@ -77,7 +76,7 @@ final class newMain extends MainAnnotation:
             names.map(_ -> canonicalName)
         ).toMap
 
-        helpIsOverridden = namesToCanonicalName.exists((name, _) => name == helpArg)
+        val helpIsOverridden = namesToCanonicalName.exists((name, _) => name == helpArg)
         shortHelpIsOverridden = shortNamesToCanonicalName.exists((name, _) => name == shortHelpArg)
 
         def getCanonicalArgName(arg: String): Option[String] =
@@ -108,7 +107,7 @@ final class newMain extends MainAnnotation:
 
         val (pa, bna, ia) = recurse(args.toSeq, mutable.Queue.empty, Vector(), Vector())
         val nameToArgValues: Map[String, Seq[String]] = if bna.isEmpty then Map.empty else bna.groupMapReduce(_._1)(p => List(p._2))(_ ++ _)
-        (pa, nameToArgValues, ia)
+        (pa, nameToArgValues, ia, helpIsOverridden)
       }
 
       /** A buffer for all errors */
@@ -134,7 +133,7 @@ final class newMain extends MainAnnotation:
         case s => argMarker + s
       }
 
-      private def convert[T](argName: String, arg: String, p: Parser[T]): () => T =
+      private def convert[T](argName: String, arg: String)(using p: Parser[T]): () => T =
         p.fromStringOption(arg) match
           case Some(t) => () => t
           case None => error(s"invalid argument for $argName: $arg")
@@ -247,10 +246,10 @@ final class newMain extends MainAnnotation:
               // Remove this test to take last given argument
               error(s"more than one value for $name: ${argValues.mkString(", ")}")
             else
-              convert(name, argValues.last, p)
+              convert(name, argValues.last)
           case None =>
             if positionalArgs.length > 0 then
-              convert(name, positionalArgs.dequeue, p)
+              convert(name, positionalArgs.dequeue)
             else if optDefaultGetter.nonEmpty then
               optDefaultGetter.get
             else
@@ -261,8 +260,8 @@ final class newMain extends MainAnnotation:
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
         val name = parameterInfos.last.name
 
-        val byNameGetters = byNameArgs.getOrElse(name, Seq()).map(arg => convert(name, arg, p))
-        val positionalGetters = positionalArgs.removeAll.map(arg => convert(name, arg, p))
+        val byNameGetters = byNameArgs.getOrElse(name, Seq()).map(arg => convert(name, arg))
+        val positionalGetters = positionalArgs.removeAll.map(arg => convert(name, arg))
         // First take arguments passed by name, then those passed by position
         () => (byNameGetters ++ positionalGetters).map(_())
 
