@@ -1,0 +1,28 @@
+command(
+  Array(),
+  foo,
+  "Foo docs",
+  Seq(
+    ParameterInfo(name = i, typeName = Int, hasDefault = false, documentation = None, annotations = List()), 
+    ParameterInfo(name = j, typeName = String, hasDefault = true, documentation = None, annotations = List())
+  )*
+)
+argGetter(0, None)
+argGetter(1, Some(2))
+run()
+foo(42, abc)
+
+command(
+  Array(),
+  bar,
+  "Bar docs",
+  Seq(
+    ParameterInfo(name = i, typeName = Int, hasDefault = false, documentation = None, annotations = List()), 
+    ParameterInfo(name = rest, typeName = Int, hasDefault = false, documentation = None, annotations = List())
+  )*
+)
+argGetter(0, None)
+varargGetter()
+run()
+bar(42, 42, 42)
+

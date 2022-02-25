@@ -30,26 +30,38 @@ end MainAnnotation
 object MainAnnotation:
 
   final class ParameterInfo private (
-    /** The name of the parameter */
-    val name: String,
-    /** The name of the parameter's type */
-    val typeName: String,
-    /** The docstring of the parameter. Defaults to None. */
-    val documentation: Option[String],
-    /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
-    val annotations: Seq[ParameterAnnotation],
+    paramName: String,
+    paramTypeName: String,
+    paramDocumentation: Option[String],
+    paramAnnotations: Seq[ParameterAnnotation],
+    paramHasDefault: Boolean,
   ) {
-    /** ParameterInfo with a name and the type of the parameter */
-    def this(name: String, typeName: String) =
-      this(name, typeName, None, Seq.empty)
+    /** ParameterInfo with a name, the type of the parameter and if it has a default */
+    def this(name: String, typeName: String, hasDefault: Boolean) =
+      this(name, typeName, None, Seq.empty, hasDefault)
+
+    /** The name of the parameter */
+    def name: String = paramName
+
+    /** The name of the parameter's type */
+    def typeName: String = paramTypeName
+
+    /** If the parameter has a default value */
+    def hasDefault: Boolean = paramHasDefault
+
+    /** The docstring of the parameter. Defaults to None. */
+    def documentation: Option[String] = paramDocumentation
+
+    /** The ParameterAnnotations associated with the parameter. Defaults to Seq.empty. */
+    def annotations: Seq[ParameterAnnotation] = paramAnnotations
 
     /** Copy this ParameterInfo and sets the documentation */
     def withDocumentation(doc: String): ParameterInfo =
-      new ParameterInfo(name, typeName, Some(doc), annotations)
+      new ParameterInfo(paramName, typeName, Some(doc), annotations, paramHasDefault)
 
     /** Copy this ParameterInfo and sets the annotations */
     def withAnnotations(annotations: ParameterAnnotation*): ParameterInfo =
-      new ParameterInfo(name, typeName, documentation, annotations)
+      new ParameterInfo(paramName, typeName, documentation, annotations, paramHasDefault)
 
     override def toString: String = s"$name: $typeName"
   }
