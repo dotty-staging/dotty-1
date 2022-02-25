@@ -38,9 +38,6 @@ final class newMain extends MainAnnotation:
 
   override def command(args: Array[String], commandName: String, documentation: String, parameterInfos: ParameterInfo*) =
     new Command[Parser, Result]:
-      private enum ArgumentKind {
-        case SimpleArgument, OptionalArgument, VarArgument
-      }
 
       private val argMarker = "--"
       private val shortArgMarker = "-"
@@ -114,9 +111,6 @@ final class newMain extends MainAnnotation:
         (pa, nameToArgValues, ia)
       }
 
-      /** The kind of the arguments. Used to display help about the main method. */
-      private val argKinds = new mutable.ArrayBuffer[ArgumentKind]
-
       /** A buffer for all errors */
       private val errors = new mutable.ArrayBuffer[String]
 
@@ -147,19 +141,15 @@ final class newMain extends MainAnnotation:
 
       private def usage(): Unit =
         def argsUsage: Seq[String] =
-          for ((infos, kind) <- parameterInfos.zip(argKinds))
-          yield {
-            val canonicalName = getNameWithMarker(infos.name)
-            val shortNames = getShortNames(infos).map(getNameWithMarker)
-            val alternativeNames = getAlternativeNames(infos).map(getNameWithMarker)
+          for info <- parameterInfos yield
+            val canonicalName = getNameWithMarker(info.name)
+            val shortNames = getShortNames(info).map(getNameWithMarker)
+            val alternativeNames = getAlternativeNames(info).map(getNameWithMarker)
             val namesPrint = (canonicalName +: alternativeNames ++: shortNames).mkString("[", " | ", "]")
-
-            kind match {
-              case ArgumentKind.SimpleArgument => s"$namesPrint <${infos.typeName}>"
-              case ArgumentKind.OptionalArgument => s"[$namesPrint <${infos.typeName}>]"
-              case ArgumentKind.VarArgument => s"[<${infos.typeName}> [<${infos.typeName}> [...]]]"
-            }
-          }
+            if info.isVarargs then s"[<${info.typeName}> [<${info.typeName}> [...]]]"
+            else if info.hasDefault then s"[$namesPrint <${info.typeName}>]"
+            else s"$namesPrint <${info.typeName}>"
+          end for
 
         def wrapArgumentUsages(argsUsage: Seq[String], maxLength: Int): Seq[String] = {
           def recurse(args: Seq[String], currentLine: String, acc: Vector[String]): Seq[String] =
@@ -204,24 +194,21 @@ final class newMain extends MainAnnotation:
           val argDocShift = argNameShift + 2
 
           println("Arguments:")
-          for ((infos, kind) <- parameterInfos.zip(argKinds))
-            val canonicalName = getNameWithMarker(infos.name)
-            val shortNames = getShortNames(infos).map(getNameWithMarker)
-            val alternativeNames = getAlternativeNames(infos).map(getNameWithMarker)
+          for info <- parameterInfos do
+            val canonicalName = getNameWithMarker(info.name)
+            val shortNames = getShortNames(info).map(getNameWithMarker)
+            val alternativeNames = getAlternativeNames(info).map(getNameWithMarker)
             val otherNames = (alternativeNames ++: shortNames) match {
               case Seq() => ""
               case names => names.mkString("(", ", ", ") ")
             }
             val argDoc = StringBuilder(" " * argNameShift)
-            argDoc.append(s"$canonicalName $otherNames- ${infos.typeName}")
+            argDoc.append(s"$canonicalName $otherNames- ${info.typeName}")
 
-            kind match {
-              case ArgumentKind.OptionalArgument => argDoc.append(" (optional)")
-              case ArgumentKind.VarArgument => argDoc.append(" (vararg)")
-              case _ =>
-            }
+            if info.isVarargs then argDoc.append(" (vararg)")
+            else if info.hasDefault then argDoc.append(" (optional)")
 
-            val doc = infos.documentation
+            val doc = info.documentation
             if (doc.nonEmpty) {
               val shiftedDoc =
                 doc.split("\n").nn
@@ -231,6 +218,7 @@ final class newMain extends MainAnnotation:
             }
 
             println(argDoc)
+          end for
         }
       end explain
 
@@ -248,7 +236,6 @@ final class newMain extends MainAnnotation:
 
       override def argGetter[T](idx: Int, optDefaultGetter: Option[() => T])(using p: Parser[T]): () => T =
         val name = parameterInfos(idx).name
-        argKinds += (if optDefaultGetter.nonEmpty then ArgumentKind.OptionalArgument else ArgumentKind.SimpleArgument)
         val parameterInfo = nameToParameterInfo(name)
 
         byNameArgs.get(name) match {
@@ -273,7 +260,6 @@ final class newMain extends MainAnnotation:
 
       override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
         val name = parameterInfos.last.name
-        argKinds += ArgumentKind.VarArgument
 
         val byNameGetters = byNameArgs.getOrElse(name, Seq()).map(arg => convert(name, arg, p))
         val positionalGetters = positionalArgs.removeAll.map(arg => convert(name, arg, p))
