@@ -45,46 +45,10 @@ package scala.annotation
 trait MainAnnotation extends StaticAnnotation:
   import MainAnnotation.*
 
-  /** The class used for argument string parsing and arguments into a `T` */
-  type Parser[T]
-
-  /** The required result type of the main method.
-   *
-   *  If this type is Any or Unit, any type will be accepted.
-   */
-  type Result
-
-  /** A new command with arguments from `args`
-   *
-   *  @param info The information about the command (name, documentation and info about parameters)
-   *  @param args The command line arguments
-   */
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result]
-
 end MainAnnotation
 
 @experimental
 object MainAnnotation:
-
-  /** A class representing a command to run */
-  trait Command[Parser[_], Result]:
-
-    /** The getter for the `idx`th argument of type `T`
-     *
-     *   @param idx The index of the argument
-     *   @param defaultArgument Optional lambda to instantiate the default argument
-     */
-    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using Parser[T]): () => T
-
-    /** The getter for a final varargs argument of type `T*` */
-    def varargGetter[T](using Parser[T]): () => Seq[T]
-
-    /** Run `program` if all arguments are valid if all arguments are valid
-     *
-     *  @param program A function containing the call to the main method and instantiation of its arguments
-     */
-    def run(program: () => Result): Unit
-  end Command
 
   /** Information about the main method
    *
@@ -96,7 +60,9 @@ object MainAnnotation:
     val name: String,
     val documentation: String,
     val parameters: Seq[ParameterInfo],
-  )
+  ) {
+    override def toString: String = s"CommandInfo(\"$name\", \"$documentation\", $parameters)"
+  }
 
   /** Information about a parameter of a main method
    *
@@ -114,7 +80,10 @@ object MainAnnotation:
     val isVarargs: Boolean,
     val documentation: String,
     val annotations: Seq[ParameterAnnotation],
-  )
+  ) {
+    override def toString: String =
+      s"ParameterInfo($name, $typeName, $hasDefault, $isVarargs, $documentation, $annotations)"
+  }
 
   /** Marker trait for annotations that will be included in the ParameterInfo annotations. */
   trait ParameterAnnotation extends StaticAnnotation

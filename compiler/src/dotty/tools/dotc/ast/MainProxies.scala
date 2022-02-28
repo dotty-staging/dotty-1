@@ -265,15 +265,15 @@ object MainProxies {
           val argName = nme.args ++ idx.toString
           val isRepeated = formal.isRepeatedParam
           val formalType = if isRepeated then formal.argTypes.head else formal
-          val getterSym =
-            if isRepeated then defn.MainAnnotationCommand_varargGetter
-            else defn.MainAnnotationCommand_argGetter
+          val getterName =
+            if isRepeated then "varargGetter".toTermName
+            else "argGetter".toTermName
           val defaultValueGetterOpt = defaultValueSymbols.get(idx) match
             case None => ref(defn.NoneModule.termRef)
             case Some(dvSym) =>
                val value = unitToValue(ref(dvSym.termRef))
                Apply(ref(defn.SomeClass.companionModule.termRef), value)
-          val argGetter0 = TypeApply(Select(Ident(nme.cmd), getterSym.name), TypeTree(formalType) :: Nil)
+          val argGetter0 = TypeApply(Select(Ident(nme.cmd), getterName), TypeTree(formalType) :: Nil)
           val argGetter =
             if isRepeated then argGetter0
             else Apply(argGetter0, List(Literal(Constant(idx)), defaultValueGetterOpt))
@@ -324,11 +324,11 @@ object MainProxies {
         nme.cmd,
         TypeTree(),
         Apply(
-          Select(instantiateAnnotation(mainAnnot), defn.MainAnnotation_command.name),
+          Select(instantiateAnnotation(mainAnnot), "command".toTermName),
           List(cmdInfo, Ident(nme.args))
         )
       )
-      val run = Apply(Select(Ident(nme.cmd), defn.MainAnnotationCommand_run.name), mainCall)
+      val run = Apply(Select(Ident(nme.cmd), nme.run), mainCall)
       val body = Block(cmdInfo :: cmd :: args, run)
       val mainArg = ValDef(nme.args, TypeTree(defn.ArrayType.appliedTo(defn.StringType)), EmptyTree)
         .withFlags(Param)

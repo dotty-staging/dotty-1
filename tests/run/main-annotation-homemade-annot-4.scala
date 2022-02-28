@@ -13,14 +13,13 @@ end Test
 class mainManyArgs(i1: Int, s2: String, i3: Int) extends MainAnnotation:
   import MainAnnotation.*
 
-  override type Parser[T] = util.CommandLineParser.FromString[T]
-  override type Result = Any
+  type Parser[T] = util.CommandLineParser.FromString[T]
 
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
-    new Command[Parser, Result]:
-      override def argGetter[T](idx: Int, optDefaultGetter: Option[() => T])(using p: Parser[T]): () => T = ???
+  def command(info: CommandInfo, args: Array[String]): Command = new Command
 
-      override def varargGetter[T](using p: Parser[T]): () => Seq[T] = ???
+  @experimental
+  class Command:
+    def argGetter[T](idx: Int, optDefaultGetter: Option[() => T]): () => T = ???
+    def varargGetter[T]: () => Seq[T] = ???
+    def run(program: () => Any): Unit = program()
 
-      override def run(program: () => Result): Unit = program()
-  end command

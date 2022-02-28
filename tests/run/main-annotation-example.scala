@@ -1,5 +1,6 @@
 import scala.annotation.*
 import collection.mutable
+import scala.util.CommandLineParser.FromString
 
 /** Sum all the numbers
  *
@@ -21,16 +22,10 @@ end Test
 
 @experimental
 class myMain extends MainAnnotation:
-  import MainAnnotation.{ Command, CommandInfo, ParameterInfo }
-
-  // Parser used to parse command line arguments
-  type Parser[T] = util.CommandLineParser.FromString[T]
-
-  // Result type of the annotated method
-  type Result = Int
+  import MainAnnotation.CommandInfo
 
   /** A new command with arguments from `args` */
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
+  def command(info: CommandInfo, args: Array[String]): MyCommand =
     if args.contains("--help") then
       println(info.documentation)
       System.exit(0)
@@ -47,15 +42,15 @@ class myMain extends MainAnnotation:
     new MyCommand(plainArgs, varargs)
 
   @experimental
-  class MyCommand(plainArgs: Seq[String], varargs: Seq[String]) extends Command[util.CommandLineParser.FromString, Int]:
+  class MyCommand(plainArgs: Seq[String], varargs: Seq[String]):
 
-    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using parser: Parser[T]): () => T =
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using parser: FromString[T]): () => T =
       () => parser.fromString(plainArgs(idx))
 
-    def varargGetter[T](using parser: Parser[T]): () => Seq[T] =
+    def varargGetter[T](using parser: FromString[T]): () => Seq[T] =
       () => varargs.map(arg => parser.fromString(arg))
 
-    def run(program: () => Result): Unit =
+    def run(program: () => Int): Unit =
       println("executing program")
       val result = program()
       println("result: " + result)

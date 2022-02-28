@@ -47,17 +47,12 @@ Finally, the `run` method is called to run the application. It receives a by-nam
 Example of implementation of `myMain` that takes all arguments positionally. It used `util.CommandLineParser.FromString` and expects no default arguments. For simplicity, any errors in preprocessing or parsing results in crash.
 
 ```scala
+import scala.util.CommandLineParser.FromString
+
 class myMain extends MainAnnotation:
-  import MainAnnotation.{ ParameterInfo, Command }
-
-  // Parser used to parse command line arguments
-  type Parser[T] = util.CommandLineParser.FromString[T]
-
-  // Result type of the annotated method
-  type Result = Int
 
   /** A new command with arguments from `args` */
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
+  def command(info: MainAnnotation.CommandInfo, args: Array[String]): MyCommand =
     if args.contains("--help") then
       println(info.documentation)
       // TODO: Print documentation of the parameters
@@ -75,15 +70,15 @@ class myMain extends MainAnnotation:
     new MyCommand(plainArgs, varargs)
 
   @experimental
-  class MyCommand(plainArgs: Seq[String], varargs: Seq[String]) extends Command[util.CommandLineParser.FromString, Int]:
+  class MyCommand(plainArgs: Seq[String], varargs: Seq[String]):
 
-    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using parser: Parser[T]): () => T =
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using parser: FromString[T]): () => T =
       () => parser.fromString(plainArgs(idx))
 
-    def varargGetter[T](using parser: Parser[T]): () => Seq[T] =
+    def varargGetter[T](using parser: FromString[T]): () => Seq[T] =
       () => varargs.map(arg => parser.fromString(arg))
 
-    def run(program: () => Result): Unit =
+    def run(program: () => Int): Unit =
       println("executing program")
       val result = program()
       println("result: " + result)

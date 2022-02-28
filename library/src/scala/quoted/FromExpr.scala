@@ -1,5 +1,9 @@
 package scala.quoted
 
+import scala.annotation.MainAnnotation.{CommandInfo, ParameterInfo}
+import scala.annotation.experimental
+import scala.collection.immutable
+
 /** A type class for types that can convert a `quoted.Expr[T]` to a `T`.
  *
  *  - Converts expression containing literal values to their values:
@@ -528,4 +532,22 @@ object FromExpr {
     }
   }
 
+  @experimental
+  given CommandInfoFromExpr: FromExpr[CommandInfo] with {
+    def unapply(x: Expr[CommandInfo])(using Quotes) = x match {
+      case '{ new CommandInfo(${Expr(name)}, ${Expr(documentation)}, immutable.Seq(${Expr(parameters)}*)) } =>
+        println(parameters)
+        Some(new CommandInfo(name, documentation, Nil))
+      case _ => None
+    }
+  }
+
+  @experimental
+  given ParameterInfoFromExpr: FromExpr[ParameterInfo] with {
+    def unapply(x: Expr[ParameterInfo])(using Quotes) = x match {
+      case '{ new ParameterInfo(${Expr(name)}, ${Expr(typeName)}, ${Expr(hasDefault)}, ${Expr(isVarargs)}, ${Expr(documentation)}, $annotations) } =>
+        Some(new ParameterInfo(name, typeName, hasDefault, isVarargs, documentation, Nil))
+      case _ => None
+    }
+  }
 }

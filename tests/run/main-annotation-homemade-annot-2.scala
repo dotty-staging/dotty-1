@@ -31,22 +31,23 @@ end Test
 class myMain(runs: Int = 3)(after: String*) extends MainAnnotation:
   import MainAnnotation.*
 
-  override type Parser[T] = util.CommandLineParser.FromString[T]
-  override type Result = Any
+  type Parser[T] = util.CommandLineParser.FromString[T]
 
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
-    new Command[Parser, Result]:
+  def command(info: CommandInfo, args: Array[String]): Command = new Command(args, info.parameters.length)
 
-      override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
-        () => p.fromString(args(idx))
+  @experimental
+  class Command(args: Array[String], numParams: Int):
 
-      override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
-        () => for i <- (info.parameters.length until args.length) yield p.fromString(args(i))
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
+      () => p.fromString(args(idx))
 
-      override def run(f: () => Result): Unit =
-        for (_ <- 1 to runs)
-          f()
-          if after.length > 0 then println(after.mkString(", "))
-      end run
-  end command
+    def varargGetter[T](using p: Parser[T]): () => Seq[T] =
+      () => for i <- (numParams until args.length) yield p.fromString(args(i))
+
+    def run(f: () => Any): Unit =
+      for (_ <- 1 to runs)
+        f()
+        if after.length > 0 then println(after.mkString(", "))
+    end run
+
 end myMain

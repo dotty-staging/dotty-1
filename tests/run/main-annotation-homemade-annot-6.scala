@@ -21,9 +21,8 @@ class myMain extends MainAnnotation:
   import MainAnnotation.*
 
   override type Parser[T] = Make[T]
-  override type Result = Any
 
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
+  def command(info: CommandInfo, args: Array[String]): Command =
     def paramInfoString(paramInfo: ParameterInfo) =
       import paramInfo.*
       s"    ParameterInfo(name=\"$name\", typeName=\"$typeName\", hasDefault=$hasDefault, isVarargs=$isVarargs, documentation=\"$documentation\", annotations=$annotations)"
@@ -34,20 +33,24 @@ class myMain extends MainAnnotation:
          |  "${info.documentation}",
          |  ${info.parameters.map(paramInfoString).mkString("Seq(\n", ",\n", "\n  )*")}
          |)""".stripMargin)
-    new Command[Parser, Result]:
-      override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
-        println(s"argGetter($idx, ${defaultArgument.map(_())})")
-        () => p.make
+    new Command
 
-      override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
-        println("varargGetter()")
-        () => Seq(p.make, p.make)
+  @experimental
+  class Command:
 
-      override def run(f: () => Result): Unit =
-        println("run()")
-        f()
-        println()
-  end command
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
+      println(s"argGetter($idx, ${defaultArgument.map(_())})")
+      () => p.make
+
+    def varargGetter[T](using p: Parser[T]): () => Seq[T] =
+      println("varargGetter()")
+      () => Seq(p.make, p.make)
+
+    def run(f: () => Any): Unit =
+      println("run()")
+      f()
+      println()
+  end Command
 
 @experimental
 case class MyParamAnnot(n: Int) extends MainAnnotation.ParameterAnnotation

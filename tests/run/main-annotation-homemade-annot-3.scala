@@ -13,14 +13,11 @@ end Test
 class mainNoArgs extends MainAnnotation:
   import MainAnnotation.*
 
-  override type Parser[T] = util.CommandLineParser.FromString[T]
-  override type Result = Any
+  type Parser[T] = util.CommandLineParser.FromString[T]
 
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
-    new Command[Parser, Result]:
-      override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T = ???
-
-      override def varargGetter[T](using p: Parser[T]): () => Seq[T] = ???
-
-      override def run(program: () => Result): Unit = program()
-  end command
+  def command(info: CommandInfo, args: Array[String]): Command = new Command
+  @experimental
+  class Command:
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T]): () => T = ???
+    def varargGetter[T]: () => Seq[T] = ???
+    def run(program: () => Any): Unit = program()

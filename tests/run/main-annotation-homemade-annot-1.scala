@@ -31,17 +31,18 @@ end Test
 class mainAwait(timeout: Int = 2) extends MainAnnotation:
   import MainAnnotation.*
 
-  override type Parser[T] = util.CommandLineParser.FromString[T]
-  override type Result = Future[Any]
+  type Parser[T] = util.CommandLineParser.FromString[T]
 
   // This is a toy example, it only works with positional args
-  def command(info: CommandInfo, args: Array[String]): Command[Parser, Result] =
-    new Command[Parser, Result]:
-      override def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
-        () => p.fromString(args(idx))
+  def command(info: CommandInfo, args: Array[String]): Command = new Command(args, info.parameters.length)
 
-      override def varargGetter[T](using p: Parser[T]): () => Seq[T] =
-        () => for i <- ((info.parameters.length-1) until args.length) yield p.fromString(args(i))
+  @experimental
+  class Command(args: Array[String], numParams: Int):
+    def argGetter[T](idx: Int, defaultArgument: Option[() => T])(using p: Parser[T]): () => T =
+      () => p.fromString(args(idx))
 
-      override def run(f: () => Result): Unit = println(Await.result(f(), Duration(timeout, SECONDS)))
+    def varargGetter[T](using p: Parser[T]): () => Seq[T] =
+      () => for i <- ((numParams-1) until args.length) yield p.fromString(args(i))
+
+    def run(f: () => Future[Any]): Unit = println(Await.result(f(), Duration(timeout, SECONDS)))
 end mainAwait
