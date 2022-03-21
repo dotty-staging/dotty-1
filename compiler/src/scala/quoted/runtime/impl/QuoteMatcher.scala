@@ -247,6 +247,7 @@ object QuoteMatcher {
                     case ref: Ident =>
                       ref.tpe match
                         case TermRef(qual: TermRef, _) => tpd.ref(qual) =?= qual2
+                        case TermRef(qual: ThisType, _) => tpd.ref(ref.symbol) =?= pattern
                         case _ => matched
                 /* Match reference */
                 case _: Ident if symbolMatch(scrutinee, pattern) => matched
