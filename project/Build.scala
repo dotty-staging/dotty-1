@@ -898,7 +898,6 @@ object Build {
     settings(
       moduleName := "scala-library",
       javaOptions := (`scala3-compiler-bootstrapped` / javaOptions).value,
-      Compile/scalacOptions += "-Yerased-terms",
       Compile/scalacOptions ++= {
         Seq(
           "-sourcepath",
