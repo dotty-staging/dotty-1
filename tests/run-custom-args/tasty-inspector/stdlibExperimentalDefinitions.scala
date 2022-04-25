@@ -66,6 +66,7 @@ val experimentalDefinitionInLibrary = Set(
   "scala.quoted.Quotes.reflectModule.SymbolMethods.asQuotes",
   "scala.quoted.Quotes.reflectModule.SymbolMethods.termRef",
   "scala.quoted.Quotes.reflectModule.SymbolMethods.typeRef",
+  "scala.quoted.Quotes.reflectModule.SymbolMethods.isSuperAccessor",
   "scala.quoted.Quotes.reflectModule.TypeReprMethods.substituteTypes",
   "scala.quoted.Quotes.reflectModule.TypeReprMethods.typeArgs",
   "scala.quoted.Quotes.reflectModule.TypeTreeModule.ref",
