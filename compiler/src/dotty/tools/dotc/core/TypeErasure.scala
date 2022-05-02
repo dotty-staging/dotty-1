@@ -370,10 +370,10 @@ object TypeErasure {
     else if (tp2.isRef(defn.NothingClass) || tp2.isRef(defn.NullClass)) && tp1.derivesFrom(defn.ObjectClass) then
       tp1 // After erasure, C | {Nothing|Null} is just C, if C is a reference type.
     else if tp1.isRef(defn.NothingClass) then
-      report.error(em"erasedLub($tp1, $tp2)")
+      report.warning(em"erasedLub($tp1, $tp2)", ctx.owner.srcPos)
       tp2 // After erasure, Nothing | T is just T
     else if tp2.isRef(defn.NothingClass) then
-      report.error(em"erasedLub($tp1, $tp2)")
+      report.warning(em"erasedLub($tp1, $tp2)", ctx.owner.srcPos)
       tp1 // After erasure, T | Nothing is just T
     else tp1 match {
       case JavaArrayType(elem1) =>
