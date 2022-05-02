@@ -2165,6 +2165,28 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
         Nil
     }
 
+  def lubArgs2(args1: List[Type], args2: List[Type], tparams: List[TypeParamInfo], canConstrain: Boolean = false): List[Type] =
+    tparams match {
+      case tparam :: tparamsRest =>
+        val arg1 :: args1Rest = args1
+        val arg2 :: args2Rest = args2
+        val common = singletonInterval(arg1, arg2)
+        val v = tparam.paramVarianceSign
+        val lubArg =
+          if (common.exists) common
+          else if (v > 0) lub(arg1.hiBound, arg2.hiBound, canConstrain)
+          else if (v < 0) glb(arg1.loBound, arg2.loBound)
+          else if (isBounds(arg1) || isBounds(arg2))
+            TypeBounds(glb(arg1.loBound, arg2.loBound),
+                       lub(arg1.hiBound, arg2.hiBound, canConstrain))
+          // Like in glbArgs
+          else if (homogenizeArgs && !frozenConstraint && isSameType(arg1, arg2)) arg1
+          else NoType
+        lubArg :: lubArgs(args1Rest, args2Rest, tparamsRest, canConstrain)
+      case nil =>
+        Nil
+    }
+
   /** Try to produce joint arguments for a glb `A[T_1, ..., T_n] & A[T_1', ..., T_n']` using
    *  the following strategies:
    *
@@ -2392,10 +2414,24 @@ class TypeComparer(@constructorOnly initctx: Context) extends ConstraintHandling
    *  a refined or applied type. Example:
    *
    *     List[T] | List[U] is not the same as List[T | U].
+   *     TODO: but is using lubArgs/lubArgs2 unsound?
    *
    *  The rhs is a proper supertype of the lhs.
    */
   private def distributeOr(tp1: Type, tp2: Type, isSoft: Boolean = true): Type = tp1 match {
+    case tp1 @ AppliedType(tycon1, args1) =>
+      tp2 match
+        case AppliedType(tycon2, args2)
+        if homogenizeArgs && tycon1.typeSymbol == tycon2.typeSymbol && tycon1 =:= tycon2 =>
+          // println(i"d($tp1, $tp2)")
+          // println("c: " + constraint.show)
+          val jointArgs = lubArgs2(args1, args2, tycon1.typeParams)
+          // println("c2: " + constraint.show)
+          // println("joint: " + jointArgs)
+          if (jointArgs.forall(_.exists)) (tycon1 | tycon2).appliedTo(jointArgs)
+          else NoType
+        case _ =>
+          NoType
     case ExprType(rt1) =>
       tp2 match {
         case ExprType(rt2) =>
