@@ -31,9 +31,11 @@ abstract class SignatureTest(
       .map { file => Source.fromFile(s"${BuildInfo.test_testcasesSourceRoot}/tests/$file.scala") }
       .flatMap(signaturesFromSources(_, signatureKinds))
       .toList
+
     val expectedFromSources: Map[String, List[String]] = allSignaturesFromSources
       .collect { case e: Expected => e }
       .groupMap(_.name)(_.signature)
+
     val unexpectedFromSources: Set[String] = allSignaturesFromSources.collect { case Unexpected(name) => name }.toSet
 
     val actualSignatures: Map[String, Seq[String]] =
@@ -84,7 +86,7 @@ abstract class SignatureTest(
 
   private def findName(signature: String, kinds: Seq[String]): Option[String] =
     for
-      kindMatch <- kinds.flatMap(k => s"\\b$k\\b".r.findFirstMatchIn(signature)).headOption
+      kindMatch <- kinds.flatMap(k => s"\\b$k\\b".r.findFirstMatchIn(signature)).minByOption(_.start)
       afterKind <- Option(kindMatch.after(0)) // to filter out nulls
       nameMatch <- identifierRegex.findFirstMatchIn(afterKind)
     yield nameMatch.group(1)
@@ -96,7 +98,8 @@ abstract class SignatureTest(
       .toSeq
       .flatMap {
         case unexpectedRegex(signature) => findName(signature, kinds).map(Unexpected(_))
-        case expectedRegex(signature) => findName(signature, kinds).map(Expected(_, signature))
+        case expectedRegex(signature) =>
+          findName(signature, kinds).map(Expected(_, signature))
         case signature =>
           findName(signature, kinds).map(
             Expected(_, commentRegex.replaceAllIn(signature, "")
