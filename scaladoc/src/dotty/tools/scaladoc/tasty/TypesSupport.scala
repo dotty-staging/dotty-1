@@ -259,7 +259,7 @@ trait TypesSupport:
       case tr @ TermRef(qual, typeName) =>
         tr.termSymbol.tree match
           case vd: ValDef => inner(vd.tpt.tpe)
-          case _          => tpe(tr.termSymbol)
+          case _          => tpe(tr.termSymbol) :+ plain(".type")
 
 
         // convertTypeOrBoundsToReference(reflect)(qual) match {
