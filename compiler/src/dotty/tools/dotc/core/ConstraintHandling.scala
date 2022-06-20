@@ -709,6 +709,7 @@ trait ConstraintHandling {
 
     def description = i"constr $param ${if (fromBelow) ">:" else "<:"} $bound:\n$constraint"
 
+    println(s"adding $description")
     //checkPropagated(s"adding $description")(true) // DEBUG in case following fails
     checkPropagated(s"added $description") {
       addConstraintInvocations += 1

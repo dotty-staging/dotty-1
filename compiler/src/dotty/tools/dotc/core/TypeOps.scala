@@ -145,6 +145,8 @@ object TypeOps:
             isFullyDefined(tp, ForceDegree.all)
           case _ =>
         val normed = tp.tryNormalize
+        println("tp: " + tp.show)
+        println("normed: " + normed.show)
         if normed.exists then normed else tp.map(simplify(_, theMap))
       case tp: TypeParamRef =>
         val tvar = ctx.typerState.constraint.typeVarOfParam(tp)
@@ -181,7 +183,13 @@ object TypeOps:
           def apply(t: Type): Type = t match
             case t: TypeParamRef => constraint.typeVarOfParam(t).orElse(t)
             case _ => this.mapOver(t)
-        addTypeVars(tp)
+        val t = addTypeVars(tp)
+        if t ne tp then
+          println("tp: " + tp.show)
+          println("t: " + t.show)
+          Thread.dumpStack
+        
+        t
       case tp: SkolemType =>
         // Mapping over a skolem creates a new skolem which by definition won't
         // be =:= to the original one.
