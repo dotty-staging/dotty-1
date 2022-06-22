@@ -171,7 +171,11 @@ class PlainPrinter(_ctx: Context) extends Printer {
       case tp: RefinedType =>
         val parent :: (refined: List[RefinedType @unchecked]) =
           refinementChain(tp).reverse: @unchecked
-        toTextLocal(parent) ~ "{" ~ Text(refined map toTextRefinement, "; ").close ~ "}"
+        if parent.underlyingClassRef(refinementOK = true).typeSymbol.is(Dependent) then
+          // TODO(mbovel): check length and order of refinements
+          toTextLocal(parent) ~ "(" ~ Text(refined.map(r => toTextLocal(r.refinedInfo)), ", ").close ~ ")"
+        else
+          toTextLocal(parent) ~ "{" ~ Text(refined map toTextRefinement, "; ").close ~ "}"
       case tp: RecType =>
         try {
           openRecs = tp :: openRecs

@@ -1948,18 +1948,20 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
   }
 
   def typedAppliedTypeTree(tree: untpd.AppliedTypeTree)(using Context): Tree = {
-    tree.args match
-      case arg :: _ if arg.isTerm =>
-        if Feature.dependentEnabled then
-          return errorTree(tree, i"Not yet implemented: T(...)")
-        else
-          return errorTree(tree, dependentStr)
-      case _ =>
-
     val tpt1 = withoutMode(Mode.Pattern) {
       typed(tree.tpt, AnyTypeConstructorProto)
     }
+
+    if Feature.dependentEnabled && tree.isInstanceOf[untpd.AppliedTermTree] then
+      tpt1.tpe.typeSymbol.primaryConstructor.typeRef.underlying match
+        case tp: MethodType =>
+          // TODO(mbovel): what pre-processessing should be run on args? Desugaring as below? Other things?
+          // TODO(mbovel): set correct span
+          return TypeTree(tp.instantiate(tree.args.map((typedType(_).tpe))))
+        // TODO(mbovel): error if not a dependent class of if there is no constructor
+
     val tparams = tpt1.tpe.typeParams
+
     if (tparams.isEmpty) {
       report.error(TypeDoesNotTakeParameters(tpt1.tpe, tree.args), tree.srcPos)
       tpt1
@@ -3994,7 +3996,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           cpy.Select(qual)(pre, name.toTypeName)
         case qual: This if qual.symbol.is(ModuleClass) =>
           cpy.Ident(qual)(qual.symbol.name.sourceModuleName.toTypeName)
-      val tycon = tree.tpe.widen.finalResultType.underlyingClassRef(refinementOK = false)
+      val tycon = tree.tpe.widen.finalResultType.underlyingClassRef(refinementOK = true)
       typed(
         untpd.Select(
           untpd.New(untpd.TypedSplice(tpt.withType(tycon))),
