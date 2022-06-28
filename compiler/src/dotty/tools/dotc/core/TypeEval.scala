@@ -225,6 +225,7 @@ object TypeEval:
               constantFold3(stringValue, intValue, intValue, (s, b, e) => s.substring(b, e))
             case tpnme.CharAt     =>
               constantFold2AB(stringValue, intValue, _ charAt _)
+            case tpnme.Read       => constantFold1(stringValue, scala.io.Source.fromFile(_).mkString)
             case _ => None
           else if owner == defn.CompiletimeOpsBooleanModuleClass then name match
             case tpnme.Not        => constantFold1(boolValue, x => !x)

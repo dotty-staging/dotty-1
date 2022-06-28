@@ -63,3 +63,5 @@ object string:
    *  @syntax markdown
    */
   type CharAt[S <: String, Idx <: Int] <: Char
+
+  type Read[S <: String] <: String
