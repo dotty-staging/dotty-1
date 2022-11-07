@@ -375,21 +375,25 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
             )
           }
         case tree: ValDef =>
+          checkForMacrosAnnotations(tree)
           checkErasedDef(tree)
           val tree1 = cpy.ValDef(tree)(rhs = normalizeErasedRhs(tree.rhs, tree.symbol))
           if tree1.removeAttachment(desugar.UntupledParam).isDefined then
             checkStableSelection(tree.rhs)
           processValOrDefDef(super.transform(tree1))
         case tree: DefDef =>
+          checkForMacrosAnnotations(tree)
           checkErasedDef(tree)
           annotateContextResults(tree)
           val tree1 = cpy.DefDef(tree)(rhs = normalizeErasedRhs(tree.rhs, tree.symbol))
           processValOrDefDef(superAcc.wrapDefDef(tree1)(super.transform(tree1).asInstanceOf[DefDef]))
         case tree: TypeDef =>
+          checkForMacrosAnnotations(tree)
           val sym = tree.symbol
           if (sym.isClass)
             VarianceChecker.check(tree)
             annotateExperimental(sym)
+            checkTastyAnnotation(sym)
             tree.rhs match
               case impl: Template =>
                 for parent <- impl.parents do
@@ -482,6 +486,15 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
      */
     private def normalizeErasedRhs(rhs: Tree, sym: Symbol)(using Context) =
       if (sym.isEffectivelyErased) dropInlines.transform(rhs) else rhs
+
+    private def checkForMacrosAnnotations(tree: Tree)(using Context) =
+      if !ctx.compilationUnit.hasTastyAnnotations then
+        ctx.compilationUnit.hasTastyAnnotations |=
+          tree.symbol.annotations.exists(TastyAnnotations.isTastyAnnotation)
+
+    private def checkTastyAnnotation(sym: Symbol)(using Context) =
+      if sym.derivesFrom(defn.TastyAnnotationClass) && !sym.isStatic then
+        report.error("Implementation restriction: classes that extend TastyAnnotation must not be inner/local classes", sym.srcPos)
 
     private def checkErasedDef(tree: ValOrDefDef)(using Context): Unit =
       if tree.symbol.is(Erased, butNot = Macro) then
