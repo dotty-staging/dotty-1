@@ -98,9 +98,7 @@ class MacroAnnotations(thisPhase: DenotTransformer):
   /** Check that this tree can be added by the macro annotation and enter it if needed */
   private def checkAndEnter(newTree: Tree, annotated: Symbol, annot: Annotation)(using Context) =
     val sym = newTree.symbol
-    if sym.isClass then
-      report.error("Generating classes is not supported", annot.tree)
-    else if sym.isType then
+    if sym.isType && !sym.isClass then
       report.error("Generating type is not supported", annot.tree)
     else if sym.owner != annotated.owner then
       report.error(i"Macro annotation $annot added $sym with an inconsistent owner. Expected it to be owned by ${annotated.owner} but was owned by ${sym.owner}.", annot.tree)
