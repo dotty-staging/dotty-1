@@ -9,6 +9,7 @@ import dotty.tools.dotc.config.Printers.{macroAnnot => debug}
 import dotty.tools.dotc.core.Annotations.*
 import dotty.tools.dotc.core.Contexts.*
 import dotty.tools.dotc.core.Decorators.*
+import dotty.tools.dotc.core.Decorators.*
 import dotty.tools.dotc.core.DenotTransformers.DenotTransformer
 import dotty.tools.dotc.core.Flags.*
 import dotty.tools.dotc.core.MacroClassLoader
@@ -34,10 +35,7 @@ class MacroAnnotations(thisPhase: DenotTransformer):
       if tree.symbol.isClass then // error only reported on module class
         report.error("Macro annotations are not supported on object", tree)
       List(tree)
-    else if tree.symbol.isClass then
-      report.error("Macro annotations are not supported on class", tree)
-      List(tree)
-    else if tree.symbol.isType then
+    else if tree.symbol.isType && !tree.symbol.isClass then
       report.error("Macro annotations are not supported on type", tree)
       List(tree)
     else
@@ -59,6 +57,7 @@ class MacroAnnotations(thisPhase: DenotTransformer):
             case (prefixed, newTree :: suffixed) =>
               allTrees ++= prefixed
               insertedAfter = suffixed :: insertedAfter
+              checkModifiedTree(tree, newTree, annot)
               prefixed.foreach(checkAndEnter(_, tree.symbol, annot))
               suffixed.foreach(checkAndEnter(_, tree.symbol, annot))
               newTree
@@ -71,7 +70,6 @@ class MacroAnnotations(thisPhase: DenotTransformer):
         else
           tree
       }
-
       allTrees += transformedTree
       insertedAfter.foreach(allTrees.++=)
 
@@ -94,6 +92,14 @@ class MacroAnnotations(thisPhase: DenotTransformer):
 
     val quotes = QuotesImpl()(using SpliceScope.contextWithNewSpliceScope(tree.symbol.sourcePos)(using MacroExpansion.context(tree)).withOwner(tree.symbol))
     annotInstance.transform(using quotes)(tree.asInstanceOf[quotes.reflect.Definition])
+
+  private def checkModifiedTree(original: Tree, newTree: Tree, annot: Annotation)(using Context): Unit =
+    val sym = newTree.symbol
+    (original, newTree) match
+      case (TypeDef(_, template: Template), TypeDef(_, newTemplate: Template)) =>
+        // TODO: check that no definitions are missing
+      case _ =>
+    ()
 
   /** Check that this tree can be added by the macro annotation and enter it if needed */
   private def checkAndEnter(newTree: Tree, annotated: Symbol, annot: Annotation)(using Context) =
