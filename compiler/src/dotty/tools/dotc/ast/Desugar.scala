@@ -1307,7 +1307,7 @@ object desugar {
       arg match
         case Parens(arg) =>
           Apply(sel, assignToNamedArg(arg) :: Nil)
-        case Tuple(args) if args.exists(_.isInstanceOf[Assign]) =>
+        case Tuple(args) if args.exists(_.isInstanceOf[Assign]) || op.name.isAdditionAssignmentOperatorName =>
           Apply(sel, args.mapConserve(assignToNamedArg))
         case Tuple(args) =>
           Apply(sel, arg :: Nil).setApplyKind(ApplyKind.InfixTuple)

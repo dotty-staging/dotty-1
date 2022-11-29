@@ -77,6 +77,7 @@ object NameOps {
     def isAnonymousFunctionName: Boolean = name.startsWith(str.ANON_FUN)
     def isUnapplyName: Boolean = name == nme.unapply || name == nme.unapplySeq
     def isRightAssocOperatorName: Boolean = name.lastPart.last == ':'
+    def isAdditionAssignmentOperatorName: Boolean = name.endsWith("+=")
 
     def isOperatorName: Boolean = name match
       case name: SimpleName => name.exists(isOperatorPart)
