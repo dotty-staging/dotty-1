@@ -488,13 +488,15 @@ class PostTyper extends MacroTransform with IdentityDenotTransformer { thisPhase
       if (sym.isEffectivelyErased) dropInlines.transform(rhs) else rhs
 
     private def checkForMacrosAnnotations(tree: Tree)(using Context) =
-      if !ctx.compilationUnit.hasTastyAnnotations then
-        ctx.compilationUnit.hasTastyAnnotations |=
-          tree.symbol.annotations.exists(TastyAnnotations.isTastyAnnotation)
+      if TastyAnnotations.hasTastyAnnotation(tree.symbol) then
+        if Inlines.inInlineMethod then
+          report.error("implementation restriction: TASTy annotations can not be used in inline methods", tree)
+        else
+          ctx.compilationUnit.hasTastyAnnotations = true
 
     private def checkTastyAnnotation(sym: Symbol)(using Context) =
       if sym.derivesFrom(defn.TastyAnnotationClass) && !sym.isStatic then
-        report.error("Implementation restriction: classes that extend TastyAnnotation must not be inner/local classes", sym.srcPos)
+        report.error("classes that extend TastyAnnotation must not be inner/local classes", sym.srcPos)
 
     private def checkErasedDef(tree: ValOrDefDef)(using Context): Unit =
       if tree.symbol.is(Erased, butNot = Macro) then

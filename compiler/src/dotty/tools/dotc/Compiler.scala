@@ -47,6 +47,7 @@ class Compiler {
   /** Phases dealing with TASTY tree pickling and unpickling */
   protected def picklerPhases: List[List[Phase]] =
     List(new Pickler) ::            // Generate TASTY info
+    List(new ExpandAnnotations) ::  // Execute TASTy macro annotation
     List(new Inlining) ::           // Inline and execute macros
     List(new PostInlining) ::       // Add mirror support for inlined code
     List(new Staging) ::            // Check staging levels and heal staged types

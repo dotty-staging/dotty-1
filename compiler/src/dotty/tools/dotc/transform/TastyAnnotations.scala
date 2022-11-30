@@ -27,8 +27,8 @@ class TastyAnnotations(thisPhase: DenotTransformer):
   /** Expands every TASTy annotation that is on this tree.
    *  Returns a list with transformed definition and any added definitions.
    */
-  def transform(tree: MemberDef)(using Context): List[DefTree] =
-    if !hasMacro(tree.symbol) then
+  def expandAnnotations(tree: MemberDef)(using Context): List[DefTree] =
+    if !hasTastyAnnotation(tree.symbol) then
       List(tree)
     else if tree.symbol.is(Module) then
       if tree.symbol.isClass then // error only reported on module class
@@ -115,5 +115,5 @@ object TastyAnnotations:
     sym.denot != NoDenotation && sym.owner.derivesFrom(defn.TastyAnnotationClass)
 
   /** Is this symbol annotated with an annotation that implements `scala.annation.TastyAnnotation` */
-  def hasMacro(sym: Symbol)(using Context): Boolean =
+  def hasTastyAnnotation(sym: Symbol)(using Context): Boolean =
     sym.getAnnotation(defn.TastyAnnotationClass).isDefined

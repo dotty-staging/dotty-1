@@ -167,6 +167,8 @@ class PCPCheckAndHeal(@constructorOnly ictx: Context) extends TreeMapWithStages(
         for (annot <- tree.symbol.annotations) annot match
           case annot: BodyAnnotation => annot // already checked in PrepareInlineable before the creation of the BodyAnnotation
           case annot => transform(annot.tree)(using annotCtx)
+        if level > 0 && TastyAnnotations.hasTastyAnnotation(tree.symbol) then
+          report.error("implementation restriction: TASTy annotations can not be used in staged code", tree)
       case _ =>
 
   /** Heal types in the info of the given tree */

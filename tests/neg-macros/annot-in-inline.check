@@ -1,0 +1,4 @@
+-- Error: tests/neg-macros/annot-in-inline.scala:9:13 ------------------------------------------------------------------
+9 |  @annot def g = 4 // error
+  |  ^^^^^^^^^^^^^^^^
+  |  implementation restriction: TASTy annotations can not be used in inline methods
