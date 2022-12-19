@@ -796,7 +796,7 @@ object Contexts {
     changeOwnersInUse += 1
     nestedCtx.setOwner(owner).setTyperState(ctx.typerState)
 
-  /** Run `op` in current context, with a mode is temporarily set as specified.
+  /** Run `op` in current context, in a reusable context that has the specified owner.
    */
   inline def runWithOwner[T](owner: Symbol)(inline op: Context ?=> T)(using Context): T =
     if Config.reuseOwnerContexts then
