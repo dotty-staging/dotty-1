@@ -14,6 +14,8 @@ import scala.annotation.internal.sharable
 object Bench extends Driver:
 
   @sharable private var numRuns = 1
+  @sharable private var numCompilers = 1
+  @sharable private var curCompiler = 0
 
   private def ntimes(n: Int)(op: => Reporter): Reporter =
     (0 until n).foldLeft(emptyReporter)((_, _) => op)
@@ -21,13 +23,12 @@ object Bench extends Driver:
   @sharable private var times: Array[Int] = _
 
   override def doCompile(compiler: Compiler, files: List[AbstractFile])(using Context): Reporter =
-    times = new Array[Int](numRuns)
     var reporter: Reporter = emptyReporter
     for i <- 0 until numRuns do
       val start = System.nanoTime()
       reporter = super.doCompile(compiler, files)
-      times(i) = ((System.nanoTime - start) / 1000000).toInt
-      println(s"time elapsed: ${times(i)}ms")
+      times(curCompiler + i) = ((System.nanoTime - start) / 1000000).toInt
+      println(s"time elapsed: ${times(curCompiler + i)}ms")
       if ctx.settings.Xprompt.value then
         print("hit <return> to continue >")
         System.in.nn.read()
@@ -42,20 +43,28 @@ object Bench extends Driver:
 
   def reportTimes() =
     val best = times.sorted
-    val measured = numRuns / 3
+    val measured = numCompilers * numRuns / 3
     val avgBest = best.take(measured).sum / measured
     val avgLast = times.reverse.take(measured).sum / measured
-    println(s"best out of $numRuns runs: ${best(0)}")
+    println(s"best out of ${numCompilers * numRuns} runs: ${best(0)}")
     println(s"average out of best $measured: $avgBest")
     println(s"average out of last $measured: $avgLast")
 
-  override def process(args: Array[String], rootCtx: Context): Reporter =
+  override def process(args: Array[String]): Reporter =
     val (numCompilers, args1) = extractNumArg(args, "#compilers")
     val (numRuns, args2) = extractNumArg(args1, "#runs")
+    val (waitBefore, args3) = extractNumArg(args2, "#wait-after", -1)
     this.numRuns = numRuns
+    this.numCompilers = numCompilers
+    this.curCompiler = 0
+    this.times = new Array[Int](numCompilers * numRuns)
     var reporter: Reporter = emptyReporter
     for i <- 0 until numCompilers do
-      reporter = super.process(args2, rootCtx)
+      if waitBefore == curCompiler then
+        print("hit <return> to continue >")
+        System.in.nn.read()
+      reporter = super.process(args3)
+      curCompiler += 1
     reportTimes()
     reporter
 
