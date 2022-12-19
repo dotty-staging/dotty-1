@@ -451,7 +451,6 @@ object Contexts {
 
     /** A fresh clone of this context embedded in the specified `outer` context. */
     def freshOver(outer: Context): FreshContext =
-      util.Stats.record("Context.fresh")
       FreshContext(base).init(outer, this).setTyperState(this.typerState)
 
     final def withOwner(owner: Symbol): Context =
@@ -517,6 +516,7 @@ object Contexts {
    *  of its attributes using the with... methods.
    */
   class FreshContext(base: ContextBase) extends Context(base) {
+    util.Stats.record("Context.fresh")
 
     private var _outer: Context = uninitialized
     def outer: Context = _outer
@@ -579,7 +579,7 @@ object Contexts {
 
     def setPeriod(period: Period): this.type =
       util.Stats.record("Context.setPeriod")
-      assert(period.firstPhaseId == period.lastPhaseId, period)
+      //assert(period.firstPhaseId == period.lastPhaseId, period)
       this._period = period
       this
 

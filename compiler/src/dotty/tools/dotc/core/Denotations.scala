@@ -833,6 +833,7 @@ object Denotations {
             val savedPeriod = ctx.period
             val mutCtx = ctx.asInstanceOf[FreshContext]
             try
+              util.Stats.record("current.transform")
               mutCtx.setPhase(transformer)
               next = transformer.transform(cur)
                 // We temporarily update the context with the new phase instead of creating a
@@ -840,9 +841,9 @@ object Denotations {
                 // creations that way, and also avoid phase caches in contexts to get large.
                 // To work correctly, we need to demand that the context with the new phase
                 // is not retained in the result.
-            catch case ex: CyclicReference =>
-              // println(s"error while transforming $this")
-              throw ex
+            //catch case ex: CyclicReference =>
+            // println(s"error while transforming $this")
+            //throw ex
             finally
               mutCtx.setPeriod(savedPeriod)
             if next eq cur then
