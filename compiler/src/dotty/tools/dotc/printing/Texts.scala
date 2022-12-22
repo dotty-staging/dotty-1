@@ -3,6 +3,8 @@ package printing
 
 object Texts {
 
+  private val ansi = java.util.regex.Pattern.compile("\u001b\\[\\d+m").nn
+
   sealed abstract class Text {
 
     protected def indentMargin: Int = 2
@@ -70,7 +72,7 @@ object Texts {
       else appendIndented(that)(width)
 
     private def lengthWithoutAnsi(str: String): Int =
-      str.replaceAll("\u001b\\[\\d+m", "").nn.length
+      ansi.matcher(str).nn.replaceAll("").nn.length
 
     def layout(width: Int): Text = this match {
       case Str(s, _) =>
