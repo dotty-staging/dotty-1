@@ -139,7 +139,9 @@ class TreeBuffer extends TastyBuffer(50000) {
       val saved =
         if (numOffsets == 0) 0
         else scratch.delta1(numOffsets - 1) - scratch.delta(numOffsets - 1)
+      val tmp = scratch.delta
       scratch.delta = scratch.delta1
+      scratch.delta1 = tmp
       saved
     }
 
