@@ -126,9 +126,11 @@ object Scanners {
 
     // Setting token data ----------------------------------------------------
 
+    protected def initialCharBufferSize = 1024
+
     /** A character buffer for literals
       */
-    protected val litBuf = CharBuffer()
+    protected val litBuf = CharBuffer(initialCharBufferSize)
 
     /** append Unicode character to "litBuf" buffer
       */
@@ -242,7 +244,7 @@ object Scanners {
     def getDocComment(pos: Int): Option[Comment] = docstringMap.get(pos)
 
     /** A buffer for comments */
-    private val commentBuf = CharBuffer()
+    private val commentBuf = CharBuffer(initialCharBufferSize)
 
     def toToken(identifier: SimpleName): Token =
       def handleMigration(keyword: Token): Token =
@@ -1076,6 +1078,7 @@ object Scanners {
       next
 
     class LookaheadScanner(val allowIndent: Boolean = false) extends Scanner(source, offset, allowIndent = allowIndent) {
+      override protected def initialCharBufferSize = 8
       override def languageImportContext = Scanner.this.languageImportContext
     }
 
