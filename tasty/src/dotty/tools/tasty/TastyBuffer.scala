@@ -193,4 +193,7 @@ class TastyBuffer(initialSize: Int) {
    *  After `assemble` no more output actions to this buffer are permitted.
    */
   def assemble(): Unit = ()
+
+  def reset(): Unit =
+    length = 0
 }
