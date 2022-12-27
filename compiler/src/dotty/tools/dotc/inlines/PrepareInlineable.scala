@@ -274,7 +274,7 @@ object PrepareInlineable {
             var inlinedBody = dropInlineIfError(inlined, treeExpr)
             if inlined.isInlineMethod then
               inlinedBody = dropInlineIfError(inlined,
-                checkInlineMethod(inlined,
+                liftInlineMacro(inlined,
                   PrepareInlineable.makeInlineable(inlinedBody)))
             inlining.println(i"Body to inline for $inlined: $inlinedBody")
             inlinedBody
@@ -282,21 +282,59 @@ object PrepareInlineable {
         }
     }
 
-  private def checkInlineMethod(inlined: Symbol, body: Tree)(using Context): body.type = {
+  private def liftInlineMacro(inlined: Symbol, body: Tree)(using Context): Tree = {
     if Inlines.inInlineMethod(using ctx.outer) then
       report.error(em"Implementation restriction: nested inline methods are not supported", inlined.srcPos)
 
-    if (inlined.is(Macro) && !ctx.isAfterTyper) {
+    if inlined.is(Macro) && !ctx.isAfterTyper then
 
-      def checkMacro(tree: Tree): Unit = tree match {
-        case Spliced(code) =>
+      def liftMacro(tree: Tree): Tree = tree match {
+        case app @ Spliced(code) =>
           if (code.symbol.flags.is(Inline))
             report.error("Macro cannot be implemented with an `inline` method", code.srcPos)
-          Splicer.checkValidMacroBody(code)
-          new PCPCheckAndHeal(freshStagingContext).transform(body) // Ignore output, only check PCP
-        case Block(List(stat), Literal(Constants.Constant(()))) => checkMacro(stat)
-        case Block(Nil, expr) => checkMacro(expr)
-        case Typed(expr, _) => checkMacro(expr)
+          // Splicer.checkValidMacroBody(code)
+          val healed = new PCPCheckAndHeal(freshStagingContext).transform(body) // Ignore output, only check PCP
+          val splicing = new transform.Splicing
+          val hole = new splicing.SpliceTransformer(ctx.owner, sym =>
+            !sym.isClass && sym.is(Param) && sym.maybeOwner == ctx.owner
+          ).transformSplice(code, tree.tpe, -1)
+
+          val topLevelClass = ctx.owner.topLevelClass
+          val newOwner = topLevelClass
+            // newNormalizedClassSymbol(
+            //   ctx.owner.topLevelClass.owner,
+            //   s"${topLevelClass.name}$$macros".toTypeName,
+            //   Invisible | Final,
+            //   List(defn.ObjectType)
+            // )
+
+          val info = hole.content match
+            case Block(List(ddef), _) => ddef.symbol.info
+
+          val macroImplSym =
+            newSymbol(newOwner, s"${ctx.owner.name}$$macro".toTermName, Method | Invisible | JavaStatic, info, NoSymbol).entered
+
+          val macroImpl = tpd.DefDef(macroImplSym, paramss =>
+            hole.content.select(nme.apply).appliedToArgs(paramss.head),
+          )
+          // TODO insert macroImpl in class
+
+          val newSpliceLambda = Lambda(ContextualMethodType(List("quotes".toTermName))(_ => List(defn.QuotesClass.typeRef), _ => defn.QuotedExprClass.typeRef.appliedTo(tree.tpe)), args =>
+            ref(macroImplSym)
+              .appliedToArgs(
+                hole.args.map(arg => ref(defn.QuotedRuntime_exprQuote.termRef).appliedToType(defn.AnyType).appliedTo(arg).select(nme.apply).appliedTo(args.head))
+              )
+              .select(nme.apply) // TODO remove lambda
+              .appliedTo(args.head)
+          ).withSpan(code.span)
+          val newSplice =
+            cpy.Apply(app)(app.fun, List(newSpliceLambda))
+
+          newSplice
+
+        case Block(List(stat), Literal(Constants.Constant(()))) => liftMacro(stat)
+        case Block(Nil, expr) => liftMacro(expr)
+        case Typed(expr, _) => liftMacro(expr)
         case Block(DefDef(nme.ANON_FUN, _, _, _) :: Nil, Closure(_, fn, _)) if fn.symbol.info.isImplicitMethod =>
           // TODO Support this pattern
           report.error(
@@ -304,19 +342,18 @@ object PrepareInlineable {
               |
               |Place the implicit as an argument (`foo()(using X): Y`) to overcome this limitation.
               |""".stripMargin, tree.srcPos)
+          tree
         case _ =>
           report.error(
             """Malformed macro.
               |
               |Expected the splice ${...} to be at the top of the RHS:
-              |  inline def foo(inline x: X, ..., y: Y): Int = ${ impl('x, ... 'y) }
-              |
-              | * The contents of the splice must call a static method
-              | * All arguments must be quoted
-            """.stripMargin, inlined.srcPos)
+              |  inline def foo(inline x: X, ..., y: Y): Int = ${ ... }
+            """, inlined.srcPos)
+          tree
       }
-      checkMacro(body)
-    }
-    body
+      liftMacro(body)
+    else
+      body
   }
 }

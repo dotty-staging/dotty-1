@@ -186,13 +186,13 @@ class Splicing extends MacroTransform:
    *  {{{ <holeIdx++> | T2 | x, X | (x$1: Expr[T1], X$1: Type[X]) => (using Quotes) ?=> {... ${x$1} ...  X$1.Underlying ...}  }}}
    *  ```
    */
-  private class SpliceTransformer(spliceOwner: Symbol, isCaptured: Symbol => Boolean) extends Transformer:
+  class SpliceTransformer(spliceOwner: Symbol, isCaptured: Symbol => Boolean) extends Transformer:
     private var refBindingMap = mutable.Map.empty[Symbol, (Tree, Symbol)]
     /** Reference to the `Quotes` instance of the current level 1 splice */
     private var quotes: Tree | Null = null // TODO: add to the context
     private var healedTypes: PCPCheckAndHeal.QuoteTypeTags | Null = null // TODO: add to the context
 
-    def transformSplice(tree: tpd.Tree, tpe: Type, holeIdx: Int)(using Context): tpd.Tree =
+    def transformSplice(tree: tpd.Tree, tpe: Type, holeIdx: Int)(using Context): tpd.Hole =
       assert(level == 0)
       val newTree = transform(tree)
       val (refs, bindings) = refBindingMap.values.toList.unzip
