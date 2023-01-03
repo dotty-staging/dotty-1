@@ -22,28 +22,46 @@ import transform.SymUtils.*
 import config.Printers.inlining
 import util.Property
 import dotty.tools.dotc.transform.TreeMapWithStages._
+import dotty.tools.dotc.transform.BetaReduce
 
 object PrepareMacros {
   import tpd._
-  private val MacroDefinitionsKey = new Property.Key[collection.mutable.Set[DefDef]]
+  private val MacroDefinitionsKey = new Property.Key[collection.mutable.Map[Symbol, collection.mutable.ListBuffer[DefDef]]]
+  private val MacroDefinitionsOwnerKey = new Property.Key[collection.mutable.Map[Symbol, Symbol]]
 
-  def initContext(ctx: Context): Context =
-    ctx.fresh.setProperty(MacroDefinitionsKey, collection.mutable.Set.empty)
-
-  // def macroDef(tree: Tree)(using Context): Tree =
-  //   ctx.property(MacroDefinitionsKey).get.makeInlineable(tree)
+  def initContext(using ctx: Context): Context =
+    ctx.fresh
+      .setProperty(MacroDefinitionsKey, collection.mutable.Map.empty)
+      .setProperty(MacroDefinitionsOwnerKey, collection.mutable.Map.empty)
 
   def addMacroDefs(ddef: DefDef)(using Context): Unit =
-    ctx.property(MacroDefinitionsKey).get.add(ddef)
+    ctx.property(MacroDefinitionsKey).get.getOrElseUpdate(ctx.owner.topLevelClass, collection.mutable.ListBuffer.empty).+=(ddef)
+
+  def getMacroDefOwner(using Context): Symbol =
+    ctx.property(MacroDefinitionsOwnerKey).get.getOrElseUpdate(ctx.owner.topLevelClass, {
+      val topLevelClass = ctx.owner.topLevelClass
+      val modOwner =
+        newCompleteModuleSymbol(
+          topLevelClass.owner,
+          s"${topLevelClass.name.stripModuleClassSuffix}$$macros".toTermName,
+          Invisible,
+          Invisible,
+          List(defn.ObjectType),
+          Scopes.newScope
+        )
+      modOwner.moduleClass.asClass
+    })
 
   def addMacrosClass(using Context): List[Tree] =
-    val macroDefs = ctx.property(MacroDefinitionsKey).get
-    macroDefs.toList.map { macroDef =>
-      val cls = macroDef.symbol.owner.asClass
-      val constr = newConstructor(cls, Synthetic, Nil, Nil).entered
-      ClassDef(cls, DefDef(constr), List(macroDef), Nil)
-    }
-
+    ctx.property(MacroDefinitionsKey).get.values.flatMap {
+      ddefs =>
+        val cls = ddefs.head.symbol.owner.asClass
+        val constr = newConstructor(cls, Synthetic, Nil, Nil).entered
+        List(
+          ValDef(cls.companionModule.asTerm, New(ref(cls)).select(nme.CONSTRUCTOR).appliedToNone),
+          ClassDef(cls, DefDef(constr), ddefs.toList, Nil)
+        )
+    }.toList
 }
 
 object PrepareInlineable {
@@ -322,40 +340,34 @@ object PrepareInlineable {
             !sym.isClass && sym.is(Param) && sym.maybeOwner == ctx.owner
           ).transformSplice(code, tree.tpe, -1)
 
-          val topLevelClass = ctx.owner.topLevelClass
-          val newOwner =
-            newNormalizedClassSymbol(
-              ctx.owner.topLevelClass.owner,
-              s"${topLevelClass.name.stripModuleClassSuffix}_macros".toTypeName,
-              Invisible | Final,
-              List(defn.ObjectType)
-            ).asClass
+          val newOwner = PrepareMacros.getMacroDefOwner
 
           val info = hole.content match
             case Block(List(ddef), _) => ddef.symbol.info
 
           val macroImplSym =
-            newSymbol(newOwner, s"${ctx.owner.name}$$macro".toTermName, Method | Invisible | JavaStatic, info, NoSymbol).entered
+            newSymbol(newOwner, ctx.owner.flatName.asTermName, Method | Invisible, info, NoSymbol).entered
 
           val macroImpl = tpd.DefDef(macroImplSym, paramss =>
-            hole.content.changeOwner(ctx.owner, macroImplSym).select(nme.apply).appliedToArgs(paramss.head),
+            val fn = hole.content.changeOwner(ctx.owner, macroImplSym)
+            val app = fn.select(nme.apply).appliedToArgs(paramss.head)
+            BetaReduce(app, fn, paramss.head)(using ctx.withOwner(macroImplSym))
           )
           PrepareMacros.addMacroDefs(macroImpl)
-
-          println(macroImplSym.info.finalResultType.show)
 
           val newSpliceLambda = Lambda(ContextualMethodType(List("quotes".toTermName))(_ => List(defn.QuotesClass.typeRef), _ => defn.QuotedExprClass.typeRef.appliedTo(tree.tpe)), args =>
             ref(macroImplSym)
               .appliedToArgs(
-                hole.args.map(arg => ref(defn.QuotedRuntime_exprQuote.termRef).appliedToType(defn.AnyType).appliedTo(arg).select(nme.apply).appliedTo(args.head))
+                hole.args.map(arg =>
+                  ref(defn.QuotedRuntime_exprQuote.termRef).appliedToType(arg.tpe.widen).appliedTo(arg).select(nme.apply).appliedTo(args.head))
               )
               .select(nme.apply) // TODO remove lambda
               .appliedTo(args.head)
           ).withSpan(code.span)
           val newSplice =
             cpy.Apply(app)(app.fun, List(newSpliceLambda))
-          println(newSplice.show)
-          println(newSplice)
+          // println(newSplice.show)
+          // println(newSplice)
 
           newSplice
 
