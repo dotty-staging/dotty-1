@@ -10,6 +10,7 @@ import ImportInfo.withRootImports
 import parsing.{Parser => ParserPhase}
 import config.Printers.typr
 import inlines.PrepareInlineable
+import inlines.PrepareMacros
 import util.Stats._
 
 /**
@@ -66,7 +67,8 @@ class TyperPhase(addRootImports: Boolean = true) extends Phase {
     val unitContexts =
       for unit <- units yield
         val newCtx0 = ctx.fresh.setPhase(this.start).setCompilationUnit(unit)
-        val newCtx = PrepareInlineable.initContext(newCtx0)
+        val newCtx1 = PrepareMacros.initContext(newCtx0)
+        val newCtx = PrepareInlineable.initContext(newCtx1)
         report.inform(s"typing ${unit.source}")
         if (addRootImports)
           newCtx.withRootImports

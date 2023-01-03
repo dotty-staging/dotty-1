@@ -23,6 +23,29 @@ import config.Printers.inlining
 import util.Property
 import dotty.tools.dotc.transform.TreeMapWithStages._
 
+object PrepareMacros {
+  import tpd._
+  private val MacroDefinitionsKey = new Property.Key[collection.mutable.Set[DefDef]]
+
+  def initContext(ctx: Context): Context =
+    ctx.fresh.setProperty(MacroDefinitionsKey, collection.mutable.Set.empty)
+
+  // def macroDef(tree: Tree)(using Context): Tree =
+  //   ctx.property(MacroDefinitionsKey).get.makeInlineable(tree)
+
+  def addMacroDefs(ddef: DefDef)(using Context): Unit =
+    ctx.property(MacroDefinitionsKey).get.add(ddef)
+
+  def addMacrosClass(using Context): List[Tree] =
+    val macroDefs = ctx.property(MacroDefinitionsKey).get
+    macroDefs.toList.map { macroDef =>
+      val cls = macroDef.symbol.owner.asClass
+      val constr = newConstructor(cls, Synthetic, Nil, Nil).entered
+      ClassDef(cls, DefDef(constr), List(macroDef), Nil)
+    }
+
+}
+
 object PrepareInlineable {
   import tpd._
 
@@ -300,13 +323,13 @@ object PrepareInlineable {
           ).transformSplice(code, tree.tpe, -1)
 
           val topLevelClass = ctx.owner.topLevelClass
-          val newOwner = topLevelClass
-            // newNormalizedClassSymbol(
-            //   ctx.owner.topLevelClass.owner,
-            //   s"${topLevelClass.name}$$macros".toTypeName,
-            //   Invisible | Final,
-            //   List(defn.ObjectType)
-            // )
+          val newOwner =
+            newNormalizedClassSymbol(
+              ctx.owner.topLevelClass.owner,
+              s"${topLevelClass.name.stripModuleClassSuffix}_macros".toTypeName,
+              Invisible | Final,
+              List(defn.ObjectType)
+            ).asClass
 
           val info = hole.content match
             case Block(List(ddef), _) => ddef.symbol.info
@@ -315,9 +338,11 @@ object PrepareInlineable {
             newSymbol(newOwner, s"${ctx.owner.name}$$macro".toTermName, Method | Invisible | JavaStatic, info, NoSymbol).entered
 
           val macroImpl = tpd.DefDef(macroImplSym, paramss =>
-            hole.content.select(nme.apply).appliedToArgs(paramss.head),
+            hole.content.changeOwner(ctx.owner, macroImplSym).select(nme.apply).appliedToArgs(paramss.head),
           )
-          // TODO insert macroImpl in class
+          PrepareMacros.addMacroDefs(macroImpl)
+
+          println(macroImplSym.info.finalResultType.show)
 
           val newSpliceLambda = Lambda(ContextualMethodType(List("quotes".toTermName))(_ => List(defn.QuotesClass.typeRef), _ => defn.QuotedExprClass.typeRef.appliedTo(tree.tpe)), args =>
             ref(macroImplSym)
@@ -329,6 +354,8 @@ object PrepareInlineable {
           ).withSpan(code.span)
           val newSplice =
             cpy.Apply(app)(app.fun, List(newSpliceLambda))
+          println(newSplice.show)
+          println(newSplice)
 
           newSplice
 

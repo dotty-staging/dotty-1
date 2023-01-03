@@ -29,7 +29,7 @@ import Inferencing._
 import Dynamic.isDynamicExpansion
 import EtaExpansion.etaExpand
 import TypeComparer.CompareResult
-import inlines.{Inlines, PrepareInlineable}
+import inlines.{Inlines, PrepareInlineable, PrepareMacros}
 import util.Spans._
 import util.common._
 import util.{Property, SimpleIdentityMap, SrcPos}
@@ -2680,8 +2680,9 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           val topLevelClassName = desugar.packageObjectName(ctx.source).moduleClassName
           pkg.moduleClass.info.decls.lookup(topLevelClassName).ensureCompleted()
           var stats1 = typedStats(tree.stats, pkg.moduleClass)._1
-          if (!ctx.isAfterTyper)
+          if !ctx.isAfterTyper then
             stats1 = stats1 ++ typedBlockStats(MainProxies.proxies(stats1))._1
+            stats1 = stats1 ++ PrepareMacros.addMacrosClass
           cpy.PackageDef(tree)(pid1, stats1).withType(pkg.termRef)
         }
       case _ =>
