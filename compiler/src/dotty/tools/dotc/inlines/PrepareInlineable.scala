@@ -345,6 +345,7 @@ object PrepareInlineable {
           val info = hole.content match
             case Block(List(ddef), _) => ddef.symbol.info
 
+          // TODO add type parameters to info
           val macroImplSym =
             newSymbol(newOwner, ctx.owner.flatName.asTermName, Method | Invisible, info, NoSymbol).entered
 
@@ -359,7 +360,10 @@ object PrepareInlineable {
             ref(macroImplSym)
               .appliedToArgs(
                 hole.args.map(arg =>
-                  ref(defn.QuotedRuntime_exprQuote.termRef).appliedToType(arg.tpe.widen).appliedTo(arg).select(nme.apply).appliedTo(args.head))
+                  if arg.isType then
+                    ref(defn.QuotedTypeModule_of.termRef).appliedToType(arg.tpe).appliedTo(args.head)
+                  else
+                    ref(defn.QuotedRuntime_exprQuote.termRef).appliedToType(arg.tpe.widen).appliedTo(arg).select(nme.apply).appliedTo(args.head))
               )
               .select(nme.apply) // TODO remove lambda
               .appliedTo(args.head)
