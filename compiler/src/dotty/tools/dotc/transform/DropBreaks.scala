@@ -102,15 +102,11 @@ class DropBreaks extends MiniPhase:
 
     /** `(local, arg)` provided `tree` matches inlined
      *
-     *    val Label_this: ... = local
-     *    throw new Break[...](Label_this, arg)
+     *    throw new Break[...](local, arg): Nothing
      */
     def unapply(tree: Tree)(using Context): Option[(Symbol, Tree)] = tree match
-      case Inlined(_,
-        (vd @ ValDef(label_this1, _, id: Ident)):: Nil,
-        Apply(throww, Apply(constr, Inlined(_, _, Ident(label_this2)) :: arg :: Nil) :: Nil))
+      case Apply(throww, Apply(constr, Inlined(_, _, id: Ident) :: arg :: Nil) :: Nil)
       if throww.symbol == defn.throwMethod
-          && label_this1 == nme.Label_this && label_this2 == nme.Label_this
           && id.symbol.name == nme.local
           && constr.symbol.isClassConstructor && constr.symbol.owner == defn.BreakClass =>
         Some((id.symbol, arg))
@@ -168,20 +164,18 @@ class DropBreaks extends MiniPhase:
 
   /** Rewrite a BreakThrow
    *
-   *     val Label_this: ... = local
-   *     throw new Break[...](Label_this, arg)
+   *     throw new Break[...](local, arg)
    *
    *  where `local` is defined in the current method and is not included in
-   *  LabeldShowedByTry to
+   *  LabeledShowedByTry to
    *
    *     return[target] arg
    *
    *  where `target` is the `goto` return label associated with `local`.
    *  Adjust associated ref counts accordingly. The local refcount is increased
-   *  and the non-local refcount is decreased, since `local` the `Label_this`
-   *  binding containing `local` is dropped.
+   *  and the non-local refcount is decreased.
    */
-  override def transformInlined(tree: Inlined)(using Context): Tree = tree match
+  override def transformApply(tree: Apply)(using Context): Tree = tree match
     case BreakThrow(lbl, arg) =>
       report.log(i"trans inlined $arg, ${arg.source}, ${ctx.outer.source}, ${tree.source}")
       labelUsage(lbl) match
@@ -191,10 +185,7 @@ class DropBreaks extends MiniPhase:
           =>
           uses.otherRefs -= 1
           uses.returnRefs += 1
-          cpy.Inlined(tree)(tree.call, Nil,
-            inContext(ctx.withSource(tree.expansion.source)) {
-              Return(arg, ref(uses.goto)).withSpan(arg.span)
-            })
+          Return(arg, ref(uses.goto)).withSpan(arg.span)
         case _ =>
           tree
     case _ =>

@@ -12,7 +12,7 @@ import control.ControlException
  *      The `Break` exception class extends `ControlException` which is a regular
  *      `RuntimeException`, optimized so that stack trace generation is suppressed.
  *    - Better performance: breaks to enclosing scopes in the same method can
- *      be rwritten to jumps.
+ *      be rewritten to jumps.
  */
 object boundary:
 
@@ -23,8 +23,10 @@ object boundary:
 
   /** Labels are targets indicating which boundary will be exited by a `break`.
    */
-  class Label[T]:
-    transparent inline def break(value: T): Nothing = throw Break(this, value)
+  class Label[T]
+
+  extension [T](label: Label[T])
+    inline def break(inline value: T): Nothing = throw Break(label, value)
 
   /** Run `body` with freshly generated label as implicit argument. Catch any
    *  breaks associated with that label and return their results instead of
