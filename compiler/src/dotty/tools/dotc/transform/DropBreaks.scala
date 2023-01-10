@@ -105,13 +105,22 @@ class DropBreaks extends MiniPhase:
      *    throw new Break[...](local, arg): Nothing
      */
     def unapply(tree: Tree)(using Context): Option[(Symbol, Tree)] = tree match
-      case Apply(throww, Apply(constr, Inlined(_, _, id: Ident) :: arg :: Nil) :: Nil)
+      case Apply(throww, Apply(constr, Label(id) :: arg :: Nil) :: Nil)
       if throww.symbol == defn.throwMethod
-          && id.symbol.name == nme.local
           && constr.symbol.isClassConstructor && constr.symbol.owner == defn.BreakClass =>
-        Some((id.symbol, arg))
+        Some((id, arg))
       case _ =>
         None
+    private object Label:
+      def unapply(tree: Tree)(using Context): Option[Symbol] = tree match
+        case id: Ident if id.symbol.name == nme.local =>
+          Some(id.symbol)
+        case Inlined(_, Nil, expansion) =>
+          unapply(expansion)
+        case Block(Nil, expansion) =>
+          unapply(expansion)
+        case _ =>
+          None
   end BreakThrow
 
   /** The LabelUsage data associated with `lbl` in the current context */
