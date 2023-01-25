@@ -7,6 +7,7 @@ import jsonmacro.*
   val o: Json.Obj = json"{}"
   val a: Json.Arr = json"[]"
   val s: Json.Str = json"""""""" // empty string
+  val s2: Json.Str = json"\"\"" // empty string
 
   json" null "
   json"[true]"

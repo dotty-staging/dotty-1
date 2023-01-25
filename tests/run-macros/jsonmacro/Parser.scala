@@ -7,19 +7,22 @@ object Parser:
   final case class Parsed(json: Json) extends Result
   final case class Error(msg: String, offset: Int) extends Result
 
+  private type ![T] = boundary.Label[Error] ?=> T
+
+  private def handleParseErrors(x: ![Json]): Result =
+    boundary { Parsed(x) }
+
 private class Parser(source: String):
   import Parser.*
-
-  type ![T] = boundary.Label[Error] ?=> T
 
   private var offset = 0
 
   def parse(): Result =
     skipWhiteSpaces()
-    boundary {
+    handleParseErrors {
       val parsed = parseValue()
       if offset < source.length then error("value ended")
-      else Parsed(parsed)
+      else parsed
     }
 
   private def peek(): ![Char] =
@@ -60,37 +63,43 @@ private class Parser(source: String):
 
   private def parseObject(): ![Json.Obj] =
     accept('{')
-    if peek() == '}' then
-      accept('}')
-      Json.Obj(Map.empty)
-    else
-      def parseNameValue(): (Json.Str, Json) =
-        val name = parseString()
-        accept(':')
-        val value = parseValue()
-        (name, value)
-      def parseNext(values: Map[Json.Str, Json]): Json.Obj =
-        next() match
-          case '}' => Json.Obj(values)
-          case ',' => parseNext(values + parseNameValue())
-          case _ => error("expected `}` or `,`")
-      val firstNameValue = parseNameValue()
-      parseNext(Map(firstNameValue))
+    val nameValues =
+      if peek() == '}' then Vector.empty
+      else commaSeparatedNameValues()
+    accept('}')
+    // TODO validate key duplication
+    Json.Obj(Map(nameValues*))
 
+  private def commaSeparatedNameValues(): ![Vector[(Json.Str, Json)]] =
+    def parseNext(values: Vector[(Json.Str, Json)]): Vector[(Json.Str, Json)] =
+      peek() match
+        case ',' =>
+          accept(',')
+          parseNext(values :+ parseNameValue())
+        case _ => values
+    parseNext(Vector(parseNameValue()))
+
+  private def parseNameValue(): ![(Json.Str, Json)] =
+    val name = parseString()
+    accept(':')
+    name -> parseValue()
 
   private def parseArray(): ![Json.Arr] =
     accept('[')
-    if peek() == ']' then
-      accept(']')
-      Json.Arr()
-    else
-      def parseNext(values: Vector[Json]): Json.Arr =
-        next() match
-          case ']' => Json.Arr(values*)
-          case ',' => parseNext(values :+ parseValue())
-          case _ => error("expected `]` or `,`")
-      val firstValue = parseValue()
-      parseNext(Vector(firstValue))
+    val values =
+      if peek() == ']' then Vector.empty
+      else commaSeparatedValues()
+    accept(']')
+    Json.Arr(values*)
+
+  private def commaSeparatedValues(): ![Vector[Json]] =
+    def parseNext(values: Vector[Json]): Vector[Json] =
+      peek() match
+        case ',' =>
+          accept(',')
+          parseNext(values :+ parseValue())
+        case _ => values
+    parseNext(Vector(parseValue()))
 
   private def parseString(): ![Json.Str] =
     accept('"')
@@ -100,8 +109,8 @@ private class Parser(source: String):
         case '"' => Json.Str(stringBuffer.result())
         case '\\' =>
           next(skipSpaces = false) match
-            case '"' => stringBuffer += '"'
             case '\\' => stringBuffer += '\\'
+            case '"' => stringBuffer += '"'
             case '/' => stringBuffer += '/'
             case 'b' => stringBuffer += '\b'
             case 'f' => stringBuffer += '\f'

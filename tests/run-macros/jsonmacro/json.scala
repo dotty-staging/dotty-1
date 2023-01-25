@@ -36,7 +36,8 @@ extension (inline stringContext: StringContext)
 
 private def jsonExpr(stringContext: Expr[StringContext])(using Quotes): Expr[Json] =
   import Parser.*
-  val jsonString = stringContext.valueOrAbort.parts.mkString
+  val jsonString = stringContext.valueOrAbort.parts.map(StringContext.processEscapes).mkString
+  println(jsonString)
   Parser(jsonString).parse() match
     case Parsed(json) => Expr(json)
     case Error(msg, offset) =>
