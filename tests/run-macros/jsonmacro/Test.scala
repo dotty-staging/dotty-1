@@ -11,3 +11,7 @@ import jsonmacro.*
   json"[true]"
   json"[true, true]"
 
+  // json"a"
+  // json"[true, "
+  // json"[true, ,"
+

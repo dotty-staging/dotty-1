@@ -1,6 +1,6 @@
 package jsonmacro
 
-import scala.util.boundary
+import scala.util.boundary, boundary.Label
 
 object Parser:
   enum Result:
@@ -11,16 +11,16 @@ private class Parser(source: String):
   import Parser.Result, Result.*
 
   private var offset = 0
-  skipWhiteSpaces()
 
   def parse(): Result =
-    parseValue() match
-      case parsed: Parsed =>
-        if !atEnd then Error("value ended", offset)
-        else parsed
-      case err: Error => err
+    skipWhiteSpaces()
+    boundary {
+      val parsed = parseValue()
+      if !atEnd then error("value ended")
+      else Parsed(parsed)
+    }
 
-  def atEnd: Boolean =
+  private def atEnd: Boolean =
     offset >= source.length
 
   private def peek(): Char =
@@ -37,8 +37,8 @@ private class Parser(source: String):
     while !atEnd && source(offset).isWhitespace do
       offset += 1
 
-  private def parseValue(): Result =
-    if atEnd then Error("expected value", offset)
+  private def parseValue()(using Label[Result]): Json =
+    if atEnd then error("expected value")
     else peek() match
       case '{' => parseObject()
       case '[' => parseArray()
@@ -47,67 +47,61 @@ private class Parser(source: String):
       case 'f' => parseFalse()
       case 'n' => parseNull()
       case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'  => parseNumber()
-      case char => Error(s"expected JSON value", offset)
+      case char => error(s"expected JSON value")
 
-  private def parseObject(): Result =
+  private def parseObject()(using Label[Result]): Json =
     assert(next() == '{')
-
     boundary {
       while !atEnd do
         next() match
-          case '}' => boundary.break(Parsed(Json.Obj(Map.empty)))
-          case _ =>
-      Error("object not closed", offset)
+          case '}' => boundary.break(Json.Obj(Map.empty))
+          case _ => // FIXME
+      error("object not closed")
     }
 
-  private def parseArray(): Result =
+  private def parseArray()(using Label[Result]): Json =
     assert(next() == '[')
     if !atEnd && peek() == ']' then
       next()
-      Parsed(Json.Arr())
+      Json.Arr()
     else
       var values = Array.newBuilder[Json]
-      parseValue() match
-        case Parsed(json) => json
-        case err: Error => return err
+      values += parseValue()
       boundary {
         while !atEnd do
           next() match
-            case ']' => boundary.break(Parsed(Json.Arr(values.result()*)))
-            case ',' =>
-              parseValue() match
-                case Parsed(value) =>
-                  values += value
-                case err: Error =>
-                  boundary.break(err)
-        Error("array not closed", offset)
+            case ']' => boundary.break(Json.Arr(values.result()*))
+            case ',' => values += parseValue()
+        error("array not closed")
       }
 
-  private def parseString(): Result = ???
-  private def parseNumber(): Result = ???
+  private def parseString()(using Label[Result]): Json = ???
+  private def parseNumber()(using Label[Result]): Json = ???
 
-  private def parseTrue(): Result =
+  private def parseTrue()(using Label[Result]): Json =
     assert(next() == 't')
     if !atEnd && next() == 'r'
     && !atEnd && next() == 'u'
     && !atEnd && next() == 'e' // TODO check boundary
-    then Parsed(Json.Bool(true))
-    else Error("expected `true`", offset)
+    then Json.Bool(true)
+    else error("expected `true`")
 
-  private def parseFalse(): Result =
+  private def parseFalse()(using Label[Result]): Json =
     assert(next() == 'f')
     if !atEnd && next() == 'a'
     && !atEnd && next() == 'l'
     && !atEnd && next() == 's'
     && !atEnd && next() == 'e' // TODO check boundary
-    then Parsed(Json.Bool(false))
-    else Error("expected `false`", offset)
+    then Json.Bool(false)
+    else error("expected `false`")
 
-  private def parseNull(): Result =
+  private def parseNull()(using Label[Result]): Json =
     assert(next() == 'n')
     if !atEnd && next() == 'u'
     && !atEnd && next() == 'l'
     && !atEnd && next() == 'l' // TODO check boundary
-    then Parsed(Json.Null)
-    else Error("expected `null`", offset)
+    then Json.Null
+    else error("expected `null`")
 
+  private def error(msg: String)(using Label[Result]): Nothing =
+    boundary.break(Error(msg, offset))
