@@ -1,14 +1,16 @@
 package jsonmacro
 
-import scala.util.boundary, boundary.Label
+import scala.util.boundary
 
 object Parser:
-  enum Result:
-    case Parsed(json: Json)
-    case Error(msg: String, offset: Int)
+  sealed trait Result
+  final case class Parsed(json: Json) extends Result
+  final case class Error(msg: String, offset: Int) extends Result
 
 private class Parser(source: String):
-  import Parser.Result, Result.*
+  import Parser.*
+
+  type ![T] = boundary.Label[Error] ?=> T
 
   private var offset = 0
 
@@ -16,30 +18,37 @@ private class Parser(source: String):
     skipWhiteSpaces()
     boundary {
       val parsed = parseValue()
-      if !atEnd then error("value ended")
+      if offset < source.length then error("value ended")
       else Parsed(parsed)
     }
 
-  private def atEnd: Boolean =
-    offset >= source.length
-
-  private def peek(): Char =
+  private def peek(): ![Char] =
+    if offset >= source.length then error("unexpected end of JSON string")
     source(offset)
 
-  private def next() =
-    assert(!atEnd)
+  private def next(skipSpaces: Boolean = true): ![Char] =
+    if offset >= source.length then error("unexpected end of JSON string")
     val char = source(offset)
     offset += 1
-    skipWhiteSpaces()
+    if skipSpaces then skipWhiteSpaces()
     char
 
-  private def skipWhiteSpaces() =
-    while !atEnd && source(offset).isWhitespace do
+  private def accept(char: Char): ![Unit] =
+    if char != next() then error(s"expected `$char`")
+
+  private def accept(str: String): ![Unit] =
+    for char <- str do
+      if char != peek() then error(s"expected `$char`")
+      next(skipSpaces = false)
+    if offset < source.length && !(source(offset).isWhitespace || source(offset) == '}' || source(offset) == ']' || source(offset) == ',') then error("expected end of token")
+    skipWhiteSpaces()
+
+  private def skipWhiteSpaces(): Unit =
+    while offset < source.length && source(offset).isWhitespace do
       offset += 1
 
-  private def parseValue()(using Label[Result]): Json =
-    if atEnd then error("expected value")
-    else peek() match
+  private def parseValue(): ![Json] =
+    peek() match
       case '{' => parseObject()
       case '[' => parseArray()
       case '"' => parseString()
@@ -49,59 +58,78 @@ private class Parser(source: String):
       case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'  => parseNumber()
       case char => error(s"expected JSON value")
 
-  private def parseObject()(using Label[Result]): Json =
-    assert(next() == '{')
-    boundary {
-      while !atEnd do
+  private def parseObject(): ![Json.Obj] =
+    accept('{')
+    if peek() == '}' then
+      accept('}')
+      Json.Obj(Map.empty)
+    else
+      def parseNameValue(): (Json.Str, Json) =
+        val name = parseString()
+        accept(':')
+        val value = parseValue()
+        (name, value)
+      def parseNext(values: Map[Json.Str, Json]): Json.Obj =
         next() match
-          case '}' => boundary.break(Json.Obj(Map.empty))
-          case _ => // FIXME
-      error("object not closed")
-    }
+          case '}' => Json.Obj(values)
+          case ',' => parseNext(values + parseNameValue())
+          case _ => error("expected `}` or `,`")
+      val firstNameValue = parseNameValue()
+      parseNext(Map(firstNameValue))
 
-  private def parseArray()(using Label[Result]): Json =
-    assert(next() == '[')
-    if !atEnd && peek() == ']' then
-      next()
+
+  private def parseArray(): ![Json.Arr] =
+    accept('[')
+    if peek() == ']' then
+      accept(']')
       Json.Arr()
     else
-      var values = Array.newBuilder[Json]
-      values += parseValue()
-      boundary {
-        while !atEnd do
-          next() match
-            case ']' => boundary.break(Json.Arr(values.result()*))
-            case ',' => values += parseValue()
-        error("array not closed")
-      }
+      def parseNext(values: Vector[Json]): Json.Arr =
+        next() match
+          case ']' => Json.Arr(values*)
+          case ',' => parseNext(values :+ parseValue())
+          case _ => error("expected `]` or `,`")
+      val firstValue = parseValue()
+      parseNext(Vector(firstValue))
 
-  private def parseString()(using Label[Result]): Json = ???
-  private def parseNumber()(using Label[Result]): Json = ???
+  private def parseString(): ![Json.Str] =
+    accept('"')
+    val stringBuffer = new collection.mutable.StringBuilder()
+    def parseChars(): Json.Str =
+      next(skipSpaces = false) match
+        case '"' => Json.Str(stringBuffer.result())
+        case '\\' =>
+          next(skipSpaces = false) match
+            case '"' => stringBuffer += '"'
+            case '\\' => stringBuffer += '\\'
+            case '/' => stringBuffer += '/'
+            case 'b' => stringBuffer += '\b'
+            case 'f' => stringBuffer += '\f'
+            case 'n' => stringBuffer += '\n'
+            case 'r' => stringBuffer += '\r'
+            case 't' => stringBuffer += '\t'
+            case 'u' => ??? // 4 hexadecimal digits
+          parseChars()
+        case char if char.isControl => error("unexpected control character")
+        case char =>
+          stringBuffer += char
+          parseChars()
+    parseChars()
 
-  private def parseTrue()(using Label[Result]): Json =
-    assert(next() == 't')
-    if !atEnd && next() == 'r'
-    && !atEnd && next() == 'u'
-    && !atEnd && next() == 'e' // TODO check boundary
-    then Json.Bool(true)
-    else error("expected `true`")
+  private def parseNumber(): ![Json.Num] =
+    ???
 
-  private def parseFalse()(using Label[Result]): Json =
-    assert(next() == 'f')
-    if !atEnd && next() == 'a'
-    && !atEnd && next() == 'l'
-    && !atEnd && next() == 's'
-    && !atEnd && next() == 'e' // TODO check boundary
-    then Json.Bool(false)
-    else error("expected `false`")
+  private def parseTrue(): ![Json.Bool] =
+    accept("true")
+    Json.Bool(true)
 
-  private def parseNull()(using Label[Result]): Json =
-    assert(next() == 'n')
-    if !atEnd && next() == 'u'
-    && !atEnd && next() == 'l'
-    && !atEnd && next() == 'l' // TODO check boundary
-    then Json.Null
-    else error("expected `null`")
+  private def parseFalse(): ![Json.Bool] =
+    accept("false")
+    Json.Bool(false)
 
-  private def error(msg: String)(using Label[Result]): Nothing =
+  private def parseNull(): ![Json.Null.type] =
+    accept("null")
+    Json.Null
+
+  private def error(msg: String): ![Nothing] =
     boundary.break(Error(msg, offset))
