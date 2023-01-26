@@ -4,12 +4,12 @@ import scala.util.boundary
 
 object Parser:
   sealed trait Result
-  final case class Parsed(json: Json) extends Result
+  final case class Parsed(json: Json.Value) extends Result
   final case class Error(msg: String, offset: Int) extends Result
 
   private type ![T] = boundary.Label[Error] ?=> T
 
-  private def handleParseErrors(x: ![Json]): Result =
+  private def handleParseErrors(x: ![Json.Value]): Result =
     boundary { Parsed(x) }
 
 private class Parser(source: String):
@@ -50,7 +50,7 @@ private class Parser(source: String):
     while offset < source.length && source(offset).isWhitespace do
       offset += 1
 
-  private def parseValue(): ![Json] =
+  private def parseValue(): ![Json.Value] =
     peek() match
       case '{' => parseObject()
       case '[' => parseArray()
@@ -70,8 +70,8 @@ private class Parser(source: String):
     // TODO validate key duplication
     Json.Obj(Map(nameValues*))
 
-  private def commaSeparatedNameValues(): ![Vector[(Json.Str, Json)]] =
-    def parseNext(values: Vector[(Json.Str, Json)]): Vector[(Json.Str, Json)] =
+  private def commaSeparatedNameValues(): ![Vector[(Json.Str, Json.Value)]] =
+    def parseNext(values: Vector[(Json.Str, Json.Value)]): Vector[(Json.Str, Json.Value)] =
       peek() match
         case ',' =>
           accept(',')
@@ -79,7 +79,7 @@ private class Parser(source: String):
         case _ => values
     parseNext(Vector(parseNameValue()))
 
-  private def parseNameValue(): ![(Json.Str, Json)] =
+  private def parseNameValue(): ![(Json.Str, Json.Value)] =
     val name = parseString()
     accept(':')
     name -> parseValue()
@@ -92,8 +92,8 @@ private class Parser(source: String):
     accept(']')
     Json.Arr(values*)
 
-  private def commaSeparatedValues(): ![Vector[Json]] =
-    def parseNext(values: Vector[Json]): Vector[Json] =
+  private def commaSeparatedValues(): ![Vector[Json.Value]] =
+    def parseNext(values: Vector[Json.Value]): Vector[Json.Value] =
       peek() match
         case ',' =>
           accept(',')

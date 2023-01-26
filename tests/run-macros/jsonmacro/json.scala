@@ -5,20 +5,19 @@ import scala.compiletime.ops.string
 
 import scala.quoted.*
 
-sealed trait Json
-
 object Json:
-  final case class Obj(value: Map[Json.Str, Json]) extends Json, scala.Dynamic:
-    def selectDynamic(name: String): Json | Undefined.type = value.getOrElse(Json.Str(name), Undefined)
-  final case class Arr(values: Json*) extends Json
-  final case class Num(value: Double) extends Json
-  final case class Str(value: String) extends Json
-  final case class Bool(value: Boolean) extends Json
-  case object Null extends Json
+  sealed trait Value
+  final case class Obj(value: Map[Json.Str, Json.Value]) extends Value, scala.Dynamic:
+    def selectDynamic(name: String): Value | Undefined.type = value.getOrElse(Json.Str(name), Undefined)
+  final case class Arr(values: Json.Value*) extends Value
+  final case class Num(value: Double) extends Value
+  final case class Str(value: String) extends Value
+  final case class Bool(value: Boolean) extends Value
+  case object Null extends Value
   object Undefined
 
-  given ToExpr[Json] with
-    def apply(x: Json)(using Quotes): Expr[Json] =
+  given ToExpr[Json.Value] with
+    def apply(x: Json.Value)(using Quotes): Expr[Json.Value] =
       x match
         case Json.Null => '{ Json.Null }
         case Json.Bool(value) => '{ Json.Bool(${Expr(value)}) }
@@ -32,9 +31,10 @@ object Json:
       '{ Json.Str(${Expr(x.value)}) }
 
 extension (inline stringContext: StringContext)
-  transparent inline def json(): Json = ${ jsonExpr('stringContext) }
+  // TODO add arguments
+  transparent inline def json(/* args: Json.Value* */): Json.Value = ${ jsonExpr('stringContext) }
 
-private def jsonExpr(stringContext: Expr[StringContext])(using Quotes): Expr[Json] =
+private def jsonExpr(stringContext: Expr[StringContext])(using Quotes): Expr[Json.Value] =
   import Parser.*
   val jsonString = stringContext.valueOrAbort.parts.map(StringContext.processEscapes).mkString
   println(jsonString)
