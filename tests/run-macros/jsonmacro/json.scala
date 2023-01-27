@@ -8,7 +8,7 @@ import result.*
 
 object Json:
   sealed trait Value
-  final case class Obj(value: Map[Json.Str, Json.Value]) extends Value, scala.Dynamic:
+  final case class Obj(value: Map[Json.Str, Json.Value]) extends Value, scala.Selectable:
     def selectDynamic(name: String): Value | Undefined.type = value.getOrElse(Json.Str(name), Undefined)
   final case class Arr(values: Json.Value*) extends Value
   final case class Num(value: Double) extends Value

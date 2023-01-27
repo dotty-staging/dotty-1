@@ -12,7 +12,7 @@ import jsonmacro.*
   json" null "
   json"[true]"
   json"[true, true]"
-  json"""{ "name": true }"""
+  json"""{ "name": true }""".name
   json"""{ "name": true, "name2": false }"""
 
   // json"n u l l"
