@@ -4,6 +4,7 @@ import scala.language.dynamics
 import scala.compiletime.ops.string
 
 import scala.quoted.*
+import result.*
 
 object Json:
   sealed trait Value
@@ -35,12 +36,11 @@ extension (inline stringContext: StringContext)
   transparent inline def json(/* args: Json.Value* */): Json.Value = ${ jsonExpr('stringContext) }
 
 private def jsonExpr(stringContext: Expr[StringContext])(using Quotes): Expr[Json.Value] =
-  import Parser.*
   val jsonString = stringContext.valueOrAbort.parts.map(StringContext.processEscapes).mkString
   println(jsonString)
   Parser(jsonString).parse() match
-    case Parsed(json) => Expr(json)
-    case Error(msg, offset) =>
+    case Success(json) => Expr(json)
+    case Error(ParseError(msg, offset)) =>
       import quotes.reflect.*
       val baseOffset = stringContext.asTerm.pos.start // TODO support """ and splices
       val pos = Position(stringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)

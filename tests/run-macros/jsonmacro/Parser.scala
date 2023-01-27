@@ -1,25 +1,17 @@
 package jsonmacro
 
-import scala.util.boundary
+import result.*
 
-object Parser:
-  sealed trait Result
-  final case class Parsed(json: Json.Value) extends Result
-  final case class Error(msg: String, offset: Int) extends Result
-
-  private type ![T] = boundary.Label[Error] ?=> T
-
-  private def handleParseErrors(x: ![Json.Value]): Result =
-    boundary { Parsed(x) }
-
+final case class ParseError(msg: String, offset: Int)
 private class Parser(source: String):
-  import Parser.*
+
+  private type ![T] = Result.Continuation[Json.Value, ParseError] ?=> T
 
   private var offset = 0
 
-  def parse(): Result =
+  def parse(): Result[Json.Value, ParseError] =
     skipWhiteSpaces()
-    handleParseErrors {
+    Result.withContinuation {
       val parsed = parseValue()
       if offset < source.length then error("value ended")
       else parsed
@@ -141,4 +133,4 @@ private class Parser(source: String):
     Json.Null
 
   private def error(msg: String): ![Nothing] =
-    boundary.break(Error(msg, offset))
+    Result.continuation.error(ParseError(msg, offset))
