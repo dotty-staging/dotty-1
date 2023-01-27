@@ -37,11 +37,27 @@ extension (inline stringContext: StringContext)
 
 private def jsonExpr(stringContext: Expr[StringContext])(using Quotes): Expr[Json.Value] =
   val jsonString = stringContext.valueOrAbort.parts.map(StringContext.processEscapes).mkString
-  println(jsonString)
   Parser(jsonString).parse() match
-    case Success(json) => Expr(json)
+    case Success(json) =>
+      val jsonExpr = Expr(json)
+      refinedType(Schema.of(json)) match
+        case '[t] => '{ $jsonExpr.asInstanceOf[t & Json.Value] }
     case Error(ParseError(msg, offset)) =>
       import quotes.reflect.*
       val baseOffset = stringContext.asTerm.pos.start // TODO support """ and splices
       val pos = Position(stringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
       report.errorAndAbort(msg, pos)
+
+private def refinedType(schema: Schema)(using Quotes): Type[?] =
+  schema match
+    case Schema.Value => Type.of[Json.Value]
+    case Schema.Obj(nameSchemas: Map[String, Schema]) =>
+      import quotes.reflect.*
+      nameSchemas.foldLeft(TypeRepr.of[Json.Obj]) { case (acc, (name, schema)) =>
+        Refinement(acc, name, TypeRepr.of(using refinedType(schema)))
+      }.asType
+    case Schema.Arr => Type.of[Json.Arr]
+    case Schema.Str => Type.of[Json.Str]
+    case Schema.Num => Type.of[Json.Num]
+    case Schema.Bool => Type.of[Json.Bool]
+    case Schema.Null => Type.of[Json.Null.type]

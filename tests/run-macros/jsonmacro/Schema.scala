@@ -9,6 +9,7 @@ private enum Schema:
   case Bool
   case Null
 
+private object Schema:
   def of(json: Json.Value): Schema =
     json match
       case Json.Obj(nameValues) =>
