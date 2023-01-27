@@ -1,15 +1,27 @@
 package jsonmacro
 
+import scala.quoted.*
+
 import result.*
+
+object interpolated:
+  sealed trait Value
+  final case class Obj(value: Map[Str, Value]) extends Value
+  final case class Arr(values: Value*) extends Value
+  final case class Num(value: Double) extends Value
+  final case class Str(value: String) extends Value
+  final case class Bool(value: Boolean) extends Value
+  case object Null extends Value
+  final case class Interpolated(idx: Int) extends Value
 
 final case class ParseError(msg: String, offset: Int)
 private class Parser(source: String):
 
-  private type ![T] = Result.Continuation[Json.Value, ParseError] ?=> T
+  private type ![T] = Result.Continuation[interpolated.Value, ParseError] ?=> T
 
   private var offset = 0
 
-  def parse(): Result[Json.Value, ParseError] =
+  def parse(): Result[interpolated.Value, ParseError] =
     skipWhiteSpaces()
     Result.withContinuation {
       val parsed = parseValue()
@@ -42,7 +54,7 @@ private class Parser(source: String):
     while offset < source.length && source(offset).isWhitespace do
       offset += 1
 
-  private def parseValue(): ![Json.Value] =
+  private def parseValue(): ![interpolated.Value] =
     peek() match
       case '{' => parseObject()
       case '[' => parseArray()
@@ -53,17 +65,17 @@ private class Parser(source: String):
       case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'  => parseNumber()
       case char => error(s"expected JSON value")
 
-  private def parseObject(): ![Json.Obj] =
+  private def parseObject(): ![interpolated.Obj] =
     accept('{')
     val nameValues =
       if peek() == '}' then Vector.empty
       else commaSeparatedNameValues()
     accept('}')
     // TODO validate key duplication
-    Json.Obj(Map(nameValues*))
+    interpolated.Obj(Map(nameValues*))
 
-  private def commaSeparatedNameValues(): ![Vector[(Json.Str, Json.Value)]] =
-    def parseNext(values: Vector[(Json.Str, Json.Value)]): Vector[(Json.Str, Json.Value)] =
+  private def commaSeparatedNameValues(): ![Vector[(interpolated.Str, interpolated.Value)]] =
+    def parseNext(values: Vector[(interpolated.Str, interpolated.Value)]): Vector[(interpolated.Str, interpolated.Value)] =
       peek() match
         case ',' =>
           accept(',')
@@ -71,21 +83,21 @@ private class Parser(source: String):
         case _ => values
     parseNext(Vector(parseNameValue()))
 
-  private def parseNameValue(): ![(Json.Str, Json.Value)] =
+  private def parseNameValue(): ![(interpolated.Str, interpolated.Value)] =
     val name = parseString()
     accept(':')
     name -> parseValue()
 
-  private def parseArray(): ![Json.Arr] =
+  private def parseArray(): ![interpolated.Arr] =
     accept('[')
     val values =
       if peek() == ']' then Vector.empty
       else commaSeparatedValues()
     accept(']')
-    Json.Arr(values*)
+    interpolated.Arr(values*)
 
-  private def commaSeparatedValues(): ![Vector[Json.Value]] =
-    def parseNext(values: Vector[Json.Value]): Vector[Json.Value] =
+  private def commaSeparatedValues(): ![Vector[interpolated.Value]] =
+    def parseNext(values: Vector[interpolated.Value]): Vector[interpolated.Value] =
       peek() match
         case ',' =>
           accept(',')
@@ -93,12 +105,12 @@ private class Parser(source: String):
         case _ => values
     parseNext(Vector(parseValue()))
 
-  private def parseString(): ![Json.Str] =
+  private def parseString(): ![interpolated.Str] =
     accept('"')
     val stringBuffer = new collection.mutable.StringBuilder()
-    def parseChars(): Json.Str =
+    def parseChars(): String =
       next(skipSpaces = false) match
-        case '"' => Json.Str(stringBuffer.result())
+        case '"' => stringBuffer.result()
         case '\\' =>
           next(skipSpaces = false) match
             case '\\' => stringBuffer += '\\'
@@ -115,22 +127,22 @@ private class Parser(source: String):
         case char =>
           stringBuffer += char
           parseChars()
-    parseChars()
+    interpolated.Str(parseChars())
 
-  private def parseNumber(): ![Json.Num] =
+  private def parseNumber(): ![interpolated.Num] =
     ???
 
-  private def parseTrue(): ![Json.Bool] =
+  private def parseTrue(): ![interpolated.Bool] =
     accept("true")
-    Json.Bool(true)
+    interpolated.Bool(true)
 
-  private def parseFalse(): ![Json.Bool] =
+  private def parseFalse(): ![interpolated.Bool] =
     accept("false")
-    Json.Bool(false)
+    interpolated.Bool(false)
 
-  private def parseNull(): ![Json.Null.type] =
+  private def parseNull(): ![interpolated.Null.type] =
     accept("null")
-    Json.Null
+    interpolated.Null
 
   private def error(msg: String): ![Nothing] =
     Result.continuation.error(ParseError(msg, offset))

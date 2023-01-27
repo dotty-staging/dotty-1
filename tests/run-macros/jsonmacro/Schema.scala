@@ -9,13 +9,14 @@ private enum Schema:
   case Bool
   case Null
 
-private object Schema:
-  def of(json: Json.Value): Schema =
-    json match
-      case Json.Obj(nameValues) =>
-        Schema.Obj(nameValues.map((k, v) => k.value -> of(v)))
-      case _: Json.Arr => Schema.Arr
-      case _: Json.Str => Schema.Str
-      case _: Json.Num => Schema.Num
-      case _: Json.Bool => Schema.Bool
-      case Json.Null => Schema.Null
+object Schema:
+  def apply(value: interpolated.Value): Schema =
+    value match
+      case interpolated.Obj(nameValues) =>
+        Schema.Obj(nameValues.map((k, v) => k.value -> Schema(v)))
+      case interpolated.Arr(_*) => Schema.Arr
+      case interpolated.Str(_) => Schema.Str
+      case interpolated.Num(_) => Schema.Num
+      case interpolated.Bool(_) => Schema.Bool
+      case interpolated.Null => Schema.Null
+      case interpolated.Interpolated(_) => Schema.Value
