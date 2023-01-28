@@ -3,7 +3,6 @@ package tokens
 
 import result.*
 
-
 object Tokens:
   private type ![T] = Result.Continuation[Parsed.Value, ParseError] ?=> T
 
@@ -15,10 +14,8 @@ class Tokens(source: Seq[String]):
   private var nextToken: Token = null
 
   def peek(): ![Token] =
-    if nextToken ne null then nextToken
-    else
-      readNext()
-      nextToken
+    if nextToken eq null then readNext()
+    nextToken
 
   def next(): ![Token] =
     val res = peek()
@@ -70,21 +67,14 @@ class Tokens(source: Seq[String]):
                   case 't' => stringBuffer += '\t'
                   case 'u' => ??? // 4 hexadecimal digits
                 parseChars()
-              case char if char.isControl => error("unexpected control character")
+              case char if char.isControl =>
+                error("unexpected control character")
               case char =>
                 stringBuffer += char
                 parseChars()
           Token.Str(parseChars())
         case _ =>
           error(s"unexpected start of token")
-
-  private def peekChar(): Char =
-    source(part)(offset)
-
-  private def nextChar(): Char =
-    val char = peekChar()
-    offset += 1
-    char
 
   private def accept(str: String): ![Unit] =
     for char <- str do
@@ -95,6 +85,14 @@ class Tokens(source: Seq[String]):
 
   private def error(msg: String): ![Nothing] =
     Result.continuation.error(ParseError(msg, part, offset))
+
+  private def peekChar(): Char =
+    source(part)(offset)
+
+  private def nextChar(): Char =
+    val char = peekChar()
+    offset += 1
+    char
 
   private def skipWhiteSpaces(): Unit =
     while part < source.length && offset < source(part).length && peekChar().isWhitespace do
