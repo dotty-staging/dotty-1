@@ -14,12 +14,6 @@ class Tokens(source: Seq[String]):
   /*private*/ var part: Int = 0
   private var nextToken: Token = null
 
-  skipWhiteSpaces()
-
-  def atEnd(): ![Boolean] =
-    skipWhiteSpaces()
-    offset >= source(part).length
-
   def peek(): ![Token] =
     if nextToken ne null then nextToken
     else
@@ -37,6 +31,7 @@ class Tokens(source: Seq[String]):
     if token != nextToken then error(s"expected token $token but got $nextToken")
 
   private def readNext(): ![Unit] =
+    skipWhiteSpaces()
     nextToken =
       if offset == source(part).length then
         if part == source.length - 1 then
@@ -61,10 +56,10 @@ class Tokens(source: Seq[String]):
         case '"' =>
           val stringBuffer = new collection.mutable.StringBuilder()
           def parseChars(): String =
-            nextChar(skipSpaces = false) match
+            nextChar() match
               case '"' => stringBuffer.result()
               case '\\' =>
-                nextChar(skipSpaces = false) match
+                nextChar() match
                   case '\\' => stringBuffer += '\\'
                   case '"' => stringBuffer += '"'
                   case '/' => stringBuffer += '/'
@@ -82,31 +77,25 @@ class Tokens(source: Seq[String]):
           Token.Str(parseChars())
         case _ =>
           error(s"unexpected start of token")
-    skipWhiteSpaces()
 
-  private def peekChar(): ![Char] =
+  private def peekChar(): Char =
     source(part)(offset)
 
-  private def nextChar(skipSpaces: Boolean = true): ![Char] =
-    if offset >= source(part).length then error("unexpected end of JSON string 4")
-    val char = source(part)(offset)
+  private def nextChar(): Char =
+    val char = peekChar()
     offset += 1
-    if skipSpaces then skipWhiteSpaces()
     char
-
-  private def accept(char: Char): ![Unit] =
-    if char != nextChar() then error(s"expected `$char`")
 
   private def accept(str: String): ![Unit] =
     for char <- str do
       if char != peekChar() then error(s"expected `$char`")
-      nextChar(skipSpaces = false)
-    if offset < source(part).length && !(source(part)(offset).isWhitespace || source(part)(offset) == '}' || source(part)(offset) == ']' || source(part)(offset) == ',') then error("expected end of token")
-    skipWhiteSpaces()
+      offset += 1
+    if offset < source(part).length && !(peekChar().isWhitespace || peekChar() == '}' || peekChar() == ']' || peekChar() == ',') then
+      error("expected end of token")
 
   private def error(msg: String): ![Nothing] =
     Result.continuation.error(ParseError(msg, part, offset))
 
   private def skipWhiteSpaces(): Unit =
-    while part < source.length && offset < source(part).length && source(part)(offset).isWhitespace do
+    while part < source.length && offset < source(part).length && peekChar().isWhitespace do
       offset += 1
