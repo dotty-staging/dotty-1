@@ -24,7 +24,7 @@ private class Parser(source: Seq[String]):
   def parse(): Result[Parsed.Value, ParseError] =
     Result.withContinuation {
       val parsed = parseValue()
-      tokens.accept(Token.End)
+      accept(Token.End)
       parsed
     }
 
@@ -39,7 +39,7 @@ private class Parser(source: Seq[String]):
         val nameValues =
           if tokens.peek() == Token.CloseBrace then Vector.empty
           else commaSeparate(parseNameValue)
-        tokens.accept(Token.CloseBrace)
+        accept(Token.CloseBrace)
         nameValues.map(_._1.value).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
           error(s"Duplicate name: ${x._1}")
         }
@@ -48,7 +48,7 @@ private class Parser(source: Seq[String]):
         val values =
           if tokens.peek() == Token.CloseBracket then Vector.empty
           else commaSeparate(parseValue)
-        tokens.accept(Token.CloseBracket)
+        accept(Token.CloseBracket)
         Parsed.Arr(values*)
       case Token.InterpolatedValue =>
         interpolationsIndex += 1
@@ -60,7 +60,7 @@ private class Parser(source: Seq[String]):
     def parseNext(values: Vector[T]): Vector[T] =
       tokens.peek() match
         case Token.Comma =>
-          tokens.accept(Token.Comma)
+          accept(Token.Comma)
           parseNext(values :+ parseItem())
         case _ => values
     parseNext(Vector(parseItem()))
@@ -68,10 +68,14 @@ private class Parser(source: Seq[String]):
   private def parseNameValue(): ![(Parsed.Str, Parsed.Value)] =
     tokens.next() match
       case Token.Str(value) =>
-        tokens.accept(Token.Colon)
+        accept(Token.Colon)
         Parsed.Str(value) -> parseValue()
       case _ =>
         error("expected string literal")
+
+  private def accept(token: Token): ![Unit] =
+    val nextToken = tokens.next()
+    if token != nextToken then error(s"expected token $token but got $nextToken")
 
   private def error(msg: String): ![Nothing] =
     Result.continuation.error(ParseError(msg, tokens.part, tokens.offset))
