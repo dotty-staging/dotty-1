@@ -40,7 +40,9 @@ private class Parser(source: Seq[String]):
           if tokens.peek() == Token.CloseBrace then Vector.empty
           else commaSeparate(parseNameValue)
         tokens.accept(Token.CloseBrace)
-        // TODO validate key duplication
+        nameValues.map(_._1.value).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
+          error(s"Duplicate name: ${x._1}")
+        }
         Parsed.Obj(Map(nameValues*))
       case Token.OpenBracket =>
         val values =
