@@ -37,69 +37,51 @@ class Tokens(source: Seq[String]):
     if token != nextToken then error(s"expected token $token but got $nextToken")
 
   private def readNext(): ![Unit] =
-    if offset == source(part).length then
-      if part == source.length - 1 then
-        offset += 1
-        nextToken = Token.End
-      else
-        part += 1
-        offset = 0
-        nextToken = Token.InterpolatedValue
-    else peekChar() match
-      case '{' =>
-        accept('{')
-        nextToken = Token.OpenBrace
-      case '}' =>
-        accept('}')
-        nextToken = Token.CloseBrace
-      case '[' =>
-        accept('[')
-        nextToken = Token.OpenBracket
-      case ']' =>
-        accept(']')
-        nextToken = Token.CloseBracket
-      case 'n' =>
-        accept("null")
-        nextToken = Token.Null
-      case 'f' =>
-        accept("false")
-        nextToken = Token.False
-      case 't' =>
-        accept("true")
-        nextToken = Token.True
-      case ',' =>
-        accept(',')
-        nextToken = Token.Comma
-      case ':' =>
-        accept(':')
-        nextToken = Token.Colon
-      case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'  =>
-        nextToken = ??? // Num(value: String)
-      case '"' =>
-        accept('"')
-        val stringBuffer = new collection.mutable.StringBuilder()
-        def parseChars(): String =
-          nextChar(skipSpaces = false) match
-            case '"' => stringBuffer.result()
-            case '\\' =>
-              nextChar(skipSpaces = false) match
-                case '\\' => stringBuffer += '\\'
-                case '"' => stringBuffer += '"'
-                case '/' => stringBuffer += '/'
-                case 'b' => stringBuffer += '\b'
-                case 'f' => stringBuffer += '\f'
-                case 'n' => stringBuffer += '\n'
-                case 'r' => stringBuffer += '\r'
-                case 't' => stringBuffer += '\t'
-                case 'u' => ??? // 4 hexadecimal digits
-              parseChars()
-            case char if char.isControl => error("unexpected control character")
-            case char =>
-              stringBuffer += char
-              parseChars()
-        nextToken = Token.Str(parseChars())
-      case _ =>
-        error(s"unexpected start of token")
+    nextToken =
+      if offset == source(part).length then
+        if part == source.length - 1 then
+          offset += 1
+          Token.End
+        else
+          part += 1
+          offset = 0
+          Token.InterpolatedValue
+      else nextChar() match
+        case '{' => Token.OpenBrace
+        case '}' => Token.CloseBrace
+        case '[' => Token.OpenBracket
+        case ']' => Token.CloseBracket
+        case 'n' => accept("ull"); Token.Null
+        case 'f' => accept("alse"); Token.False
+        case 't' => accept("rue"); Token.True
+        case ',' => Token.Comma
+        case ':' => Token.Colon
+        case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'  =>
+          ??? // Num(value: String)
+        case '"' =>
+          val stringBuffer = new collection.mutable.StringBuilder()
+          def parseChars(): String =
+            nextChar(skipSpaces = false) match
+              case '"' => stringBuffer.result()
+              case '\\' =>
+                nextChar(skipSpaces = false) match
+                  case '\\' => stringBuffer += '\\'
+                  case '"' => stringBuffer += '"'
+                  case '/' => stringBuffer += '/'
+                  case 'b' => stringBuffer += '\b'
+                  case 'f' => stringBuffer += '\f'
+                  case 'n' => stringBuffer += '\n'
+                  case 'r' => stringBuffer += '\r'
+                  case 't' => stringBuffer += '\t'
+                  case 'u' => ??? // 4 hexadecimal digits
+                parseChars()
+              case char if char.isControl => error("unexpected control character")
+              case char =>
+                stringBuffer += char
+                parseChars()
+          Token.Str(parseChars())
+        case _ =>
+          error(s"unexpected start of token")
     skipWhiteSpaces()
 
   private def peekChar(): ![Char] =
