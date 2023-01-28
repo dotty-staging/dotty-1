@@ -5,7 +5,7 @@ import result.*
 
 
 object Tokens:
-  private type ![T] = Result.Continuation[interpolated.Value, ParseError] ?=> T
+  private type ![T] = Result.Continuation[Parsed.Value, ParseError] ?=> T
 
 class Tokens(source: Seq[String]):
   import Tokens.!
@@ -31,6 +31,10 @@ class Tokens(source: Seq[String]):
     if nextToken ne Token.End then
       nextToken = null
     res
+
+  def accept(token: Token): ![Unit] =
+    val nextToken = next()
+    if token != nextToken then error(s"expected token $token but got $nextToken")
 
   private def readNext(): ![Unit] =
     if offset == source(part).length then
@@ -94,7 +98,8 @@ class Tokens(source: Seq[String]):
               stringBuffer += char
               parseChars()
         nextToken = Token.Str(parseChars())
-      case _ => error(s"expected token")
+      case _ =>
+        error(s"unexpected start of token")
     skipWhiteSpaces()
 
   private def peekChar(): ![Char] =

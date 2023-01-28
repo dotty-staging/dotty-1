@@ -20,7 +20,14 @@ import jsonmacro.Json.json
   println(json"[${t}]")
   println(json"[${f}, ${o}]")
   println(json"""{ "a": ${a}, "b": ${s}}""")
+
   // json"n u l l"
+  // json"""n u l l"""
   // json"a"
+  // json"a${n}"
+  // json"[${n}a ${n}"
+  // json"[${n},a ${n}"
+  // json"[${n} ${n}"
+  // json"[${n} ${n},"
   // json"[true, "
   // json"[true, ,"

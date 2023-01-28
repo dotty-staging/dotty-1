@@ -3,7 +3,7 @@ package jsonmacro
 import result.*
 import tokens.*
 
-object interpolated:
+object Parsed:
   sealed trait Value
   final case class Obj(value: Map[Str, Value]) extends Value
   final case class Arr(values: Value*) extends Value
@@ -19,78 +19,57 @@ private class Parser(source: Seq[String]):
   private val tokens = new Tokens(source)
   private var interpolationsIndex = -1
 
-  private type ![T] = Result.Continuation[interpolated.Value, ParseError] ?=> T
+  private type ![T] = Result.Continuation[Parsed.Value, ParseError] ?=> T
 
-  def parse(): Result[interpolated.Value, ParseError] =
+  def parse(): Result[Parsed.Value, ParseError] =
     Result.withContinuation {
       val parsed = parseValue()
-      accept(Token.End)
+      tokens.accept(Token.End)
       parsed
     }
 
-  private def accept(token: Token): ![Unit] =
-    val next = tokens.next()
-    if token != next then error(s"expected token $token but got $next")
-
-  private def parseValue(): ![interpolated.Value] =
-    tokens.peek() match
-      case Token.OpenBrace => parseObject()
-      case Token.OpenBracket => parseArray()
-      case Token.Str(value) => tokens.next(); interpolated.Str(value)
-      case Token.True => tokens.next(); interpolated.Bool(true)
-      case Token.False => tokens.next(); interpolated.Bool(false)
-      case Token.Null => tokens.next(); interpolated.Null
-      case Token.Num(value) => tokens.next(); interpolated.Num(???)
+  private def parseValue(): ![Parsed.Value] =
+    tokens.next() match
+      case Token.Null => Parsed.Null
+      case Token.True => Parsed.Bool(true)
+      case Token.False => Parsed.Bool(false)
+      case Token.Str(value) => Parsed.Str(value)
+      case Token.Num(value) => Parsed.Num(???)
+      case Token.OpenBrace =>
+        val nameValues =
+          if tokens.peek() == Token.CloseBrace then Vector.empty
+          else commaSeparate(parseNameValue)
+        tokens.accept(Token.CloseBrace)
+        // TODO validate key duplication
+        Parsed.Obj(Map(nameValues*))
+      case Token.OpenBracket =>
+        val values =
+          if tokens.peek() == Token.CloseBracket then Vector.empty
+          else commaSeparate(parseValue)
+        tokens.accept(Token.CloseBracket)
+        Parsed.Arr(values*)
       case Token.InterpolatedValue =>
-        tokens.next()
         interpolationsIndex += 1
-        interpolated.InterpolatedValue(interpolationsIndex)
-      case token => error(s"unexpected token starting a value: $token")
+        Parsed.InterpolatedValue(interpolationsIndex)
+      case token =>
+        error(s"unexpected start of value: $token")
 
-  private def parseObject(): ![interpolated.Obj] =
-    accept(Token.OpenBrace)
-    val nameValues =
-      if tokens.peek() == Token.CloseBrace then Vector.empty
-      else commaSeparatedNameValues()
-    accept(Token.CloseBrace)
-
-    // TODO validate key duplication
-    interpolated.Obj(Map(nameValues*))
-
-  private def commaSeparatedNameValues(): ![Vector[(interpolated.Str, interpolated.Value)]] =
-    def parseNext(values: Vector[(interpolated.Str, interpolated.Value)]): Vector[(interpolated.Str, interpolated.Value)] =
+  private def commaSeparate[T](parseItem: () => ![T]): ![Vector[T]] =
+    def parseNext(values: Vector[T]): Vector[T] =
       tokens.peek() match
         case Token.Comma =>
-          accept(Token.Comma)
-          parseNext(values :+ parseNameValue())
+          tokens.accept(Token.Comma)
+          parseNext(values :+ parseItem())
         case _ => values
-    parseNext(Vector(parseNameValue()))
+    parseNext(Vector(parseItem()))
 
-  private def parseNameValue(): ![(interpolated.Str, interpolated.Value)] =
+  private def parseNameValue(): ![(Parsed.Str, Parsed.Value)] =
     tokens.next() match
       case Token.Str(value) =>
-        accept(Token.Colon)
-        interpolated.Str(value) -> parseValue()
+        tokens.accept(Token.Colon)
+        Parsed.Str(value) -> parseValue()
       case _ =>
         error("expected string literal")
 
-  private def parseArray(): ![interpolated.Arr] =
-    accept(Token.OpenBracket)
-    val values =
-      if tokens.peek() == Token.CloseBracket then Vector.empty
-      else commaSeparatedValues()
-    accept(Token.CloseBracket)
-    interpolated.Arr(values*)
-
-  private def commaSeparatedValues(): ![Vector[interpolated.Value]] =
-    def parseNext(values: Vector[interpolated.Value]): Vector[interpolated.Value] =
-      tokens.peek() match
-        case Token.Comma =>
-          accept(Token.Comma)
-          parseNext(values :+ parseValue())
-        case _ => values
-    parseNext(Vector(parseValue()))
-
   private def error(msg: String): ![Nothing] =
     Result.continuation.error(ParseError(msg, tokens.part, tokens.offset))
-

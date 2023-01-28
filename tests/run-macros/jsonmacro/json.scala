@@ -32,7 +32,8 @@ object Json:
       '{ Json.Str(${Expr(x.value)}) }
 
   extension (inline stringContext: StringContext)
-    transparent inline def json(args: Json.Value*): Json.Value = ${ jsonExpr('stringContext, 'args) }
+    transparent inline def json(args: Json.Value*): Json.Value =
+      ${ jsonExpr('stringContext, 'args) }
 
   // TODO add arguments
   private def jsonExpr(stringContext: Expr[StringContext], args: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
@@ -43,23 +44,30 @@ object Json:
         refinedType(Schema(json)) match
           case '[t] => '{ $jsonExpr.asInstanceOf[t & Json.Value] }
       case Error(ParseError(msg, part, offset)) =>
-        import quotes.reflect.*
-        val baseOffset = stringContext.asTerm.pos.start // TODO support """ and splices
-        val pos = Position(stringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
-        report.errorAndAbort(msg + s"($part, $offset)", pos)
+        def error(args: Seq[Expr[String]]) =
+          import quotes.reflect.*
+          val baseOffset = args(part).asTerm.pos.start
+          val pos = Position(stringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
+          report.errorAndAbort(msg + s"($part, $offset)", pos)
+        stringContext match
+          case '{ new StringContext(${Varargs(args)}: _*) } => error(args)
+          case '{     StringContext(${Varargs(args)}: _*) } => error(args)
+          case _ =>
+            quotes.reflect.report.errorAndAbort("string context is not known statically")
+        // report.errorAndAbort(msg + s"($part, $offset)", pos)
 
-  def toJsonExpr(json: interpolated.Value, args: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
+  def toJsonExpr(json: Parsed.Value, args: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
     json match
-      case interpolated.Null => '{ Json.Null }
-      case interpolated.Bool(value) => '{ Json.Bool(${Expr(value)}) }
-      case interpolated.Num(value) => '{ Json.Num(${Expr(value)}) }
-      case interpolated.Str(value) => '{ Json.Str(${Expr(value)}) }
-      case interpolated.Arr(value*) => '{ Json.Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
-      case interpolated.Obj(value) =>
+      case Parsed.Null => '{ Json.Null }
+      case Parsed.Bool(value) => '{ Json.Bool(${Expr(value)}) }
+      case Parsed.Num(value) => '{ Json.Num(${Expr(value)}) }
+      case Parsed.Str(value) => '{ Json.Str(${Expr(value)}) }
+      case Parsed.Arr(value*) => '{ Json.Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
+      case Parsed.Obj(value) =>
         // TODo improve
-        def f(k: interpolated.Str, v: interpolated.Value) = '{ (Json.Str(${Expr(k.value)}), ${toJsonExpr(v, args)}) }
+        def f(k: Parsed.Str, v: Parsed.Value) = '{ (Json.Str(${Expr(k.value)}), ${toJsonExpr(v, args)}) }
         '{ Json.Obj(Map(${Varargs(value.toSeq.map(f))}*)) }
-      case interpolated.InterpolatedValue(idx) =>
+      case Parsed.InterpolatedValue(idx) =>
         '{ $args(${Expr(idx)}) }
 
   private def refinedType(schema: Schema)(using Quotes): Type[?] =
