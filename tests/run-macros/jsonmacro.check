@@ -1,0 +1,9 @@
+Null
+Arr(ArraySeq(Bool(true)))
+Arr(ArraySeq(Bool(true), Bool(true)))
+Bool(true)
+Obj(Map(Str(name) -> Bool(true), Str(name2) -> Bool(false)))
+Null
+Arr(ArraySeq(Bool(true)))
+Arr(ArraySeq(Bool(false), Obj(Map())))
+Obj(Map(Str(a) -> Arr(ArraySeq()), Str(b) -> Str()))

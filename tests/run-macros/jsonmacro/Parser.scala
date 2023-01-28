@@ -11,12 +11,13 @@ object interpolated:
   final case class Str(value: String) extends Value
   final case class Bool(value: Boolean) extends Value
   case object Null extends Value
-  case object InterpolatedValue extends Value
+  final case class InterpolatedValue(idx: Int) extends Value
 
 final case class ParseError(msg: String, part: Int, offset: Int)
 private class Parser(source: Seq[String]):
 
   private val tokens = new Tokens(source)
+  private var interpolationsIndex = -1
 
   private type ![T] = Result.Continuation[interpolated.Value, ParseError] ?=> T
 
@@ -40,7 +41,10 @@ private class Parser(source: Seq[String]):
       case Token.False => tokens.next(); interpolated.Bool(false)
       case Token.Null => tokens.next(); interpolated.Null
       case Token.Num(value) => tokens.next(); interpolated.Num(???)
-      case Token.InterpolatedValue => tokens.next(); interpolated.InterpolatedValue
+      case Token.InterpolatedValue =>
+        tokens.next()
+        interpolationsIndex += 1
+        interpolated.InterpolatedValue(interpolationsIndex)
       case token => error(s"unexpected token starting a value: $token")
 
   private def parseObject(): ![interpolated.Obj] =

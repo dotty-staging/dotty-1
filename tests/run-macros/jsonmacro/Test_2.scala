@@ -1,4 +1,5 @@
 import jsonmacro.*
+import jsonmacro.Json.json
 
 @main def Test: Unit =
   val n: Json.Null.type = json"null"
@@ -9,18 +10,17 @@ import jsonmacro.*
   val s: Json.Str = json"""""""" // empty string
   val s2: Json.Str = json"\"\"" // empty string
 
-  json" null "
-  json"[true]"
-  json"[true, true]"
-  json"""{ "name": true }""".name
-  json"""{ "name": true, "name2": false }"""
+  println(json" null ")
+  println(json"[true]")
+  println(json"[true, true]")
+  println(json"""{ "name": true }""".name)
+  println(json"""{ "name": true, "name2": false }""")
 
-  json"${n}"
-  json"[${n}]"
-  json"[${n}, ${n}]"
-  json"""{ "a": ${n}, "b": ${n}}"""
+  println(json"${n}")
+  println(json"[${t}]")
+  println(json"[${f}, ${o}]")
+  println(json"""{ "a": ${a}, "b": ${s}}""")
   // json"n u l l"
   // json"a"
   // json"[true, "
   // json"[true, ,"
-
