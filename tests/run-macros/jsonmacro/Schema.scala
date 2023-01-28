@@ -19,4 +19,4 @@ object Schema:
       case interpolated.Num(_) => Schema.Num
       case interpolated.Bool(_) => Schema.Bool
       case interpolated.Null => Schema.Null
-      case interpolated.Interpolated(_) => Schema.Value
+      case interpolated.InterpolatedValue => Schema.Value // TODO refine further

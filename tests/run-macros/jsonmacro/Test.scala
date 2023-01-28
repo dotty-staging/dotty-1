@@ -15,6 +15,10 @@ import jsonmacro.*
   json"""{ "name": true }""".name
   json"""{ "name": true, "name2": false }"""
 
+  json"${n}"
+  json"[${n}]"
+  json"[${n}, ${n}]"
+  json"""{ "a": ${n}, "b": ${n}}"""
   // json"n u l l"
   // json"a"
   // json"[true, "

@@ -32,21 +32,21 @@ object Json:
       '{ Json.Str(${Expr(x.value)}) }
 
 extension (inline stringContext: StringContext)
-  // TODO add arguments
-  transparent inline def json(/* args: Json.Value* */): Json.Value = ${ jsonExpr('stringContext) }
+  transparent inline def json(args: Json.Value*): Json.Value = ${ jsonExpr('stringContext) }
 
+// TODO add arguments
 private def jsonExpr(stringContext: Expr[StringContext])(using Quotes): Expr[Json.Value] =
-  val jsonString = stringContext.valueOrAbort.parts.map(StringContext.processEscapes).mkString
+  val jsonString = stringContext.valueOrAbort.parts.map(StringContext.processEscapes)
   Parser(jsonString).parse() match
     case Success(json) =>
       val jsonExpr = toJsonExpr(json)
       refinedType(Schema(json)) match
         case '[t] => '{ $jsonExpr.asInstanceOf[t & Json.Value] }
-    case Error(ParseError(msg, offset)) =>
+    case Error(ParseError(msg, part, offset)) =>
       import quotes.reflect.*
       val baseOffset = stringContext.asTerm.pos.start // TODO support """ and splices
       val pos = Position(stringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
-      report.errorAndAbort(msg, pos)
+      report.errorAndAbort(msg + s"($part, $offset)", pos)
 
 def toJsonExpr(json: interpolated.Value)(using Quotes): Expr[Json.Value] =
   json match
@@ -59,7 +59,8 @@ def toJsonExpr(json: interpolated.Value)(using Quotes): Expr[Json.Value] =
       // TODo improve
       def f(k: interpolated.Str, v: interpolated.Value) = '{ (Json.Str(${Expr(k.value)}), ${toJsonExpr(v)}) }
       '{ Json.Obj(Map(${Varargs(value.toSeq.map(f))}*)) }
-    case interpolated.Interpolated(idx) => ???
+    case interpolated.InterpolatedValue =>
+      '{ ??? } // TODO
 
 private def refinedType(schema: Schema)(using Quotes): Type[?] =
   schema match
