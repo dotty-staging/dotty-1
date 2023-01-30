@@ -1,13 +1,13 @@
 import jsonlib.*
 
 @main def Test: Unit =
-  val n: Json.Null.type = json"null"
-  val t: Json.Bool = json"true"
-  val f: Json.Bool = json"false"
-  val o: Json.Obj = json"{}"
-  val a: Json.Arr = json"[]"
-  val s: Json.Str = json"""""""" // empty string
-  val s2: Json.Str = json"\"\"" // empty string
+  val n: Null.type = json"null"
+  val t: Bool = json"true"
+  val f: Bool = json"false"
+  val o: Obj = json"{}"
+  val a: Arr = json"[]"
+  val s: Str = json"""""""" // empty string
+  val s2: Str = json"\"\"" // empty string
 
   println(json" null ")
   println(json"[true]")
@@ -34,7 +34,7 @@ import jsonlib.*
   account.user.firstName
 
 
-  (account: Json.Value) match
+  (account: Json) match
     case json"""{ "user": $x, "a": true }""" => println("case 1: " + x)
     case json"""{ "user": $x, "active": $y }""" => println("case 2: " + (x, y))
 

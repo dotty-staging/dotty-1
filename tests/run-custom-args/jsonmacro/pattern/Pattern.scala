@@ -1,8 +1,6 @@
 package jsonlib
 package pattern
 
-import jsonlib.Json.Str
-
 enum Pattern:
   case Obj(namePatterns: (String, Pattern)*)
   case Arr(values: Pattern*)
@@ -12,15 +10,15 @@ enum Pattern:
   case Null
   case InterpolatedValue(idx: Int)
 
-  def unapplySeq(json: Json.Value): Option[Seq[Json.Value]] =
+  def unapplySeq(json: Json): Option[Seq[Json]] =
     // TODO avoid O(n^2) concatenation of results
     this match
       case Obj(namePatterns*) =>
         json match
-          case Json.Obj(nameValues) =>
+          case jsonlib.Obj(nameValues) =>
             // TODO improve
             val res = (for (name, pattern) <- namePatterns yield
-              nameValues.get(Json.Str(name)) match
+              nameValues.get(jsonlib.Str(name)) match
                 case Some(value) => pattern.unapplySeq(value)
                 case None => return None
             ).filter(_.isDefined).flatten.flatten
@@ -28,9 +26,9 @@ enum Pattern:
           case _ => None
       case Arr(patterns*) =>
         json match
-          case Json.Arr(values*) =>
+          case jsonlib.Arr(values*) =>
             // TODO improve
-            values.zip(patterns).foldLeft[Option[Seq[Json.Value]]](Some(Seq())) {
+            values.zip(patterns).foldLeft[Option[Seq[jsonlib.Json]]](Some(Seq())) {
               case (acc, (value, pattern)) =>
                 for extractedAcc <- acc
                     extracted <- pattern.unapplySeq(value)
@@ -39,18 +37,18 @@ enum Pattern:
           case _ => None
       case Num(value) =>
         json match
-          case Json.Num(`value`) => Some(Seq())
+          case jsonlib.Num(`value`) => Some(Seq())
           case _ => None
       case Str(value) =>
         json match
-          case Json.Str(`value`) => Some(Seq())
+          case jsonlib.Str(`value`) => Some(Seq())
           case _ => None
       case Bool(value) =>
         json match
-          case Json.Bool(`value`) => Some(Seq())
+          case jsonlib.Bool(`value`) => Some(Seq())
           case _ => None
       case Null =>
-        if json == Json.Null then Some(Seq())
+        if json == jsonlib.Null then Some(Seq())
         else None
       case InterpolatedValue(idx) =>
         Some(Seq(json))

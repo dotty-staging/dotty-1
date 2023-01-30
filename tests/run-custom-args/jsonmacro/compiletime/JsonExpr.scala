@@ -10,16 +10,16 @@ import jsonlib.util.*
 import scala.quoted.runtime.Patterns.patternType
 
 object JsonExpr:
-  /*private[jsonmacro]*/ def jsonExpr(jsonStringContext: Expr[JsonStringContext], argsExpr: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
+  /*private[jsonmacro]*/ def jsonExpr(jsonStringContext: Expr[JsonStringContext], argsExpr: Expr[Seq[Json]])(using Quotes): Expr[Json] =
     val json = parsed(jsonStringContext)
     val argExprs = argsExpr match
       case Varargs(argExprs) => argExprs
       case _ => quotes.reflect.report.errorAndAbort("Unpacking StringContext.json args is not supported")
     val jsonExpr = toJsonExpr(json, argExprs)
     ExprSchema.refinedType(json, argExprs) match
-      case '[t] => '{ $jsonExpr.asInstanceOf[t & Json.Value] }
+      case '[t] => '{ $jsonExpr.asInstanceOf[t & Json] }
 
-  def jsonUnapplySeqExpr(jsonStringContext: Expr[JsonStringContext], scrutinee: Expr[Json.Value])(using Quotes): Expr[Option[Seq[Json.Value]]] =
+  def jsonUnapplySeqExpr(jsonStringContext: Expr[JsonStringContext], scrutinee: Expr[Json])(using Quotes): Expr[Option[Seq[Json]]] =
     val json = parsed(jsonStringContext)
     // Exercise: partially evaluate the pattern matching
     '{ ${Expr(json.toPattern)}.unapplySeq($scrutinee) }
@@ -42,16 +42,16 @@ object JsonExpr:
               case _ =>
                 quotes.reflect.report.errorAndAbort("string context is not known statically")
 
-  private def toJsonExpr(ast: AST, args: Seq[Expr[Json.Value]])(using Quotes): Expr[Json.Value] =
+  private def toJsonExpr(ast: AST, args: Seq[Expr[Json]])(using Quotes): Expr[Json] =
     ast match
-      case AST.Null => '{ Json.Null }
-      case AST.Bool(value) => '{ Json.Bool(${Expr(value)}) }
-      case AST.Num(value) => '{ Json.Num(${Expr(value)}) }
-      case AST.Str(value) => '{ Json.Str(${Expr(value)}) }
-      case AST.Arr(value*) => '{ Json.Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
+      case AST.Null => '{ Null }
+      case AST.Bool(value) => '{ Bool(${Expr(value)}) }
+      case AST.Num(value) => '{ Num(${Expr(value)}) }
+      case AST.Str(value) => '{ Str(${Expr(value)}) }
+      case AST.Arr(value*) => '{ Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
       case AST.Obj(nameValues*) =>
-        val nameValueExprs = for (name, value) <- nameValues yield '{ (Json.Str(${Expr(name)}), ${toJsonExpr(value, args)}) }
-        '{ Json.Obj(Map(${Varargs(nameValueExprs)}*)) }
+        val nameValueExprs = for (name, value) <- nameValues yield '{ (Str(${Expr(name)}), ${toJsonExpr(value, args)}) }
+        '{ Obj(Map(${Varargs(nameValueExprs)}*)) }
       case AST.InterpolatedValue(idx) => args(idx)
 
   given ToExpr[Pattern] with

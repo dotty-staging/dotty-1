@@ -11,8 +11,8 @@ type JsonStringContext
 object JsonStringContext:
 
   extension (inline jsonStringContext: JsonStringContext)
-    transparent inline def apply(inline args: Json.Value*): Json.Value =
+    transparent inline def apply(inline args: Json*): Json =
       ${ jsonExpr('jsonStringContext, 'args) }
 
-    transparent inline def unapplySeq(scrutinee: Json.Value): Option[Seq[Json.Value]] =
-      ${ jsonUnapplySeqExpr('jsonStringContext, 'scrutinee) }: Option[Seq[Json.Value]]
+    transparent inline def unapplySeq(scrutinee: Json): Option[Seq[Json]] =
+      ${ jsonUnapplySeqExpr('jsonStringContext, 'scrutinee) }: Option[Seq[Json]]
