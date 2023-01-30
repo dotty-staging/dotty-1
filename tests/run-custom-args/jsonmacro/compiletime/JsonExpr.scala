@@ -21,9 +21,10 @@ object JsonExpr:
 
   def jsonUnapplySeqExpr(jsonStringContext: Expr[JsonStringContext], scrutinee: Expr[Json.Value])(using Quotes): Expr[Option[Seq[Json.Value]]] =
     val json = parsed(jsonStringContext)
+    // Exercise: partially evaluate the pattern matching
     '{ ${Expr(json.toPattern)}.unapplySeq($scrutinee) }
 
-  private def parsed(jsonStringContext: Expr[JsonStringContext])(using Quotes): Parsed.Value =
+  private def parsed(jsonStringContext: Expr[JsonStringContext])(using Quotes): AST =
     jsonStringContext match
       case '{ jsonlib.json($sc) } =>
         val jsonString = sc.valueOrAbort.parts.map(scala.StringContext.processEscapes)
@@ -41,18 +42,17 @@ object JsonExpr:
               case _ =>
                 quotes.reflect.report.errorAndAbort("string context is not known statically")
 
-  private def toJsonExpr(json: Parsed.Value, args: Seq[Expr[Json.Value]])(using Quotes): Expr[Json.Value] =
-    json match
-      case Parsed.Null => '{ Json.Null }
-      case Parsed.Bool(value) => '{ Json.Bool(${Expr(value)}) }
-      case Parsed.Num(value) => '{ Json.Num(${Expr(value)}) }
-      case Parsed.Str(value) => '{ Json.Str(${Expr(value)}) }
-      case Parsed.Arr(value*) => '{ Json.Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
-      case Parsed.Obj(nameValues*) =>
+  private def toJsonExpr(ast: AST, args: Seq[Expr[Json.Value]])(using Quotes): Expr[Json.Value] =
+    ast match
+      case AST.Null => '{ Json.Null }
+      case AST.Bool(value) => '{ Json.Bool(${Expr(value)}) }
+      case AST.Num(value) => '{ Json.Num(${Expr(value)}) }
+      case AST.Str(value) => '{ Json.Str(${Expr(value)}) }
+      case AST.Arr(value*) => '{ Json.Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
+      case AST.Obj(nameValues*) =>
         val nameValueExprs = for (name, value) <- nameValues yield '{ (Json.Str(${Expr(name)}), ${toJsonExpr(value, args)}) }
         '{ Json.Obj(Map(${Varargs(nameValueExprs)}*)) }
-      case Parsed.InterpolatedValue(idx) => args(idx)
-
+      case AST.InterpolatedValue(idx) => args(idx)
 
   given ToExpr[ValuePattern] with
     def apply(pattern: ValuePattern)(using Quotes): Expr[ValuePattern] =

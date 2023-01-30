@@ -18,17 +18,17 @@ object Json:
 
   def apply(json: String): Json.Value =
     new Parser(Seq(json)).parse() match
-      case Success(parsed) => fromParsed(parsed)
+      case Success(ast) => fromAST(ast)
       case Error(ParseError(msg, 0, offset)) =>
         ???
 
-  private def fromParsed(parsed: Parsed.Value): Json.Value =
-    parsed match
-      case Parsed.Null => Json.Null
-      case Parsed.Bool(value) => Json.Bool(value)
-      case Parsed.Num(value) => Json.Num(value)
-      case Parsed.Str(value) => Json.Str(value)
-      case Parsed.Arr(values*) => Json.Arr(values.map(fromParsed)*)
-      case Parsed.Obj(nameValues*) =>
-        val nameJsons = for (name, value) <- nameValues yield (Json.Str(name), fromParsed(value))
+  private def fromAST(ast: AST): Json.Value =
+    ast match
+      case AST.Null => Json.Null
+      case AST.Bool(value) => Json.Bool(value)
+      case AST.Num(value) => Json.Num(value)
+      case AST.Str(value) => Json.Str(value)
+      case AST.Arr(values*) => Json.Arr(values.map(fromAST)*)
+      case AST.Obj(nameValues*) =>
+        val nameJsons = for (name, value) <- nameValues yield (Json.Str(name), fromAST(value))
         Json.Obj(Map(nameJsons*))

@@ -1,55 +1,28 @@
 package jsonlib.parser
 
 import jsonlib.util.*
-import jsonlib.pattern.*
 
-object Parsed:
-  sealed trait Value:
-    def toPattern: ValuePattern =
-      this match
-        case Null => NullPattern
-        case Bool(value) => BoolPattern(value)
-        case Num(value) => NumPattern(value)
-        case Str(value) => StrPattern(value)
-        case Arr(values*) =>
-          val patterns = values.map(_.toPattern)
-          ArrPattern(patterns*)
-        case Obj(nameValues*) =>
-          val namePatterns = for (name, value) <- nameValues yield (name, value.toPattern)
-          ObjPattern(namePatterns*)
-        case InterpolatedValue(idx) =>
-          InterpolatedValuePattern(idx)
-
-  final case class Obj(nameValues: (String, Value)*) extends Value
-  final case class Arr(values: Value*) extends Value
-  final case class Num(value: Double) extends Value
-  final case class Str(value: String) extends Value
-  final case class Bool(value: Boolean) extends Value
-  case object Null extends Value
-  final case class InterpolatedValue(idx: Int) extends Value
-
-final case class ParseError(msg: String, part: Int, offset: Int)
-class Parser(source: Seq[String]):
+private[jsonlib] class Parser(source: Seq[String]):
 
   private val tokens = new Tokens(source)
   private var interpolationsIndex = -1
 
-  private type ![T] = Result.Continuation[Parsed.Value, ParseError] ?=> T
+  private type ![T] = Result.Continuation[AST, ParseError] ?=> T
 
-  def parse(): Result[Parsed.Value, ParseError] =
+  def parse(): Result[AST, ParseError] =
     Result.withContinuation {
-      val parsed = parseValue()
+      val ast = parseValue()
       accept(Token.End)
-      parsed
+      ast
     }
 
-  private def parseValue(): ![Parsed.Value] =
+  private def parseValue(): ![AST] =
     tokens.next() match
-      case Token.Null => Parsed.Null
-      case Token.True => Parsed.Bool(true)
-      case Token.False => Parsed.Bool(false)
-      case Token.Str(value) => Parsed.Str(value)
-      case Token.Num(value) => Parsed.Num(???)
+      case Token.Null => AST.Null
+      case Token.True => AST.Bool(true)
+      case Token.False => AST.Bool(false)
+      case Token.Str(value) => AST.Str(value)
+      case Token.Num(value) => AST.Num(???)
       case Token.OpenBrace =>
         val nameValues =
           if tokens.peek() == Token.CloseBrace then Vector.empty
@@ -58,16 +31,16 @@ class Parser(source: Seq[String]):
         nameValues.map(_._1).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
           error(s"Duplicate name: ${x._1}")
         }
-        Parsed.Obj(nameValues*)
+        AST.Obj(nameValues*)
       case Token.OpenBracket =>
         val values =
           if tokens.peek() == Token.CloseBracket then Vector.empty
           else commaSeparate(parseValue)
         accept(Token.CloseBracket)
-        Parsed.Arr(values*)
+        AST.Arr(values*)
       case Token.InterpolatedValue =>
         interpolationsIndex += 1
-        Parsed.InterpolatedValue(interpolationsIndex)
+        AST.InterpolatedValue(interpolationsIndex)
       case token =>
         error(s"unexpected start of value: $token")
 
@@ -80,7 +53,7 @@ class Parser(source: Seq[String]):
         case _ => values
     parseNext(Vector(parseItem()))
 
-  private def parseNameValue(): ![(String, Parsed.Value)] =
+  private def parseNameValue(): ![(String, AST)] =
     tokens.next() match
       case Token.Str(value) =>
         accept(Token.Colon)

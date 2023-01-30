@@ -4,11 +4,7 @@ import scala.util.boundary
 
 import jsonlib.util.*
 
-object Tokens:
-  private type ![T] = Result.Continuation[Parsed.Value, ParseError] ?=> T
-
-class Tokens(source: Seq[String]):
-  import Tokens.!
+private class Tokens(source: Seq[String]):
 
   /*private*/ var offset: Int = 0
   /*private*/ var part: Int = 0
