@@ -132,6 +132,7 @@ class BootstrappedOnlyCompilationTests {
       compileFilesInDir("tests/run-custom-args/run-macros-erased", defaultOptions.and("-language:experimental.erasedDefinitions").and("-Xcheck-macros")),
       compileDir("tests/run-custom-args/Xmacro-settings/simple", defaultOptions.and("-Xmacro-settings:one,two,three")),
       compileDir("tests/run-custom-args/Xmacro-settings/compileTimeEnv", defaultOptions.and("-Xmacro-settings:a,b=1,c.b.a=x.y.z=1,myLogger.level=INFO")),
+      compileDir("tests/run-custom-args/jsonmacro", defaultOptions.and("-Xcheck-macros")),
     )
   }.checkRuns()
 

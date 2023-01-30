@@ -1,9 +1,8 @@
-package jsonmacro
-package tokens
+package jsonmacro.parser
 
 import scala.util.boundary
 
-import result.*
+import jsonmacro.util.*
 
 object Tokens:
   private type ![T] = Result.Continuation[Parsed.Value, ParseError] ?=> T

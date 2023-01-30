@@ -1,7 +1,6 @@
-package jsonmacro
+package jsonmacro.parser
 
-import result.*
-import tokens.*
+import jsonmacro.util.*
 
 object Parsed:
   sealed trait Value
@@ -14,7 +13,7 @@ object Parsed:
   final case class InterpolatedValue(idx: Int) extends Value
 
 final case class ParseError(msg: String, part: Int, offset: Int)
-private class Parser(source: Seq[String]):
+class Parser(source: Seq[String]):
 
   private val tokens = new Tokens(source)
   private var interpolationsIndex = -1

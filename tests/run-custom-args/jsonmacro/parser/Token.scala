@@ -1,6 +1,6 @@
-package jsonmacro.tokens
+package jsonmacro.parser
 
-enum Token:
+private enum Token:
   case Null
   case False
   case True

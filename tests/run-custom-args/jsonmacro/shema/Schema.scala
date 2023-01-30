@@ -1,6 +1,6 @@
-package jsonmacro
+package jsonmacro.schema
 
-private enum Schema:
+enum Schema:
   case Value
   case Obj(nameSchemas: Map[String, Schema])
   case Arr
