@@ -29,7 +29,6 @@ object JsonExpr:
           case '{     StringContext(${Varargs(args)}: _*) } => error(args)
           case _ =>
             quotes.reflect.report.errorAndAbort("string context is not known statically")
-        // report.errorAndAbort(msg + s"($part, $offset)", pos)
 
   private def toJsonExpr(json: Parsed.Value, args: Seq[Expr[Json.Value]])(using Quotes): Expr[Json.Value] =
     json match
@@ -38,8 +37,7 @@ object JsonExpr:
       case Parsed.Num(value) => '{ Json.Num(${Expr(value)}) }
       case Parsed.Str(value) => '{ Json.Str(${Expr(value)}) }
       case Parsed.Arr(value*) => '{ Json.Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
-      case Parsed.Obj(value) =>
-        // TODo improve
-        def f(k: Parsed.Str, v: Parsed.Value) = '{ (Json.Str(${Expr(k.value)}), ${toJsonExpr(v, args)}) }
-        '{ Json.Obj(Map(${Varargs(value.toSeq.map(f))}*)) }
+      case Parsed.Obj(nameValues*) =>
+        val nameValueExprs = for (name, value) <- nameValues yield '{ (Json.Str(${Expr(name.value)}), ${toJsonExpr(value, args)}) }
+        '{ Json.Obj(Map(${Varargs(nameValueExprs)}*)) }
       case Parsed.InterpolatedValue(idx) => args(idx)

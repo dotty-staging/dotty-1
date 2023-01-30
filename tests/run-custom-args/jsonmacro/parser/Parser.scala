@@ -4,7 +4,7 @@ import jsonmacro.util.*
 
 object Parsed:
   sealed trait Value
-  final case class Obj(value: Map[Str, Value]) extends Value
+  final case class Obj(nameValues: (Str, Value)*) extends Value
   final case class Arr(values: Value*) extends Value
   final case class Num(value: Double) extends Value
   final case class Str(value: String) extends Value
@@ -42,7 +42,7 @@ class Parser(source: Seq[String]):
         nameValues.map(_._1.value).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
           error(s"Duplicate name: ${x._1}")
         }
-        Parsed.Obj(Map(nameValues*))
+        Parsed.Obj(nameValues*)
       case Token.OpenBracket =>
         val values =
           if tokens.peek() == Token.CloseBracket then Vector.empty

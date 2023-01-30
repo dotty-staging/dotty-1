@@ -2,7 +2,7 @@ package jsonmacro.schema
 
 enum Schema:
   case Value
-  case Obj(nameSchemas: Map[String, Schema])
+  case Obj(nameSchemas: (String, Schema)*)
   case Arr
   case Str
   case Num
