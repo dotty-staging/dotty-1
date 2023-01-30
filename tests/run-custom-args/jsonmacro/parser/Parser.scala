@@ -1,6 +1,6 @@
-package jsonmacro.parser
+package jsonlib.parser
 
-import jsonmacro.util.*
+import jsonlib.util.*
 
 object Parsed:
   sealed trait Value

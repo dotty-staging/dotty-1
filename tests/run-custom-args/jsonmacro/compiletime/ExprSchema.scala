@@ -1,11 +1,11 @@
-package jsonmacro
-package compiletime
+package jsonlib.compiletime
 
 import scala.quoted.*
 
-import jsonmacro.parser.*
-import jsonmacro.schema.*
-import jsonmacro.util.*
+import jsonlib.Json
+import jsonlib.parser.*
+import jsonlib.schema.*
+import jsonlib.util.*
 
 private object ExprSchema:
 

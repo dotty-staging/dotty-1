@@ -1,4 +1,4 @@
-package jsonmacro.parser
+package jsonlib.parser
 
 private enum Token:
   case Null

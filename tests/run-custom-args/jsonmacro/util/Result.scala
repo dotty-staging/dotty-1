@@ -1,4 +1,4 @@
-package jsonmacro.util
+package jsonlib.util
 
 import scala.util.boundary
 

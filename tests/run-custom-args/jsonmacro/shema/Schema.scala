@@ -1,4 +1,4 @@
-package jsonmacro.schema
+package jsonlib.schema
 
 enum Schema:
   case Value

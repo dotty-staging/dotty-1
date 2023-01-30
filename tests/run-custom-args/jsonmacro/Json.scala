@@ -1,9 +1,9 @@
-package jsonmacro
+package jsonlib
 
 import scala.language.dynamics
 
-import jsonmacro.parser.*
-import jsonmacro.util.*
+import parser.*
+import util.*
 
 object Json:
   sealed trait Value

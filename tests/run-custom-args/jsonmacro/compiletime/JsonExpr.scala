@@ -1,17 +1,17 @@
-package jsonmacro
-package compiletime
+package jsonlib.compiletime
 
 import scala.quoted.*
 
-import jsonmacro.parser.*
-import jsonmacro.schema.*
-import jsonmacro.util.*
+import jsonlib.*
+import jsonlib.parser.*
+import jsonlib.schema.*
+import jsonlib.util.*
 
 object JsonExpr:
-  /*private[jsonmacro]*/ def jsonExpr(jsonMacros: Expr[JsonMacros], argsExpr: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
-    jsonMacros match
-      case '{ jsonmacro.json($sc) } =>
-        val jsonString = sc.valueOrAbort.parts.map(StringContext.processEscapes)
+  /*private[jsonmacro]*/ def jsonExpr(jsonStringContext: Expr[JsonStringContext], argsExpr: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
+    jsonStringContext match
+      case '{ jsonlib.json($sc) } =>
+        val jsonString = sc.valueOrAbort.parts.map(scala.StringContext.processEscapes)
         Parser(jsonString).parse() match
           case Success(json) =>
             val argExprs = argsExpr match
@@ -24,15 +24,15 @@ object JsonExpr:
             def error(args: Seq[Expr[String]]) =
               import quotes.reflect.*
               val baseOffset = args(part).asTerm.pos.start
-              val pos = Position(jsonMacros.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
+              val pos = Position(jsonStringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
               report.errorAndAbort(msg + s"($part, $offset)", pos)
             sc match
-              case '{ new StringContext(${Varargs(args)}: _*) } => error(args)
-              case '{     StringContext(${Varargs(args)}: _*) } => error(args)
+              case '{ new scala.StringContext(${Varargs(args)}: _*) } => error(args)
+              case '{     scala.StringContext(${Varargs(args)}: _*) } => error(args)
               case _ =>
                 quotes.reflect.report.errorAndAbort("string context is not known statically")
 
-  def jsonUnapplyExpr(jsonMacros: Expr[JsonMacros])(using Quotes): Expr[Option[Any]] =
+  def jsonUnapplyExpr(jsonStringContext: Expr[JsonStringContext])(using Quotes): Expr[Option[Any]] =
     quotes.reflect.report.errorAndAbort("jsonUnapplyExpr is not implemented")
 
   private def toJsonExpr(json: Parsed.Value, args: Seq[Expr[Json.Value]])(using Quotes): Expr[Json.Value] =
