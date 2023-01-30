@@ -21,6 +21,19 @@ import jsonmacro.Json.json
   println(json"[${f}, ${o}]")
   println(json"""{ "a": ${a}, "b": ${s}}""")
 
+
+  val user = json"""{
+    "firstName": "John",
+    "lastName": "Doe"
+  }"""
+  val bool = json"true"
+  val account = json"""{
+    "user": $user,
+    "active": $bool
+  }"""
+  account.active.value
+  account.user.firstName
+
   // json"n u l l"
   // json"""n u l l"""
   // json"a"

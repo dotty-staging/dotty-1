@@ -95,5 +95,5 @@ class Tokens(source: Seq[String]):
     char
 
   private def skipWhiteSpaces(): Unit =
-    while part < source.length && offset < source(part).length && peekChar().isWhitespace do
+    while part < source.length && offset < source(part).length && (peekChar().isWhitespace || peekChar() == '\n') do
       offset += 1
