@@ -8,7 +8,7 @@ final class JsonObject(private[jsonlib] val nameValues: Map[String, Json]) exten
 
   override def toString(): String = nameValues.iterator.map {
     (name, value) => s"$name -> $value"
-  }.mkString(s"{", ", ", "}")
+  }.mkString("{", ", ", "}")
 
   override def equals(x: Any): Boolean = x match
     case x: JsonObject => this.nameValues == x.nameValues
