@@ -1,13 +1,13 @@
 import jsonlib.*
 
 @main def Test: Unit =
-  val n: Null.type = json"null"
-  val t: Bool = json"true"
-  val f: Bool = json"false"
-  val o: Obj = json"{}"
-  val a: Arr = json"[]"
-  val s: Str = json"""""""" // empty string
-  val s2: Str = json"\"\"" // empty string
+  val n: Null = json"null"
+  val t: Boolean = json"true"
+  val f: Boolean = json"false"
+  val o: JsonObject = json"{}"
+  val a: JsonArray = json"[]"
+  val s: String = json"""""""" // empty string
+  val s2: String = json"\"\"" // empty string
 
   println(json" null ")
   println(json"[true]")
@@ -30,8 +30,8 @@ import jsonlib.*
     "user": $user,
     "active": $bool
   }"""
-  account.active.value
-  account.user.firstName
+  account.active: Boolean
+  account.user.firstName: String
 
 
   (account: Json) match

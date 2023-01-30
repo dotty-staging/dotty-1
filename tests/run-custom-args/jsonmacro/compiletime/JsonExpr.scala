@@ -44,14 +44,14 @@ object JsonExpr:
 
   private def toJsonExpr(ast: AST, args: Seq[Expr[Json]])(using Quotes): Expr[Json] =
     ast match
-      case AST.Null => '{ Null }
-      case AST.Bool(value) => '{ Bool(${Expr(value)}) }
-      case AST.Num(value) => '{ Num(${Expr(value)}) }
-      case AST.Str(value) => '{ Str(${Expr(value)}) }
-      case AST.Arr(value*) => '{ Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
+      case AST.Null => '{ null }
+      case AST.Bool(value) => Expr(value)
+      case AST.Num(value) => Expr(value)
+      case AST.Str(value) => Expr(value)
+      case AST.Arr(value*) => '{ JsonArray(${Varargs(value.map(toJsonExpr(_, args)))}*) }
       case AST.Obj(nameValues*) =>
-        val nameValueExprs = for (name, value) <- nameValues yield '{ (Str(${Expr(name)}), ${toJsonExpr(value, args)}) }
-        '{ Obj(Map(${Varargs(nameValueExprs)}*)) }
+        val nameValueExprs = for (name, value) <- nameValues yield '{ (${Expr(name)}, ${toJsonExpr(value, args)}) }
+        '{ JsonObject(Map(${Varargs(nameValueExprs)}*)) }
       case AST.InterpolatedValue(idx) => args(idx)
 
   given ToExpr[Pattern] with

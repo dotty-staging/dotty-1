@@ -15,10 +15,10 @@ enum Pattern:
     this match
       case Obj(namePatterns*) =>
         json match
-          case jsonlib.Obj(nameValues) =>
+          case json: JsonObject =>
             // TODO improve
             val res = (for (name, pattern) <- namePatterns yield
-              nameValues.get(jsonlib.Str(name)) match
+              json.nameValues.get(name) match
                 case Some(value) => pattern.unapplySeq(value)
                 case None => return None
             ).filter(_.isDefined).flatten.flatten
@@ -26,7 +26,7 @@ enum Pattern:
           case _ => None
       case Arr(patterns*) =>
         json match
-          case jsonlib.Arr(values*) =>
+          case values: Seq[Json] =>
             // TODO improve
             values.zip(patterns).foldLeft[Option[Seq[jsonlib.Json]]](Some(Seq())) {
               case (acc, (value, pattern)) =>
@@ -36,19 +36,12 @@ enum Pattern:
             }
           case _ => None
       case Num(value) =>
-        json match
-          case jsonlib.Num(`value`) => Some(Seq())
-          case _ => None
+        if json == value then Some(Seq()) else None
       case Str(value) =>
-        json match
-          case jsonlib.Str(`value`) => Some(Seq())
-          case _ => None
+        if json == value then Some(Seq()) else None
       case Bool(value) =>
-        json match
-          case jsonlib.Bool(`value`) => Some(Seq())
-          case _ => None
+        if json == value then Some(Seq()) else None
       case Null =>
-        if json == jsonlib.Null then Some(Seq())
-        else None
+        if json == null then Some(Seq()) else None
       case InterpolatedValue(idx) =>
         Some(Seq(json))

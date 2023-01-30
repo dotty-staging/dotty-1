@@ -17,14 +17,14 @@ private object ExprSchema:
       case Schema.Value => Type.of[Json]
       case Schema.Obj(nameSchemas*) =>
         import quotes.reflect.*
-        nameSchemas.foldLeft(TypeRepr.of[Obj]) { case (acc, (name, schema)) =>
+        nameSchemas.foldLeft(TypeRepr.of[JsonObject]) { case (acc, (name, schema)) =>
           Refinement(acc, name, TypeRepr.of(using refinedType(schema)))
         }.asType
-      case Schema.Arr => Type.of[Arr]
-      case Schema.Str => Type.of[Str]
-      case Schema.Num => Type.of[Num]
-      case Schema.Bool => Type.of[Bool]
-      case Schema.Null => Type.of[Null.type]
+      case Schema.Arr => Type.of[JsonArray]
+      case Schema.Str => Type.of[String]
+      case Schema.Num => Type.of[Double]
+      case Schema.Bool => Type.of[Boolean]
+      case Schema.Null => Type.of[Null]
 
   private def schema(ast: AST, args: Seq[Expr[Json]])(using Quotes): Schema =
     ast match
@@ -42,12 +42,12 @@ private object ExprSchema:
 
   private def schemaOf[T : Type](using Quotes): Schema =
     Type.of[T] match
-      case '[Null.type] => Schema.Null
-      case '[Bool] => Schema.Bool
-      case '[Str] => Schema.Str
-      case '[Num] => Schema.Num
-      case '[Arr] => Schema.Arr
-      case '[Obj] =>
+      case '[Null] => Schema.Null
+      case '[Boolean] => Schema.Bool
+      case '[String] => Schema.Str
+      case '[Double] => Schema.Num
+      case '[JsonArray] => Schema.Arr
+      case '[JsonObject] =>
         import quotes.reflect.*
         def refinements(tpe: TypeRepr): Vector[(String, Schema)] =
           tpe match
