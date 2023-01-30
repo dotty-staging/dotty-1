@@ -54,13 +54,13 @@ object JsonExpr:
         '{ Json.Obj(Map(${Varargs(nameValueExprs)}*)) }
       case AST.InterpolatedValue(idx) => args(idx)
 
-  given ToExpr[ValuePattern] with
-    def apply(pattern: ValuePattern)(using Quotes): Expr[ValuePattern] =
+  given ToExpr[Pattern] with
+    def apply(pattern: Pattern)(using Quotes): Expr[Pattern] =
       pattern match
-        case NullPattern => '{ NullPattern }
-        case BoolPattern(value) => '{ BoolPattern(${Expr(value)}) }
-        case NumPattern(value) => '{ NumPattern(${Expr(value)}) }
-        case StrPattern(value) => '{ StrPattern(${Expr(value)}) }
-        case ArrPattern(values*) => '{ ArrPattern(${Expr(values)}*) }
-        case ObjPattern(nameValue*) => '{ ObjPattern(${Expr(nameValue)}*) }
-        case InterpolatedValuePattern(idx) => '{ InterpolatedValuePattern(${Expr(idx)}) }
+        case Pattern.Null => '{ Pattern.Null }
+        case Pattern.Bool(value) => '{ Pattern.Bool(${Expr(value)}) }
+        case Pattern.Num(value) => '{ Pattern.Num(${Expr(value)}) }
+        case Pattern.Str(value) => '{ Pattern.Str(${Expr(value)}) }
+        case Pattern.Arr(values*) => '{ Pattern.Arr(${Expr(values)}*) }
+        case Pattern.Obj(nameValue*) => '{ Pattern.Obj(${Expr(nameValue)}*) }
+        case Pattern.InterpolatedValue(idx) => '{ Pattern.InterpolatedValue(${Expr(idx)}) }

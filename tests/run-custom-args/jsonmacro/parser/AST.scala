@@ -12,17 +12,17 @@ private[jsonlib] enum AST:
   case Null
   case InterpolatedValue(idx: Int)
 
-  def toPattern: ValuePattern =
+  def toPattern: Pattern =
     this match
-      case Null => NullPattern
-      case Bool(value) => BoolPattern(value)
-      case Num(value) => NumPattern(value)
-      case Str(value) => StrPattern(value)
+      case Null => Pattern.Null
+      case Bool(value) => Pattern.Bool(value)
+      case Num(value) => Pattern.Num(value)
+      case Str(value) => Pattern.Str(value)
       case Arr(values*) =>
         val patterns = values.map(_.toPattern)
-        ArrPattern(patterns*)
+        Pattern.Arr(patterns*)
       case Obj(nameValues*) =>
         val namePatterns = for (name, value) <- nameValues yield (name, value.toPattern)
-        ObjPattern(namePatterns*)
+        Pattern.Obj(namePatterns*)
       case InterpolatedValue(idx) =>
-        InterpolatedValuePattern(idx)
+        Pattern.InterpolatedValue(idx)
