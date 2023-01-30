@@ -1,6 +1,8 @@
 package jsonlib
 package pattern
 
+import jsonlib.util.optional, optional.?
+
 enum Pattern:
   case Obj(namePatterns: (String, Pattern)*)
   case Arr(values: Pattern*)
@@ -16,24 +18,21 @@ enum Pattern:
       case Obj(namePatterns*) =>
         json match
           case json: JsonObject =>
-            // TODO improve
-            val res = (for (name, pattern) <- namePatterns yield
-              json.nameValues.get(name) match
-                case Some(value) => pattern.unapplySeq(value)
-                case None => return None
-            ).filter(_.isDefined).flatten.flatten
-            Some(res)
+            optional:
+              namePatterns.foldLeft(Seq.empty[Json]) {
+                case (acc, (name, pattern)) =>
+                  val value = json.nameValues.get(name).?
+                  acc ++ pattern.unapplySeq(value).?
+              }
           case _ => None
       case Arr(patterns*) =>
         json match
           case values: Seq[Json] =>
-            // TODO improve
-            values.zip(patterns).foldLeft[Option[Seq[jsonlib.Json]]](Some(Seq())) {
-              case (acc, (value, pattern)) =>
-                for extractedAcc <- acc
-                    extracted <- pattern.unapplySeq(value)
-                yield extractedAcc ++ extracted
-            }
+            optional:
+              values.zip(patterns).foldLeft(Seq.empty[Json]) {
+                case (acc, (value, pattern)) =>
+                  acc ++ pattern.unapplySeq(value).?
+              }
           case _ => None
       case Num(value) =>
         if json == value then Some(Seq()) else None
