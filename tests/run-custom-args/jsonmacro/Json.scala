@@ -4,7 +4,6 @@ import scala.language.dynamics
 
 import jsonmacro.parser.*
 import jsonmacro.util.*
-import jsonmacro.compiletime.JsonExpr.{jsonExpr, jsonUnapplyExpr}
 
 object Json:
   sealed trait Value
@@ -16,23 +15,6 @@ object Json:
   final case class Bool(value: Boolean) extends Value
   case object Null extends Value
   object Undefined
-
-
-  type StringContext
-  object StringContext:
-    def apply(sc: scala.StringContext): StringContext = sc.asInstanceOf[StringContext]
-
-  extension (stringContext: scala.StringContext)
-    inline def json: StringContext =
-      scala.compiletime.error("Json.json should have been removed by macro")
-
-  extension (inline stringContext: StringContext)
-    transparent inline def apply(inline args: Json.Value*): Json.Value =
-      ${ jsonExpr('stringContext, 'args) }
-
-    transparent inline def unapply(scrutinee: Json.Value): Option[Any] =
-      ${ jsonUnapplyExpr('stringContext) }
-
 
   def apply(json: String): Json.Value =
     new Parser(Seq(json)).parse() match

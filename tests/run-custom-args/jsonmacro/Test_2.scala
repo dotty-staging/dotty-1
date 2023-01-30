@@ -1,5 +1,4 @@
 import jsonmacro.*
-import jsonmacro.Json.json
 
 @main def Test: Unit =
   val n: Json.Null.type = json"null"
