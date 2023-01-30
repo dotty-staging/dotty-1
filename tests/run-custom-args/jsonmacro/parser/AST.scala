@@ -24,5 +24,5 @@ private[jsonlib] enum AST:
       case Obj(nameValues*) =>
         val namePatterns = for (name, value) <- nameValues yield (name, value.toPattern)
         Pattern.Obj(namePatterns*)
-      case InterpolatedValue(idx) =>
-        Pattern.InterpolatedValue(idx)
+      case InterpolatedValue(_) =>
+        Pattern.InterpolatedValue

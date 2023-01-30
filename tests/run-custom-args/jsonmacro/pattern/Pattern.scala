@@ -10,7 +10,7 @@ enum Pattern:
   case Str(value: String)
   case Bool(value: Boolean)
   case Null
-  case InterpolatedValue(idx: Int)
+  case InterpolatedValue
 
   def unapplySeq(json: Json): Option[Seq[Json]] =
     // TODO avoid O(n^2) concatenation of results
@@ -42,5 +42,5 @@ enum Pattern:
         if json == value then Some(Seq()) else None
       case Null =>
         if json == null then Some(Seq()) else None
-      case InterpolatedValue(idx) =>
+      case InterpolatedValue =>
         Some(Seq(json))

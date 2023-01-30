@@ -63,4 +63,4 @@ object JsonExpr:
         case Pattern.Str(value) => '{ Pattern.Str(${Expr(value)}) }
         case Pattern.Arr(values*) => '{ Pattern.Arr(${Expr(values)}*) }
         case Pattern.Obj(nameValue*) => '{ Pattern.Obj(${Expr(nameValue)}*) }
-        case Pattern.InterpolatedValue(idx) => '{ Pattern.InterpolatedValue(${Expr(idx)}) }
+        case Pattern.InterpolatedValue => '{ Pattern.InterpolatedValue }
