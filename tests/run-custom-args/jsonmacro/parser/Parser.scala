@@ -1,9 +1,25 @@
 package jsonlib.parser
 
 import jsonlib.util.*
+import jsonlib.pattern.*
 
 object Parsed:
-  sealed trait Value
+  sealed trait Value:
+    def toPattern: ValuePattern =
+      this match
+        case Null => NullPattern
+        case Bool(value) => BoolPattern(value)
+        case Num(value) => NumPattern(value)
+        case Str(value) => StrPattern(value)
+        case Arr(values*) =>
+          val patterns = values.map(_.toPattern)
+          ArrPattern(patterns*)
+        case Obj(nameValues*) =>
+          val namePatterns = for (name, value) <- nameValues yield (name, value.toPattern)
+          ObjPattern(namePatterns*)
+        case InterpolatedValue(idx) =>
+          InterpolatedValuePattern(idx)
+
   final case class Obj(nameValues: (String, Value)*) extends Value
   final case class Arr(values: Value*) extends Value
   final case class Num(value: Double) extends Value

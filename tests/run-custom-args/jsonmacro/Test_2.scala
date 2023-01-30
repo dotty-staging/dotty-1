@@ -34,8 +34,9 @@ import jsonlib.*
   account.user.firstName
 
 
-  // account: Json.Value match
-  //   case json"""{ "user": $x }""" => println(x)
+  (account: Json.Value) match
+    case json"""{ "user": $x, "a": true }""" => println("case 1: " + x)
+    case json"""{ "user": $x, "active": $y }""" => println("case 2: " + (x, y))
 
   // json"n u l l"
   // json"""n u l l"""

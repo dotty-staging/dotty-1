@@ -1,6 +1,6 @@
 package jsonlib
 
-import jsonlib.compiletime.JsonExpr.{jsonExpr, jsonUnapplyExpr}
+import jsonlib.compiletime.JsonExpr.{jsonExpr, jsonUnapplySeqExpr}
 
 extension (stringContext: scala.StringContext)
   inline def json: JsonStringContext =
@@ -14,5 +14,5 @@ object JsonStringContext:
     transparent inline def apply(inline args: Json.Value*): Json.Value =
       ${ jsonExpr('jsonStringContext, 'args) }
 
-    transparent inline def unapply(scrutinee: Json.Value): Option[Any] =
-      ${ jsonUnapplyExpr('jsonStringContext) }
+    transparent inline def unapplySeq(scrutinee: Json.Value): Option[Seq[Json.Value]] =
+      ${ jsonUnapplySeqExpr('jsonStringContext, 'scrutinee) }: Option[Seq[Json.Value]]
