@@ -4,7 +4,7 @@ import jsonmacro.util.*
 
 object Parsed:
   sealed trait Value
-  final case class Obj(nameValues: (Str, Value)*) extends Value
+  final case class Obj(nameValues: (String, Value)*) extends Value
   final case class Arr(values: Value*) extends Value
   final case class Num(value: Double) extends Value
   final case class Str(value: String) extends Value
@@ -39,7 +39,7 @@ class Parser(source: Seq[String]):
           if tokens.peek() == Token.CloseBrace then Vector.empty
           else commaSeparate(parseNameValue)
         accept(Token.CloseBrace)
-        nameValues.map(_._1.value).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
+        nameValues.map(_._1).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
           error(s"Duplicate name: ${x._1}")
         }
         Parsed.Obj(nameValues*)
@@ -64,11 +64,11 @@ class Parser(source: Seq[String]):
         case _ => values
     parseNext(Vector(parseItem()))
 
-  private def parseNameValue(): ![(Parsed.Str, Parsed.Value)] =
+  private def parseNameValue(): ![(String, Parsed.Value)] =
     tokens.next() match
       case Token.Str(value) =>
         accept(Token.Colon)
-        Parsed.Str(value) -> parseValue()
+        value -> parseValue()
       case _ =>
         error("expected string literal")
 

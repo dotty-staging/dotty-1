@@ -29,7 +29,7 @@ private object ExprSchema:
   private def schema(value: Parsed.Value, args: Seq[Expr[Json.Value]])(using Quotes): Schema =
     value match
       case Parsed.Obj(nameValues*) =>
-        val nameSchemas: Seq[(String, Schema)] = for (name, value) <- nameValues yield (name.value, schema(value, args))
+        val nameSchemas = for (name, value) <- nameValues yield (name, schema(value, args))
         Schema.Obj(nameSchemas*)
       case Parsed.Arr(_*) => Schema.Arr
       case Parsed.Str(_) => Schema.Str

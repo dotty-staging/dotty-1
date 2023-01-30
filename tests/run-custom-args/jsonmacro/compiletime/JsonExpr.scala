@@ -38,6 +38,6 @@ object JsonExpr:
       case Parsed.Str(value) => '{ Json.Str(${Expr(value)}) }
       case Parsed.Arr(value*) => '{ Json.Arr(${Varargs(value.map(toJsonExpr(_, args)))}*) }
       case Parsed.Obj(nameValues*) =>
-        val nameValueExprs = for (name, value) <- nameValues yield '{ (Json.Str(${Expr(name.value)}), ${toJsonExpr(value, args)}) }
+        val nameValueExprs = for (name, value) <- nameValues yield '{ (Json.Str(${Expr(name)}), ${toJsonExpr(value, args)}) }
         '{ Json.Obj(Map(${Varargs(nameValueExprs)}*)) }
       case Parsed.InterpolatedValue(idx) => args(idx)
