@@ -8,8 +8,9 @@ import jsonmacro.schema.*
 import jsonmacro.util.*
 
 object JsonExpr:
-  /*private[jsonmacro]*/ def jsonExpr(stringContext: Expr[StringContext], argsExpr: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
-    val jsonString = stringContext.valueOrAbort.parts.map(StringContext.processEscapes)
+  /*private[jsonmacro]*/ def jsonExpr(stringContext: Expr[Json.StringContext], argsExpr: Expr[Seq[Json.Value]])(using Quotes): Expr[Json.Value] =
+    val jsonString = stringContext match
+      case '{ Json.json($sc) } => sc.valueOrAbort.parts.map(StringContext.processEscapes)
     Parser(jsonString).parse() match
       case Success(json) =>
         val argExprs = argsExpr match
@@ -25,10 +26,13 @@ object JsonExpr:
           val pos = Position(stringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
           report.errorAndAbort(msg + s"($part, $offset)", pos)
         stringContext match
-          case '{ new StringContext(${Varargs(args)}: _*) } => error(args)
-          case '{     StringContext(${Varargs(args)}: _*) } => error(args)
+          case '{ Json.json(new StringContext(${Varargs(args)}: _*)) } => error(args)
+          case '{ Json.json(    StringContext(${Varargs(args)}: _*)) } => error(args)
           case _ =>
             quotes.reflect.report.errorAndAbort("string context is not known statically")
+
+  def jsonUnapplyExpr(stringContext: Expr[Json.StringContext])(using Quotes): Expr[Option[Any]] =
+    quotes.reflect.report.errorAndAbort("jsonUnapplyExpr is not implemented")
 
   private def toJsonExpr(json: Parsed.Value, args: Seq[Expr[Json.Value]])(using Quotes): Expr[Json.Value] =
     json match

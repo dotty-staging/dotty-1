@@ -34,6 +34,10 @@ import jsonmacro.Json.json
   account.active.value
   account.user.firstName
 
+
+  // account: Json.Value match
+  //   case json"""{ "user": $x }""" => println(x)
+
   // json"n u l l"
   // json"""n u l l"""
   // json"a"
