@@ -4,7 +4,6 @@ import scala.quoted.*
 
 import jsonlib.*
 import jsonlib.parser.*
-import jsonlib.schema.*
 import jsonlib.util.*
 import scala.quoted.runtime.Patterns.patternType
 
@@ -15,7 +14,7 @@ object JsonExpr:
       case Varargs(argExprs) => argExprs
       case _ => quotes.reflect.report.errorAndAbort("Unpacking StringContext.json args is not supported")
     val jsonExpr = toJsonExpr(json, argExprs.iterator)
-    ExprSchema.refinedType(json, argExprs) match
+    Schema.refinedType(json, argExprs) match
       case '[t] => '{ $jsonExpr.asInstanceOf[t & Json] }
 
   def jsonUnapplySeqExpr(jsonStringContext: Expr[JsonStringContext], scrutinee: Expr[Json])(using Quotes): Expr[Option[Seq[Json]]] =

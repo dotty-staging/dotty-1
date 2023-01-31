@@ -4,10 +4,18 @@ package compiletime
 import scala.quoted.*
 
 import jsonlib.parser.*
-import jsonlib.schema.*
 import jsonlib.util.*
 
-private object ExprSchema:
+private enum Schema:
+  case Value
+  case Obj(nameSchemas: (String, Schema)*)
+  case Arr
+  case Str
+  case Num
+  case Bool
+  case Null
+
+private object Schema:
 
   def refinedType(pattern: Pattern, args: Seq[Expr[Json]])(using Quotes): Type[?] =
     refinedType(schema(pattern, args.iterator))
