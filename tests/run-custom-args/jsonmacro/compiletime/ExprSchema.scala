@@ -9,8 +9,8 @@ import jsonlib.util.*
 
 private object ExprSchema:
 
-  def refinedType(ast: AST, args: Seq[Expr[Json]])(using Quotes): Type[?] =
-    refinedType(schema(ast, args))
+  def refinedType(pattern: Pattern, args: Seq[Expr[Json]])(using Quotes): Type[?] =
+    refinedType(schema(pattern, args.iterator))
 
   private def refinedType(schema: Schema)(using Quotes): Type[?] =
     schema match
@@ -26,18 +26,18 @@ private object ExprSchema:
       case Schema.Bool => Type.of[Boolean]
       case Schema.Null => Type.of[Null]
 
-  private def schema(ast: AST, args: Seq[Expr[Json]])(using Quotes): Schema =
-    ast match
-      case AST.Obj(nameValues*) =>
+  private def schema(pattern: Pattern, args: Iterator[Expr[Json]])(using Quotes): Schema =
+    pattern match
+      case Pattern.Obj(nameValues*) =>
         val nameSchemas = for (name, value) <- nameValues yield (name, schema(value, args))
         Schema.Obj(nameSchemas*)
-      case AST.Arr(_*) => Schema.Arr
-      case AST.Str(_) => Schema.Str
-      case AST.Num(_) => Schema.Num
-      case AST.Bool(_) => Schema.Bool
-      case AST.Null => Schema.Null
-      case AST.InterpolatedValue(idx) =>
-        args(idx) match
+      case Pattern.Arr(_*) => Schema.Arr
+      case Pattern.Str(_) => Schema.Str
+      case Pattern.Num(_) => Schema.Num
+      case Pattern.Bool(_) => Schema.Bool
+      case Pattern.Null => Schema.Null
+      case Pattern.InterpolatedValue =>
+        args.next() match
           case '{ $x : t } => schemaOf[t]
 
   private def schemaOf[T : Type](using Quotes): Schema =

@@ -7,7 +7,7 @@ final class JsonObject(private[jsonlib] val nameValues: Map[String, Json]) exten
     nameValues.getOrElse(name, JsonObject.Undefined)
 
   override def toString(): String = nameValues.iterator.map {
-    (name, value) => s"$name -> $value"
+    (name, value) => s"\"$name\" -> $value" // TODO escape characters of name
   }.mkString("{", ", ", "}")
 
   override def equals(x: Any): Boolean = x match

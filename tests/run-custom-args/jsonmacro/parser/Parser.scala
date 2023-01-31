@@ -1,28 +1,28 @@
 package jsonlib.parser
 
 import jsonlib.util.*
+import jsonlib.Pattern
 
 private[jsonlib] class Parser(source: Seq[String]):
 
   private val tokens = new Tokens(source)
-  private var interpolationsIndex = -1
 
-  private type ![T] = Result.Continuation[AST, ParseError] ?=> T
+  private type ![T] = Result.Continuation[Pattern, ParseError] ?=> T
 
-  def parse(): Result[AST, ParseError] =
+  def parse(): Result[Pattern, ParseError] =
     Result.withContinuation {
       val ast = parseValue()
       accept(Token.End)
       ast
     }
 
-  private def parseValue(): ![AST] =
+  private def parseValue(): ![Pattern] =
     tokens.next() match
-      case Token.Null => AST.Null
-      case Token.True => AST.Bool(true)
-      case Token.False => AST.Bool(false)
-      case Token.Str(value) => AST.Str(value)
-      case Token.Num(value) => AST.Num(???)
+      case Token.Null => Pattern.Null
+      case Token.True => Pattern.Bool(true)
+      case Token.False => Pattern.Bool(false)
+      case Token.Str(value) => Pattern.Str(value)
+      case Token.Num(value) => Pattern.Num(???)
       case Token.OpenBrace =>
         val nameValues =
           if tokens.peek() == Token.CloseBrace then Vector.empty
@@ -31,16 +31,15 @@ private[jsonlib] class Parser(source: Seq[String]):
         nameValues.map(_._1).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
           error(s"Duplicate name: ${x._1}")
         }
-        AST.Obj(nameValues*)
+        Pattern.Obj(nameValues*)
       case Token.OpenBracket =>
         val values =
           if tokens.peek() == Token.CloseBracket then Vector.empty
           else commaSeparate(parseValue)
         accept(Token.CloseBracket)
-        AST.Arr(values*)
+        Pattern.Arr(values*)
       case Token.InterpolatedValue =>
-        interpolationsIndex += 1
-        AST.InterpolatedValue(interpolationsIndex)
+        Pattern.InterpolatedValue
       case token =>
         error(s"unexpected start of value: $token")
 
@@ -53,7 +52,7 @@ private[jsonlib] class Parser(source: Seq[String]):
         case _ => values
     parseNext(Vector(parseItem()))
 
-  private def parseNameValue(): ![(String, AST)] =
+  private def parseNameValue(): ![(String, Pattern)] =
     tokens.next() match
       case Token.Str(value) =>
         accept(Token.Colon)
