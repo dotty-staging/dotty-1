@@ -31,23 +31,24 @@ private class Tokens(source: Seq[String]):
         part += 1
         offset = 0
         Token.InterpolatedValue
-    else nextChar() match
-      case '{' => Token.OpenBrace
-      case '}' => Token.CloseBrace
-      case '[' => Token.OpenBracket
-      case ']' => Token.CloseBracket
+    else peekChar() match
+      case '{' => accept('{', Token.OpenBrace)
+      case '}' => accept('}', Token.CloseBrace)
+      case '[' => accept('[', Token.OpenBracket)
+      case ']' => accept(']', Token.CloseBracket)
       case 'n' => accept("null", Token.Null)
       case 'f' => accept("false", Token.False)
       case 't' => accept("true", Token.True)
-      case ',' => Token.Comma
-      case ':' => Token.Colon
+      case ',' => accept(',', Token.Comma)
+      case ':' => accept(':', Token.Colon)
       case '"' => readString()
-      case '-' => readNum('-')
-      case c if '0' <= c && c <= '9' => readNum(c)
+      case '-' => readNum()
+      case c if '0' <= c && c <= '9' => readNum()
       case _ =>
-        Token.Error("unexpected start of token", part, offset)
+        Token.Error(s"unexpected start of token ${nextChar()}", part, offset)
 
   private def readString(): Token =
+    assert(nextChar() == '"')
     boundary:
       val stringBuffer = new collection.mutable.StringBuilder()
       def parseChars(): String =
@@ -63,7 +64,7 @@ private class Tokens(source: Seq[String]):
               case 'n' => stringBuffer += '\n'
               case 'r' => stringBuffer += '\r'
               case 't' => stringBuffer += '\t'
-              case 'u' => ??? // 4 hexadecimal digits
+              case 'u' => Token.Error("HEX not supported", part, offset) // TODO support 4 hexadecimal digits
             parseChars()
           case char if char.isControl =>
             boundary.break(Token.Error("unexpected control character", part, offset))
@@ -72,11 +73,16 @@ private class Tokens(source: Seq[String]):
             parseChars()
       Token.Str(parseChars())
 
-  private def readNum(first: Char): Token =
-    ???
+  private def readNum(): Token =
+    Token.Error("JSON number not supported", part, offset) // TODO support numbers
+
+  private def accept(char: Char, token: Token): Token =
+    nextChar() match
+      case `char` => token
+      case next => Token.Error(s"unexpected character: got $char but got $next", part, offset)
 
   private def accept(str: String, token: Token): Token =
-    for char <- str.tail do
+    for char <- str do
       if char != peekChar() then
         return Token.Error(s"expected `$char` (of $str)", part, offset)
       offset += 1
