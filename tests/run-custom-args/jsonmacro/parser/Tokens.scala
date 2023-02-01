@@ -4,10 +4,8 @@ import scala.util.boundary
 
 import jsonlib.util.*
 
-private class Tokens(source: Seq[String]):
+private class Tokens(chars: InterpolatedChars):
 
-  /*private*/ var offset: Int = 0
-  /*private*/ var part: Int = 0
   private var nextToken: Token = null
 
   def peek(): Token =
@@ -21,17 +19,16 @@ private class Tokens(source: Seq[String]):
       nextToken = null
     res
 
+  def location: Location = chars.location
+
   private def readToken(): Token =
-    skipWhiteSpaces()
-    if offset == source(part).length then
-      if part == source.length - 1 then
-        offset += 1
-        Token.End
-      else
-        part += 1
-        offset = 0
-        Token.InterpolatedValue
-    else peekChar() match
+    chars.skipWhiteSpaces()
+    if chars.atEnd then
+      Token.End
+    else if chars.atInterpolation then
+      chars.nextPart()
+      Token.InterpolatedValue
+    else chars.peekChar() match
       case '{' => accept('{', Token.OpenBrace)
       case '}' => accept('}', Token.CloseBrace)
       case '[' => accept('[', Token.OpenBracket)
@@ -45,17 +42,17 @@ private class Tokens(source: Seq[String]):
       case '-' => readNum()
       case c if '0' <= c && c <= '9' => readNum()
       case _ =>
-        Token.Error(s"unexpected start of token ${nextChar()}", part, offset)
+        Token.Error(s"unexpected start of token ${chars.nextChar()}", chars.location)
 
   private def readString(): Token =
-    assert(nextChar() == '"')
+    assert(chars.nextChar() == '"')
     boundary:
       val stringBuffer = new collection.mutable.StringBuilder()
       def parseChars(): String =
-        nextChar() match
+        chars.nextChar() match
           case '"' => stringBuffer.result()
           case '\\' =>
-            nextChar() match
+            chars.nextChar() match
               case '\\' => stringBuffer += '\\'
               case '"' => stringBuffer += '"'
               case '/' => stringBuffer += '/'
@@ -64,41 +61,31 @@ private class Tokens(source: Seq[String]):
               case 'n' => stringBuffer += '\n'
               case 'r' => stringBuffer += '\r'
               case 't' => stringBuffer += '\t'
-              case 'u' => Token.Error("HEX not supported", part, offset) // TODO support 4 hexadecimal digits
+              case 'u' => Token.Error("HEX not supported", chars.location) // TODO support 4 hexadecimal digits
             parseChars()
           case char if char.isControl =>
-            boundary.break(Token.Error("unexpected control character", part, offset))
+            boundary.break(Token.Error("unexpected control character", chars.location))
           case char =>
             stringBuffer += char
             parseChars()
       Token.Str(parseChars())
 
   private def readNum(): Token =
-    Token.Error("JSON number not supported", part, offset) // TODO support numbers
+    Token.Error("JSON number not supported", chars.location) // TODO support numbers
 
   private def accept(char: Char, token: Token): Token =
-    nextChar() match
+    chars.nextChar() match
       case `char` => token
-      case next => Token.Error(s"unexpected character: got $char but got $next", part, offset)
+      case next => Token.Error(s"unexpected character: got $char but got $next", chars.location)
 
   private def accept(str: String, token: Token): Token =
-    for char <- str do
-      if char != peekChar() then
-        return Token.Error(s"expected `$char` (of $str)", part, offset)
-      offset += 1
-    if offset < source(part).length && !(peekChar().isWhitespace || peekChar() == '}' || peekChar() == ']' || peekChar() == ',') then
-      Token.Error("expected end of token", part, offset)
+    for char <- str if char != chars.nextChar() do
+      return Token.Error(s"expected `$char` (of $str)", chars.location)
+
+    def isEndOfToken(char: Char): Boolean =
+      char.isWhitespace || char == '}' || char == ']' || char == ','
+
+    if !chars.atPartEnd && !isEndOfToken(chars.peekChar()) then
+      Token.Error("expected end of token", chars.location)
     else
       token
-
-  private def peekChar(): Char =
-    source(part)(offset)
-
-  private def nextChar(): Char =
-    val char = peekChar()
-    offset += 1
-    char
-
-  private def skipWhiteSpaces(): Unit =
-    while part < source.length && offset < source(part).length && (peekChar().isWhitespace || peekChar() == '\n') do
-      offset += 1

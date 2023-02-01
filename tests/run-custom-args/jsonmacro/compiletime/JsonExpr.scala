@@ -28,12 +28,12 @@ object JsonExpr:
         val jsonString = sc.valueOrAbort.parts.map(scala.StringContext.processEscapes)
         Parser(jsonString).parse() match
           case Success(json) => json
-          case Error(ParseError(msg, part, offset)) =>
+          case Error(ParseError(msg, location)) =>
             def error(args: Seq[Expr[String]]) =
               import quotes.reflect.*
-              val baseOffset = args(part).asTerm.pos.start
-              val pos = Position(jsonStringContext.asTerm.pos.sourceFile, baseOffset + offset, baseOffset + offset)
-              report.errorAndAbort(msg + s"($part, $offset)", pos)
+              val baseOffset = args(location.part).asTerm.pos.start
+              val pos = Position(jsonStringContext.asTerm.pos.sourceFile, baseOffset + location.offset, baseOffset + location.offset)
+              report.errorAndAbort(msg + s"(${location.part}, ${location.offset})", pos)
             sc match
               case '{ new scala.StringContext(${Varargs(args)}: _*) } => error(args)
               case '{     scala.StringContext(${Varargs(args)}: _*) } => error(args)

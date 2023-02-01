@@ -14,4 +14,4 @@ private enum Token:
   case Str(value: String)
   case InterpolatedValue
   case End
-  case Error(msg: String, part: Int, offset: Int)
+  case Error(msg: String, location: Location)

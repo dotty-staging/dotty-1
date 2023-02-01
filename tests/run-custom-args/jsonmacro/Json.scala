@@ -9,9 +9,9 @@ type Json = JsonObject | JsonArray | Double | String | Boolean | Null
 
 object Json:
   def apply(json: String): Json =
-    new Parser(Seq(json)).parse() match
+    Parser(Seq(json)).parse() match
       case Success(ast) => fromPattern(ast)
-      case Error(ParseError(msg, 0, offset)) =>
+      case Error(ParseError(msg, location)) =>
         ???
 
   private def fromPattern(ast: Pattern): Json =

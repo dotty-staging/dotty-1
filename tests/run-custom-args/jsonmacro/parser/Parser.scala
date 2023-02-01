@@ -3,9 +3,12 @@ package jsonlib.parser
 import jsonlib.util.*
 import jsonlib.Pattern
 
-private[jsonlib] class Parser(source: Seq[String]):
 
-  private val tokens = new Tokens(source)
+private[jsonlib] object Parser:
+  def apply(source: Seq[String]): Parser =
+    new Parser(new Tokens(new InterpolatedChars(source)))
+
+private[jsonlib] class Parser private(tokens: Tokens):
 
   private type ![T] = Result.Continuation[Pattern, ParseError] ?=> T
 
@@ -29,7 +32,7 @@ private[jsonlib] class Parser(source: Seq[String]):
           else commaSeparate(parseNameValue)
         accept(Token.CloseBrace)
         nameValues.map(_._1).groupBy(x => x).filter(_._2.length > 1).foreach { x =>
-          error(s"Duplicate name: ${x._1}")
+          error(s"Duplicate name: ${x._1}", tokens.location)
         }
         Pattern.Obj(nameValues*)
       case Token.OpenBracket =>
@@ -40,8 +43,10 @@ private[jsonlib] class Parser(source: Seq[String]):
         Pattern.Arr(values*)
       case Token.InterpolatedValue =>
         Pattern.InterpolatedValue
+      case Token.Error(msg, location) =>
+        error(msg, location)
       case token =>
-        error(s"unexpected start of value: $token")
+        error(s"unexpected start of value: $token", tokens.location)
 
   private def commaSeparate[T](parseItem: () => ![T]): ![Vector[T]] =
     def parseNext(values: Vector[T]): Vector[T] =
@@ -57,12 +62,14 @@ private[jsonlib] class Parser(source: Seq[String]):
       case Token.Str(value) =>
         accept(Token.Colon)
         value -> parseValue()
+      case Token.Error(msg, location) =>
+        error(msg, location)
       case _ =>
-        error("expected string literal")
+        error("expected string literal", tokens.location)
 
   private def accept(token: Token): ![Unit] =
     val nextToken = tokens.next()
-    if token != nextToken then error(s"expected token $token but got $nextToken")
+    if token != nextToken then error(s"expected token $token but got $nextToken", tokens.location)
 
-  private def error(msg: String): ![Nothing] =
-    Result.continuation.error(ParseError(msg, tokens.part, tokens.offset))
+  private def error(msg: String, location: Location): ![Nothing] =
+    Result.continuation.error(ParseError(msg, location))
