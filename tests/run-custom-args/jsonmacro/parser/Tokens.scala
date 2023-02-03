@@ -61,7 +61,15 @@ private class Tokens(chars: InterpolatedChars):
             case 'n' => stringBuffer += '\n'
             case 'r' => stringBuffer += '\r'
             case 't' => stringBuffer += '\t'
-            case 'u' => error("HEX not supported") // TODO support 4 hexadecimal digits
+            case 'u' =>
+              def hex =
+                val c = nextCharOrError()
+                if ('0' <= c && c <= '9') || ('A' <= c && c <= 'F') || ('a' <= c && c <= 'f') then c
+                else error("Expected hex digit [0-9a-fA-F]")
+              val num = Integer.parseInt(hex.toString + hex + hex + hex, 16)
+              stringBuffer += num.toChar
+            case _ =>
+              error("unexpected escaped character")
           parseChars()
         case char if char.isControl =>
           error("unexpected control character")

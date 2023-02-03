@@ -24,6 +24,10 @@ import jsonlib.*
   json"-1E-35" : Double
   json"-1E+35" : Double
 
+  json"\"\\u0046\"" : String
+  json"\"\\u1A3F\"" : String
+  json"\"\\u1a3f\"" : String
+
   println(json" null ")
   println(json"[true]")
   println(json"[true, true]")
