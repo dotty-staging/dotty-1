@@ -46,7 +46,7 @@ private class Tokens(chars: InterpolatedChars):
           Token.Error(s"unexpected start of token ${chars.nextChar()}", chars.location)
 
   private def readString()(using boundary.Label[Token]): Token =
-    assert(chars.nextChar() == '"')
+    assert(nextCharOrError() == '"')
     val stringBuffer = new collection.mutable.StringBuilder()
     def parseChars(): String =
       nextCharOrError() match
@@ -61,38 +61,39 @@ private class Tokens(chars: InterpolatedChars):
             case 'n' => stringBuffer += '\n'
             case 'r' => stringBuffer += '\r'
             case 't' => stringBuffer += '\t'
-            case 'u' => boundary.break(Token.Error("HEX not supported", chars.location)) // TODO support 4 hexadecimal digits
+            case 'u' => error("HEX not supported") // TODO support 4 hexadecimal digits
           parseChars()
         case char if char.isControl =>
-          boundary.break(Token.Error("unexpected control character", chars.location))
+          error("unexpected control character")
         case char =>
           stringBuffer += char
           parseChars()
     Token.Str(parseChars())
 
   private def readNum(): Token =
-    Token.Error("JSON number not supported", chars.location) // TODO support numbers
+    error("JSON number not supported") // TODO support numbers
 
   private def nextCharOrError()(using boundary.Label[Token]): Char =
-    if chars.atPartEnd then boundary.break(Token.Error("unexpected end", chars.location))
+    if chars.atPartEnd then error("unexpected end")
     else chars.nextChar()
 
   private def accept(char: Char, token: Token)(using boundary.Label[Token]): Token =
     nextCharOrError() match
       case `char` => token
       case next =>
-        boundary.break(Token.Error(s"unexpected character: got $char but got $next", chars.location))
+        error(s"unexpected character: got $char but got $next")
 
   private def accept(str: String, token: Token)(using boundary.Label[Token]): Token =
     for char <- str if char != nextCharOrError() do //
-      boundary.break(Token.Error(s"expected `$char` (of $str)", chars.location))
+      error(s"expected `$char` (of $str)")
 
     def isEndOfToken(char: Char): Boolean =
       char.isWhitespace || char == '}' || char == ']' || char == ','
 
     if !chars.atPartEnd && !isEndOfToken(chars.peekChar()) then
-      boundary.break(Token.Error("expected end of token", chars.location))
+      error("expected end of token")
     else
       token
 
-    // TODO def error(...)(using boundary.Label[Token])
+  private def error(msg: String)(using boundary.Label[Token]): Nothing =
+    boundary.break(Token.Error(msg, chars.location))
