@@ -25,7 +25,7 @@ private[jsonlib] class Parser private(tokens: Tokens):
       case Token.True => Pattern.Bool(true)
       case Token.False => Pattern.Bool(false)
       case Token.Str(value) => Pattern.Str(value)
-      case Token.Num(value) => Pattern.Num(???)
+      case Token.Num(value) => Pattern.Num(value.toDouble)
       case Token.OpenBrace =>
         val nameValues =
           if tokens.peek() == Token.CloseBrace then Vector.empty

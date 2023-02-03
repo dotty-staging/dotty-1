@@ -70,8 +70,56 @@ private class Tokens(chars: InterpolatedChars):
           parseChars()
     Token.Str(parseChars())
 
-  private def readNum(): Token =
-    error("JSON number not supported") // TODO support numbers
+  private def readNum()(using boundary.Label[Token]): Token =
+    val num = new StringBuilder
+
+    def readDigits() =
+      def peekIsDigit() =
+        if atEndOfToken then false
+        else
+          val char = chars.peekChar()
+          '0' <= char && char <= '9'
+      while peekIsDigit() do num += nextCharOrError()
+
+    def readExponent() =
+      if atEndOfToken then ()
+      else chars.peekChar() match
+        case 'e' | 'E' =>
+          num += nextCharOrError()
+          chars.peekChar() match
+            case '+' => num += nextCharOrError()
+            case '-' => num += nextCharOrError()
+            case _ =>
+          readDigits()
+          if !atEndOfToken then
+            error(s"Expected end of number")
+        case c =>
+          error(s"Unexpected character in number exponent: $c")
+
+    def readDecimal() =
+      if atEndOfToken then ()
+      else
+        chars.peekChar() match
+          case '.' =>
+            num += nextCharOrError()
+            readDigits()
+          case _ =>
+        readExponent()
+
+    def readPosNum() =
+      val char = nextCharOrError()
+      num += char
+      if '1' <= char && char <= '9' then
+        readDigits()
+      else if char != '0' then
+        error(s"Unexpected character in number: $char")
+      readDecimal()
+
+    if !chars.atPartEnd && chars.peekChar() == '-' then
+      num += nextCharOrError()
+    readPosNum()
+
+    Token.Num(num.toString)
 
   private def nextCharOrError()(using boundary.Label[Token]): Char =
     if chars.atPartEnd then error("unexpected end")
@@ -83,14 +131,16 @@ private class Tokens(chars: InterpolatedChars):
       case next =>
         error(s"unexpected character: got $char but got $next")
 
+  private def atEndOfToken: Boolean =
+    if chars.atPartEnd then true
+    else
+      val char = chars.peekChar()
+      char.isWhitespace || char == '}' || char == ']' || char == ','
+
   private def accept(str: String, token: Token)(using boundary.Label[Token]): Token =
     for char <- str if char != nextCharOrError() do //
       error(s"expected `$char` (of $str)")
-
-    def isEndOfToken(char: Char): Boolean =
-      char.isWhitespace || char == '}' || char == ']' || char == ','
-
-    if !chars.atPartEnd && !isEndOfToken(chars.peekChar()) then
+    if !chars.atPartEnd && !atEndOfToken then
       error("expected end of token")
     else
       token

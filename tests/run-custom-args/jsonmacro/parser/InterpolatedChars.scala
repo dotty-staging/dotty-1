@@ -1,6 +1,6 @@
 package jsonlib.parser
 
-private class InterpolatedChars(source: Seq[String]):
+private class InterpolatedChars(val source: Seq[String]):
 
   private var part: Int = 0
   private var offset: Int = 0

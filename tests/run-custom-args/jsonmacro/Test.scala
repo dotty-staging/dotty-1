@@ -9,6 +9,21 @@ import jsonlib.*
   val s: String = json"""""""" // empty string
   val s2: String = json"\"\"" // empty string
 
+  json"0" : Double
+  json"-0" : Double
+  json"1" : Double
+  json"-1" : Double
+  json"-1.1" : Double
+  json"15345.15445" : Double
+  json"-15345.15445" : Double
+  json"-1.1e33" : Double
+  json"-1.1e+34" : Double
+  json"-1.1e-35" : Double
+  json"-1e-35" : Double
+  json"-1e+35" : Double
+  json"-1E-35" : Double
+  json"-1E+35" : Double
+
   println(json" null ")
   println(json"[true]")
   println(json"[true, true]")
