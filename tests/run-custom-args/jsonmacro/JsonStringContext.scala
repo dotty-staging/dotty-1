@@ -15,4 +15,4 @@ object JsonStringContext:
       ${ jsonExpr('jsonStringContext, 'args) }
 
     transparent inline def unapplySeq(scrutinee: Json): Option[Seq[Json]] =
-      ${ jsonUnapplySeqExpr('jsonStringContext, 'scrutinee) }: Option[Seq[Json]]
+      ${ jsonUnapplySeqExpr('jsonStringContext, 'scrutinee) }
