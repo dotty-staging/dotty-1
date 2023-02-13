@@ -7,6 +7,7 @@ import dotty.tools.dotc.config.SourceVersion._
 import dotty.tools.dotc.core._
 import dotty.tools.dotc.core.Annotations._
 import dotty.tools.dotc.core.Contexts._
+import dotty.tools.dotc.core.ContextOps.enter
 import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Flags._
 import dotty.tools.dotc.core.NameKinds.PatMatGivenVarName
@@ -20,6 +21,7 @@ import dotty.tools.dotc.inlines.PrepareInlineable
 import dotty.tools.dotc.transform.SymUtils._
 import dotty.tools.dotc.typer.Implicits._
 import dotty.tools.dotc.typer.Inferencing._
+import dotty.tools.dotc.util.Property
 import dotty.tools.dotc.util.Spans._
 import dotty.tools.dotc.util.Stats.record
 import dotty.tools.dotc.reporting.IllegalVariableInPatternAlternative
@@ -30,6 +32,7 @@ trait QuotesAndSplices {
   self: Typer =>
 
   import tpd._
+  import QuotesAndSplices._
 
   /** Translate `'{ e }` into `scala.quoted.Expr.apply(e)` and `'[T]` into `scala.quoted.Type.apply[T]`
    *  while tracking the quotation level in the context.
@@ -149,19 +152,28 @@ trait QuotesAndSplices {
    *  The resulting pattern is the split in `splitQuotePattern`.
    */
   def typedQuotedTypeVar(tree: untpd.Ident, pt: Type)(using Context): Tree =
-    def spliceOwner(ctx: Context): Symbol =
-      if (ctx.mode.is(Mode.QuotedPattern)) spliceOwner(ctx.outer) else ctx.owner
-    val name = tree.name.toTypeName
-    val nameOfSyntheticGiven = PatMatGivenVarName.fresh(tree.name.toTermName)
-    val expr = untpd.cpy.Ident(tree)(nameOfSyntheticGiven)
-    val typeSymInfo = pt match
-      case pt: TypeBounds => pt
-      case _ => TypeBounds.empty
-    val typeSym = newSymbol(spliceOwner(ctx), name, EmptyFlags, typeSymInfo, NoSymbol, tree.span)
-    typeSym.addAnnotation(Annotation(New(ref(defn.QuotedRuntimePatterns_patternTypeAnnot.typeRef)).withSpan(tree.span)))
-    val pat = typedPattern(expr, defn.QuotedTypeClass.typeRef.appliedTo(typeSym.typeRef))(
-        using spliceContext.retractMode(Mode.QuotedPattern).withOwner(spliceOwner(ctx)))
-    pat.select(tpnme.Underlying)
+    getTypeBinding(tree.name.asTypeName) match
+      case Some(binding) =>
+        pt match
+          case pt: TypeBounds => binding.typeRef <:< pt.hi
+          case _ =>
+        Ident(binding.typeRef)
+      case None => ???
+
+    // println(">> " + tree)
+    // def spliceOwner(ctx: Context): Symbol =
+    //   if (ctx.mode.is(Mode.QuotedPattern)) spliceOwner(ctx.outer) else ctx.owner
+    // val name = tree.name.toTypeName
+    // val nameOfSyntheticGiven = PatMatGivenVarName.fresh(tree.name.toTermName)
+    // val expr = untpd.cpy.Ident(tree)(nameOfSyntheticGiven)
+    // val typeSymInfo = pt match
+    //   case pt: TypeBounds => pt
+    //   case _ => TypeBounds.empty
+    // val typeSym = newSymbol(spliceOwner(ctx), name, EmptyFlags, typeSymInfo, NoSymbol, tree.span)
+    // typeSym.addAnnotation(Annotation(New(ref(defn.QuotedRuntimePatterns_patternTypeAnnot.typeRef)).withSpan(tree.span)))
+    // val pat = typedPattern(expr, defn.QuotedTypeClass.typeRef.appliedTo(typeSym.typeRef))(
+    //     using spliceContext.retractMode(Mode.QuotedPattern).withOwner(spliceOwner(ctx)))
+    // pat.select(tpnme.Underlying)
 
   def typedHole(tree: untpd.Hole, pt: Type)(using Context): Tree =
     val tpt = typedType(tree.tpt)
@@ -393,7 +405,6 @@ trait QuotesAndSplices {
       case _ => defn.AnyType
     }
     val quoted0 = desugar.quotedPattern(quoted, untpd.TypedSplice(TypeTree(quotedPt)))
-    val quoteCtx = quoteContext.addMode(Mode.QuotedPattern).retractMode(Mode.Pattern)
 
     def normalizeTypeBindings(quoted: untpd.Tree): untpd.Tree =
       val variables = mutable.Set.empty[TypeName] // TODO use stable order
@@ -403,7 +414,7 @@ trait QuotesAndSplices {
             case untpd.Ident(tpnme.WILDCARD_STAR) => tpt
             case tpt @ untpd.Ident(name) if name.isTypeName && !tpt.isBackquoted && name.isVarPattern =>
               variables += name.asTypeName
-              tpt.pushAttachment(Trees.Backquoted, ())
+              // tpt.pushAttachment(Trees.Backquoted, ())
               tpt
             case _: untpd.TypedSplice => tpt
             case _ => super.transform(tpt)
@@ -439,15 +450,15 @@ trait QuotesAndSplices {
           case _ => Nil
       variables --= typeBindingDefinedInSource
 
-      // println("==============")
-      // println(quoted.show)
-      // println(quoted)
-      // println("--------------")
-      // println(transformed.show)
-      // println(transformed)
-      // println(" ")
-      // println(variables)
-      // println(" ")
+      println("==============")
+      println(quoted.show)
+      println(quoted)
+      println("--------------")
+      println(transformed.show)
+      println(transformed)
+      println(" ")
+      println(variables)
+      println(" ")
 
       if variables.isEmpty then transformed
       else
@@ -468,10 +479,45 @@ trait QuotesAndSplices {
               transformed
             )
 
-    val quoted0normalized = normalizeTypeBindings(quoted0)
+    // val quoted0normalized1 = normalizeTypeBindings(quoted0)
+    val (bindingSyms, quoted0normalized1) = normalizeTypeBindings(quoted0) match
+      case normalized @ untpd.Block(stats, expr) =>
+        val typeBindings = stats.takeWhile {
+          case untpd.TypeDef(name, _) => name.isVarPattern
+          case _ => false
+        }
+        val otherStats = stats.dropWhile {
+          case untpd.TypeDef(name, _) => name.isVarPattern
+          case _ => false
+        }
+        val bindingSyms = typeBindings.map {
+          case untpd.TypeDef(name, _) => newSymbol(ctx.owner, name, EmptyFlags, TypeBounds.empty)
+        }
+        (bindingSyms, untpd.cpy.Block(normalized)(otherStats, expr))
+      case tree => (Nil, tree)
+
+    val quoteCtx =
+      quoteContext.addMode(Mode.QuotedPattern).retractMode(Mode.Pattern)
+        .withTypeBindings(bindingSyms)
+
+    println(bindingSyms)
+    println(quoted0normalized1.show)
+
     val quoted1 =
-      if quoted.isType then typedType(quoted0normalized, WildcardType)(using quoteCtx)
-      else typedExpr(quoted0normalized, WildcardType)(using quoteCtx)
+      if quoted.isType then typedType(quoted0normalized1, WildcardType)(using quoteCtx)
+      else typedExpr(quoted0normalized1, WildcardType)(using quoteCtx)
+
+    println("gadt.fullBounds:" + bindingSyms.map(sym => quoteCtx.gadt.fullBounds(sym).show))
+    println(quoted1.show)
+
+    // val newTypeBindings = bindingSyms.map { sym =>
+    //   val bounds = quoteCtx1.gadt.fullBounds(sym)
+    //   println(bounds)
+    //   newSymbol(sym.owner, (sym.name.toString + "2").toTypeName, EmptyFlags, bounds)
+    // }
+    // val quoted2 = cpy.Block(quoted1)(newTypeBindings.map(TypeDef), quoted1.subst(bindingSyms, newTypeBindings))
+
+    println(quoted1.show)
 
     val (typeBindings, shape, splices) = splitQuotePattern(quoted1)
 
@@ -528,3 +574,19 @@ trait QuotesAndSplices {
       proto = quoteClass.typeRef.appliedTo(replaceBindings(quoted1.tpe) & quotedPt))
   }
 }
+
+object QuotesAndSplices:
+
+  private val PatternTypeBindings = new Property.Key[Map[TypeName, Symbol]]
+
+  def getTypeBinding(name: TypeName)(using Context): Option[Symbol] =
+    ctx.property(PatternTypeBindings).get.get(name)
+
+  extension (ctx: Context)
+    def withTypeBindings(bindings: List[Symbol]): Context =
+      if bindings.isEmpty then ctx
+      else
+        val newCtx = ctx.fresh.setNewScope.setFreshGADTBounds.addMode(Mode.GadtConstraintInference)
+        for binding <- bindings do newCtx.enter(binding)
+        newCtx.gadtState.addToConstraint(bindings)(using newCtx)
+        newCtx.setProperty(PatternTypeBindings, bindings.map(sym => (sym.name(using ctx).asTypeName, sym)).toMap)
