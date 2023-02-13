@@ -166,7 +166,7 @@ trait QuotesAndSplices {
           tree.srcPos,
           "\n\nSIP-53: https://docs.scala-lang.org/sips/quote-pattern-type-variable-syntax.html")
         if !(typeSymInfo =:= TypeBounds.empty) && !(typeSym.info <:< typeSymInfo) then
-          report.warning(em"Ignored bound$typeSymInfo\n\nConsider defining bounds explicitly `'{ $typeSym$typeSymInfo; ... }`", tree.srcPos)
+          report.warning(em"Ignored bound$typeSymInfo\n\nConsider defining bounds explicitly `'{ $typeSym${typeSym.info & typeSymInfo}; ... }`", tree.srcPos)
         ref(typeSym)
       case None =>
         def spliceOwner(ctx: Context): Symbol =
@@ -211,11 +211,11 @@ trait QuotesAndSplices {
    *  )
    *  ```
    */
-  private def splitQuotePattern(quoted: Tree)(using Context): (Map[Symbol, Bind], Tree, List[Tree]) = {
+  private def splitQuotePattern(quoted: Tree)(using Context): (Map[Symbol, Tree], Tree, List[Tree]) = {
     val ctx0 = ctx
 
-    val typeBindings: collection.mutable.Map[Symbol, Bind] = collection.mutable.Map.empty
-    def getBinding(sym: Symbol): Bind =
+    val typeBindings: collection.mutable.Map[Symbol, Tree] = collection.mutable.Map.empty
+    def getBinding(sym: Symbol): Tree =
       typeBindings.getOrElseUpdate(sym, {
         val bindingBounds = sym.info
         val bsym = newPatternBoundSymbol(sym.name.toString.stripPrefix("$").toTypeName, bindingBounds, quoted.span)
@@ -393,6 +393,17 @@ trait QuotesAndSplices {
     }
     val (untpdTypeVariables, quoted0) = desugar.quotedPatternTypeVariables(desugar.quotedPattern(quoted, untpd.TypedSplice(TypeTree(quotedPt))))
 
+    for tdef @ untpd.TypeDef(_, rhs) <- untpdTypeVariables do rhs match
+      case _: TypeBoundsTree => // ok
+      case LambdaTypeTree(_, body: TypeBoundsTree) => // ok
+      case _ => report.error("Quote type variable definition cannot be an alias", tdef.srcPos)
+
+    if quoted.isType && untpdTypeVariables.nonEmpty then
+      checkExperimentalFeature(
+        "explicit type variable declarations quoted type patterns (SIP-53)",
+        untpdTypeVariables.head.srcPos,
+        "\n\nSIP-53: https://docs.scala-lang.org/sips/quote-pattern-type-variable-syntax.html")
+
     val (typeTypeVariables, patternCtx) =
       val quoteCtx = quotePatternContext()
       if untpdTypeVariables.isEmpty then (Nil, quoteCtx)
@@ -403,7 +414,7 @@ trait QuotesAndSplices {
         addQuotedPatternTypeVariable(typeVariable.symbol)
 
       val pattern =
-        if quoted.isType then typedType(quoted0, WildcardType)
+        if quoted.isType then typedType(quoted0, WildcardType)(using patternCtx)
         else typedExpr(quoted0, WildcardType)
 
       if untpdTypeVariables.isEmpty then pattern
