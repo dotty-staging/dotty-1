@@ -194,6 +194,10 @@ object LiftCoverage extends LiftImpure {
     val liftedArgs = liftArgs(defs, tree.fun.tpe, tree.args)(using liftingArgsContext)
     tpd.cpy.Apply(tree)(liftedFun, liftedArgs)
   }
+
+  override def liftedFlags: FlagSet = Method
+
+  override def liftedDef(sym: TermSymbol, rhs: tpd.Tree)(using Context): tpd.DefDef = tpd.DefDef(sym, rhs)
 }
 
 object LiftErased extends LiftComplex:
