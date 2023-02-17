@@ -24,6 +24,8 @@ import CaptureSet.{CompareResult, IdempotentCaptRefMap, IdentityCaptRefMap}
 
 import scala.annotation.internal.sharable
 import scala.annotation.threadUnsafe
+import dotty.tools.dotc.refine.RefinementType
+import dotty.tools.dotc.refine.derivedRefinementType
 
 object TypeOps:
 
@@ -175,6 +177,8 @@ object TypeOps:
           simplify(parent, theMap)
         else
           mapOver
+      case tp @ RefinementType(parent, refinement) =>
+        mapOver
       case tp @ AnnotatedType(parent, annot) =>
         val parent1 = simplify(parent, theMap)
         if annot.symbol == defn.UncheckedVarianceAnnot
@@ -298,6 +302,8 @@ object TypeOps:
           return tp1.rebind(approximateOr(tp1.parent, tp2))
         case CapturingType(parent1, refs1) =>
           return tp1.derivedCapturingType(approximateOr(parent1, tp2), refs1)
+        case RefinementType(parent1, refinement1) =>
+          return tp1.derivedRefinementType(approximateOr(parent1, tp2), refinement1)
         case err: ErrorType =>
           return err
         case _ =>
@@ -307,6 +313,8 @@ object TypeOps:
           return tp2.rebind(approximateOr(tp1, tp2.parent))
         case CapturingType(parent2, refs2) =>
           return tp2.derivedCapturingType(approximateOr(tp1, parent2), refs2)
+        case RefinementType(parent2, refinement2) =>
+          return tp2.derivedRefinementType(approximateOr(tp1, parent2), refinement2)
         case err: ErrorType =>
           return err
         case _ =>

@@ -560,6 +560,7 @@ class OrderingConstraint(private val boundsMap: ParamBounds,
       case CapturingType(parent, refs) =>
         val parent1 = recur(parent)
         if parent1 ne parent then tp.derivedCapturingType(parent1, refs) else tp
+      // TODO(mbovel): add case?
       case tp: AnnotatedType =>
         val parent1 = recur(tp.parent)
         if parent1 ne tp.parent then tp.derivedAnnotatedType(parent1, tp.annot) else tp

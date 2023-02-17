@@ -319,7 +319,7 @@ trait ImportSuggestions:
    *  If there's nothing to suggest, an empty string is returned.
    */
   override def importSuggestionAddendum(pt: Type)(using Context): String =
-    if ctx.phase == Phases.checkCapturesPhase then
+    if ctx.phase == Phases.checkCapturesPhase || ctx.phase == Phases.checkRefinementsPhase then
       return "" // it's too late then to look for implicits
     val (fullMatches, headMatches) =
       importSuggestions(pt)(using ctx.fresh.setExploreTyperState())

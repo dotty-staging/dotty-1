@@ -84,7 +84,7 @@ object Recheck:
      *  type stored in the tree itself
      */
     def rememberTypeAlways(tpe: Type)(using Context): Unit =
-      if tpe ne tree.tpe then tree.putAttachment(RecheckedType, tpe)
+      if tpe ne tree.knownType then tree.putAttachment(RecheckedType, tpe)
 
     /** The remembered type of the tree, or if none was installed, the original type */
     def knownType: Type =
@@ -323,10 +323,11 @@ abstract class Recheck extends Phase, SymTransformer:
       recheck(tree.thenp, pt) | recheck(tree.elsep, pt)
 
     def recheckClosure(tree: Closure, pt: Type)(using Context): Type =
-      if tree.tpt.isEmpty then
+      val res = if tree.tpt.isEmpty then
         tree.meth.tpe.widen.toFunctionType(tree.meth.symbol.is(JavaDefined))
       else
         recheck(tree.tpt)
+      res
 
     def recheckMatch(tree: Match, pt: Type)(using Context): Type =
       val selectorType = recheck(tree.selector)

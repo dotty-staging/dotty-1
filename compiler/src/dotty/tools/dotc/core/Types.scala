@@ -37,6 +37,7 @@ import reporting.{trace, Message}
 import java.lang.ref.WeakReference
 import compiletime.uninitialized
 import cc.{CapturingType, CaptureSet, derivedCapturingType, isBoxedCapturing, EventuallyCapturingType, boxedUnlessFun}
+import refine.{RefinementType, derivedRefinementType}
 import CaptureSet.{CompareResult, IdempotentCaptRefMap, IdentityCaptRefMap}
 
 import scala.annotation.internal.sharable
@@ -44,6 +45,7 @@ import scala.annotation.threadUnsafe
 
 import dotty.tools.dotc.transform.SymUtils._
 
+import dotty.tools.dotc.refine.RefinementType
 object Types {
 
   @sharable private var nextId = 0
@@ -367,6 +369,7 @@ object Types {
       case tp: LambdaType => tp.resultType.unusableForInference || tp.paramInfos.exists(_.unusableForInference)
       case WildcardType(optBounds) => optBounds.unusableForInference
       case CapturingType(parent, refs) => parent.unusableForInference || refs.elems.exists(_.unusableForInference)
+      case RefinementType(parent, _) => parent.unusableForInference
       case _: ErrorType => true
       case _ => false
 
@@ -1393,6 +1396,8 @@ object Types {
         tp match
           case tp @ CapturingType(parent, refs) =>
             tp.derivedCapturingType(parent1, refs)
+          case tp @ RefinementType(parent, refinement) =>
+            tp.derivedRefinementType(parent1, refinement)
           case _ =>
             if keep(tp) then tp.derivedAnnotatedType(parent1, tp.annot)
             else parent1
@@ -3807,6 +3812,9 @@ object Types {
                     case tp: TermParamRef if tp.binder eq thisLambdaType => combine(s, CaptureDeps)
                     case _ => s
                 }
+              case RefinementType(parent, refinement) =>
+                // TODO(mbovel)
+                compute(status, tp.parent, theAcc)
               case _ =>
                 if tp.annot.refersToParamOf(thisLambdaType) then TrueDeps
                 else compute(status, tp.parent, theAcc)
@@ -3874,6 +3882,8 @@ object Types {
             case tp @ TermParamRef(`thisLambdaType`, _) =>
               range(defn.NothingType, atVariance(1)(apply(tp.underlying)))
             case CapturingType(_, _) =>
+              mapOver(tp)
+            case RefinementType(_, _) =>
               mapOver(tp)
             case AnnotatedType(parent, ann) if ann.refersToParamOf(thisLambdaType) =>
               val parent1 = mapOver(parent)
@@ -4976,6 +4986,7 @@ object Types {
           else givenSelf match
             case givenSelf @ EventuallyCapturingType(tp, _) =>
               givenSelf.derivedAnnotatedType(tp & appliedRef, givenSelf.annot)
+            // TODO(mbovel): add RefinementType case?
             case _ =>
               AndType(givenSelf, appliedRef)
         }
@@ -5604,6 +5615,8 @@ object Types {
       tp.derivedAnnotatedType(underlying, annot)
     protected def derivedCapturingType(tp: Type, parent: Type, refs: CaptureSet): Type =
       tp.derivedCapturingType(parent, refs)
+    protected def derivedRefinementType(tp: Type, parent: Type, refinemnent: refine.Refinement): Type =
+      tp.derivedRefinementType(parent, refinemnent)
     protected def derivedWildcardType(tp: WildcardType, bounds: Type): Type =
       tp.derivedWildcardType(bounds)
     protected def derivedSkolemType(tp: SkolemType, info: Type): Type =
@@ -5645,6 +5658,12 @@ object Types {
       try derivedCapturingType(tp, this(parent), refs.map(this))
       finally variance = saved
 
+    protected def mapRefinementType(tp: Type, parent: Type, refinement: refine.Refinement, v: Int): Type =
+      val saved = variance
+      variance = v
+      try derivedRefinementType(tp, this(parent), refinement)
+      finally variance = saved
+
     /** Map this function over given type */
     def mapOver(tp: Type): Type = {
       record(s"TypeMap mapOver ${getClass}")
@@ -5682,6 +5701,9 @@ object Types {
 
         case CapturingType(parent, refs) =>
           mapCapturingType(tp, parent, refs, variance)
+
+        case RefinementType(parent, refinement) =>
+          mapRefinementType(tp, parent, refinement, variance)
 
         case tp @ AnnotatedType(underlying, annot) =>
           val underlying1 = this(underlying)
@@ -6183,6 +6205,10 @@ object Types {
 
       case CapturingType(parent, refs) =>
         (this(x, parent) /: refs.elems)(this)
+
+      case RefinementType(parent, refinement) =>
+        // TODO(mbovel): check that if this makes sense.
+        this(x, parent)
 
       case AnnotatedType(underlying, annot) =>
         this(applyToAnnot(x, annot), underlying)
