@@ -26,6 +26,14 @@ object MiMaFilters {
     ProblemFilters.exclude[MissingFieldProblem]("scala.runtime.stdLibPatches.language#experimental.into"),
     ProblemFilters.exclude[MissingClassProblem]("scala.runtime.stdLibPatches.language$experimental$into$"),
     // end of New experimental features in 3.3.X
+
+    // New API in 3.4.X
+    ProblemFilters.exclude[ReversedMissingMethodProblem]("scala.quoted.Quotes#reflectModule.ValOrDefDefTypeTest"),
+    ProblemFilters.exclude[ReversedMissingMethodProblem]("scala.quoted.Quotes#reflectModule.ValOrDefDefMethods"),
+    ProblemFilters.exclude[DirectMissingMethodProblem]("scala.quoted.Quotes#reflectModule.ValOrDefDefTypeTest"),
+    ProblemFilters.exclude[DirectMissingMethodProblem]("scala.quoted.Quotes#reflectModule.ValOrDefDefMethods"),
+    ProblemFilters.exclude[MissingClassProblem]("scala.quoted.Quotes$reflectModule$ValOrDefDefMethods"),
+    // New API in 3.4.X
   )
   val TastyCore: Seq[ProblemFilter] = Seq(
     ProblemFilters.exclude[DirectMissingMethodProblem]("dotty.tools.tasty.TastyBuffer.reset"),
