@@ -2497,7 +2497,7 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
       if sym.isScala2Macro then typedScala2MacroBody(ddef.rhs)(using rhsCtx)
       else typedExpr(ddef.rhs, tpt1.tpe.widenExpr)(using rhsCtx))
 
-    if sym.isInlineMethod then
+    if sym.isInlineMethod || (sym.is(Method) && sym.owner.isAllOf(Trait | Inline)) then
       if StagingLevel.level > 0 then
         report.error("inline def cannot be within quotes", sym.sourcePos)
       if sym.is(Given)
@@ -2662,9 +2662,9 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
     }
 
     def generateInlineTraitsDefs(parents: List[Tree]): List[Tree] = {
-      def rhs(sym: Symbol, argss: List[List[Tree]]) = {
-        tpd.ref(defn.Predef_undefined)
-      }
+      def rhs(oldDefSym: Symbol, newDefSym: Symbol, argss: List[List[Tree]])(using Context) =
+        val sup = Super(This(newDefSym.owner.asClass), oldDefSym.owner.name.asTypeName)
+        Inlines.inlineCall(sup.select(oldDefSym).appliedToArgss(argss).withSpan(newDefSym.span))
 
       def isInlineable(decl: Symbol): Boolean = !decl.isConstructor && !decl.isType
 
@@ -2705,14 +2705,14 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           val constrParamsToArgs: ParamsToArgs = mapConstructorArgss(parent, parentTypeParamSymss, Nil)
           parent -> (parentSym, inlineableDefs, constrParamsToArgs)
         }).toMap
-      val inlinedSyms = classSyms.transform{ case (parent, (parentSym, defSyms, paramsToArgs)) => defSyms.map(sym => {
+      val inlinedDefs = classSyms.flatMap{ case (parent, (parentSym, defSyms, paramsToArgs)) => defSyms.map(sym => {
         val inlineInfoMap = new TypeMap {
           def apply(tp: Type): Type = tp match {
               case tr: TypeRef => paramsToArgs.getOrElse(tr, mapOver(tp))
               case _ => mapOver(tp)
           }
         }
-        newSymbol(
+        val newSym = newSymbol(
           cls,
           sym.name,
           sym.flags | Override,
@@ -2720,10 +2720,11 @@ class Typer(@constructorOnly nestingLevel: Int = 0) extends Namer
           sym.privateWithin,
           cls.coord
         ).asTerm.entered
+
+        DefDef(newSym, argss => rhs(sym, newSym, argss)(using ctx.withOwner(newSym)))
       })}
-      val inlinedDefs: List[DefDef] =
-        inlinedSyms.flatMap{(_, defSyms) => defSyms.map(sym => DefDef(sym, argss => rhs(sym, argss)))}.toList // appliedToArgss(argss)
-      inlinedDefs
+
+      inlinedDefs.toList
     }
 
     ensureCorrectSuperClass()
