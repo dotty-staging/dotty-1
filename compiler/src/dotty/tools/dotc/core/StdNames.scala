@@ -537,6 +537,7 @@ object StdNames {
     val name: N                 = "name"
     val nameDollar: N           = "$name"
     val ne: N                   = "ne"
+    val newFors: N              = "newFors"
     val newFreeTerm: N          = "newFreeTerm"
     val newFreeType: N          = "newFreeType"
     val newScopeWith: N         = "newScopeWith"

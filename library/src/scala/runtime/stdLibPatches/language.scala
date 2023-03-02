@@ -90,6 +90,9 @@ object language:
      */
     @compileTimeOnly("`into` can only be used at compile time in import statements")
     object into
+
+    @compileTimeOnly("`newFors` can only be used at compile time in import statements")
+    object newFors
   end experimental
 
   /** The deprecated object contains features that are no longer officially suypported in Scala.

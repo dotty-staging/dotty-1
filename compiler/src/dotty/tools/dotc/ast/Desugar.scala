@@ -1707,6 +1707,18 @@ object desugar {
           val filtered = Apply(rhsSelect(gen, nme.withFilter), makeLambda(gen, test))
           val genFrom = GenFrom(gen.pat, filtered, GenCheckMode.Ignore)
           makeFor(mapName, flatMapName, genFrom :: rest, body)
+        case GenAlias(_, _) :: _ =>
+          val (valeqs, rest) = enums.span(_.isInstanceOf[GenAlias])
+          val pats = valeqs.map { case GenAlias(pat, _) => pat }
+          val rhss = valeqs.map { case GenAlias(_, rhs) => rhs }
+          val (defpats, ids) = pats.map(makeIdPat).unzip
+          val pdefs = valeqs.lazyZip(defpats).lazyZip(rhss).map { (valeq, defpat, rhs) =>
+            val mods = defpat match
+              case defTree: DefTree => defTree.mods
+              case _ => Modifiers()
+            makePatDef(valeq, mods, defpat, rhs)
+          }
+          Block(pdefs, makeFor(mapName, flatMapName, rest, body))
         case _ =>
           EmptyTree //may happen for erroneous input
       }

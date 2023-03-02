@@ -2634,9 +2634,19 @@ object Parsers {
       if (in.token == IF) { in.nextToken(); postfixExpr(Location.InGuard) }
       else EmptyTree
 
+    def enumerators(): List[Tree] =
+      if in.featureEnabled(Feature.newFors) then
+        newEnumerators()
+      else
+        oldEnumerators()
+
     /** Enumerators ::= Generator {semi Enumerator | Guard}
      */
-    def enumerators(): List[Tree] = generator() :: enumeratorsRest()
+    def oldEnumerators(): List[Tree] = generator() :: enumeratorsRest()
+
+    /** Enumerators ::= {Pattern1 `=' Expr semi} Generator {semi Enumerator | Guard}
+     */
+    def newEnumerators(): List[Tree] = patternsUntilGenerator() ++ enumeratorsRest()
 
     def enumeratorsRest(): List[Tree] =
       if (isStatSep) {
@@ -2647,6 +2657,18 @@ object Parsers {
       else if (in.token == IF)
         guard() :: enumeratorsRest()
       else Nil
+
+    def patternsUntilGenerator(): List[Tree] =
+      if (in.token == CASE) generator() :: Nil
+      else {
+        val pat = pattern1()
+        if in.token == EQUALS then
+          atSpan(startOffset(pat), in.skipToken()) { GenAlias(pat, subExpr()) } :: {
+            if (isStatSep) in.nextToken()
+            patternsUntilGenerator()
+          } 
+        else generatorRest(pat, casePat = false) :: Nil
+      }
 
     /** Enumerator  ::=  Generator
      *                |  Guard {Guard}
