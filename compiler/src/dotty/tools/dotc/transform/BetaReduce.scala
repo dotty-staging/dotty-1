@@ -44,6 +44,83 @@ class BetaReduce extends MiniPhase:
     if app1 ne app then report.log(i"beta reduce $app -> $app1")
     app1
 
+  override def transformValDef(tree: ValDef)(using Context): Tree =
+    if !tree.symbol.maybeOwner.isClass then tree
+    else
+      val newRHS = inlineClosureBindings(tree.rhs)(using ctx.withOwner(tree.symbol))
+      cpy.ValDef(tree)(tree.name, tree.tpt, newRHS)
+
+  override def transformDefDef(tree: DefDef)(using Context): Tree =
+    if !tree.symbol.maybeOwner.isClass then tree
+    else
+      val newRHS = inlineClosureBindings(tree.rhs)(using ctx.withOwner(tree.symbol))
+      cpy.DefDef(tree)(tree.name, tree.paramss, tree.tpt, newRHS)
+
+  private def inlineClosureBindings(tree: Tree)(using Context): Tree =
+    val closureBindingRefCounts = inlinableClosuresCounts(tree)
+    val inlinableClosures = closureBindingRefCounts.filter((sym, count) => count <= 1).map((sym, count) => sym).toSet
+    if inlinableClosures.isEmpty then tree
+    else devalifyClosures(tree, inlinableClosures)
+
+  /** Find bindings containing closures and count the number of applied references to that binding
+   *  If the references is used but not applied, it will not be part of the result.
+   */
+  private def inlinableClosuresCounts(tree: Tree)(using Context): Map[Symbol, Int] = new TreeAccumulator[Map[Symbol, Int]]() {
+    def apply(symsCount: Map[Symbol, Int], tree: Tree)(using Context): Map[Symbol, Int] = tree match
+      case _: Ident => symsCount - tree.symbol // used but not applied
+      case Select(_, nme.apply) =>
+        symsCount.get(tree.symbol) match
+          case Some(count) => symsCount.updated(tree.symbol, count + 1)
+          case None => symsCount
+      case tree: Block =>
+        val symsCount1 = tree.stats.collect(closureVals).foldLeft(symsCount) {
+          (acc1, vdef) => acc1.updated(vdef.symbol, 0)
+        }
+        foldOver(symsCount1, tree)
+      case tree: Inlined =>
+        val symsCount1 = tree.bindings.collect(closureVals).foldLeft(symsCount) {
+          (acc1, vdef) => acc1.updated(vdef.symbol, 0)
+        }
+        foldOver(symsCount1, tree)
+      case _ => foldOver(symsCount, tree)
+
+    private def closureVals(using Context): PartialFunction[Tree, ValDef] = {
+      case vdef: ValDef if closureDef.unapply(vdef.rhs).isDefined => vdef
+    }
+  }.apply(Map.empty, tree)
+
+  /** Inlines and attempts to beta-reduce closure bindings */
+  private def devalifyClosures(tree: Tree, inlinableClosures: Set[Symbol])(using Context): Tree =
+    new TreeMap {
+      private val closures = MutableSymbolMap[Tree]()
+      override def transform(tree: Tree)(using Context): Tree =
+        tree match
+          case _: Ident =>
+            closures.get(tree.symbol) match
+              case Some(tree1) => tree1.changeOwner(tree.symbol, ctx.owner)
+              case _ => tree
+          case _: Apply =>
+            super.transform(tree) match
+              case tree1: Apply => transformApply(tree1)
+              case tree1 => tree1
+          case tree: Block =>
+            val newStats = filterClosureBindingAndCollectRHS(tree.stats)
+            super.transform(cpy.Block(tree)(newStats, tree.expr))
+          case tree: Inlined =>
+            val newBindings = filterClosureBindingAndCollectRHS(tree.bindings)
+            super.transform(cpy.Inlined(tree)(tree.call, newBindings, tree.expansion))
+          case _ => super.transform(tree)
+      private def filterClosureBindingAndCollectRHS[T <: Tree](xs: List[T]): List[T] =
+        xs.filterConserve {
+          case vdef: ValDef =>
+            if inlinableClosures(vdef.symbol) then
+              closures(vdef.symbol) = vdef.rhs
+              false
+            else true
+          case _ => true
+        }
+    }.transform(tree)
+
 object BetaReduce:
   import ast.tpd._
 

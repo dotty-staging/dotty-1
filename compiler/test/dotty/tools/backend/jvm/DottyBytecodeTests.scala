@@ -1682,6 +1682,67 @@ class DottyBytecodeTests extends DottyBytecodeTest {
       assertSameCode(instructions, expected)
     }
   }
+
+  @Test def beta_reduce_bound_closure = {
+    val source = """class Test:
+                   |  def test1(a: Int) =
+                   |    val f = (x: Int) => x + x
+                   |    f(a)
+                   |  def test2(cond: Boolean, a: Int) =
+                   |    val f = (x: Int) => x + x
+                   |    if cond then f(a) else 1
+                   |  def test3(cond: Boolean, a: Int) =
+                   |    val f = (x: Int) => x + x
+                   |    while cond do f(a)
+                   |    4
+                 """.stripMargin
+
+    checkBCode(source) { dir =>
+      val clsIn      = dir.lookupName("Test.class", directory = false).input
+      val clsNode    = loadClassNode(clsIn)
+
+      def test(method: String)(expected: Instruction*) =
+        val fun = getMethod(clsNode, method)
+        val instructions = instructionsFromMethod(fun)
+        val expectedList = expected.toList
+        assert(instructions == expectedList,
+          "`i was not properly beta-reduced in `test`\n" + diffInstructions(instructions, expectedList))
+
+      test("test1")(
+        VarOp(ILOAD, 1),
+        VarOp(ILOAD, 1),
+        Op(IADD),
+        Op(IRETURN)
+      )
+      test("test2")(
+        VarOp(ILOAD, 1),
+        Jump(IFEQ, Label(6)),
+        VarOp(ILOAD, 2),
+        VarOp(ILOAD, 2),
+        Op(IADD),
+        Op(IRETURN),
+        Label(6),
+        FrameEntry(3, List(), List()),
+        Op(ICONST_1),
+        Op(IRETURN)
+      )
+      test("test3")(
+        Label(0),
+        FrameEntry(3, List(), List()),
+        VarOp(ILOAD, 1),
+        Jump(IFEQ, Label(9)),
+        VarOp(ILOAD, 2),
+        VarOp(ILOAD, 2),
+        Op(IADD),
+        Op(POP),
+        Jump(GOTO, Label(0)),
+        Label(9),
+        FrameEntry(3, List(), List()),
+        Op(ICONST_4),
+        Op(IRETURN)
+      )
+    }
+  }
 }
 
 object invocationReceiversTestCode {
