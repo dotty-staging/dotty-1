@@ -114,7 +114,7 @@ class ExtractDependencies extends Phase {
     val sourceFile = ctx.compilationUnit.source.file.file
 
     def binaryDependency(file: File, binaryClassName: String) =
-      ctx.sbtCallback.binaryDependency(file, binaryClassName, fromClassName, sourceFile, dep.context)
+      ()//ctx.sbtCallback.binaryDependency(file, binaryClassName, fromClassName, sourceFile, dep.context)
 
     def processExternalDependency(depFile: AbstractFile, binaryClassName: String) = {
       depFile match {

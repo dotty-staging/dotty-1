@@ -66,8 +66,8 @@ class ExtractAPI extends Phase {
   override def run(using Context): Unit = {
     val unit = ctx.compilationUnit
     val sourceFile = unit.source.file
-    if (ctx.sbtCallback != null)
-      ctx.sbtCallback.startSource(sourceFile.file)
+    // if (ctx.sbtCallback != null)
+    //   ctx.sbtCallback.startSource(sourceFile.file)
 
     val apiTraverser = new ExtractAPICollector
     val classes = apiTraverser.apiSource(unit.tpdTree)
@@ -82,11 +82,11 @@ class ExtractAPI extends Phase {
       } finally pw.close()
     }
 
-    if ctx.sbtCallback != null &&
-      !ctx.compilationUnit.suspendedAtInliningPhase // already registered before this unit was suspended
-    then
-      classes.foreach(ctx.sbtCallback.api(sourceFile.file, _))
-      mainClasses.foreach(ctx.sbtCallback.mainClass(sourceFile.file, _))
+    // if ctx.sbtCallback != null &&
+    //   !ctx.compilationUnit.suspendedAtInliningPhase // already registered before this unit was suspended
+    // then
+    //   classes.foreach(ctx.sbtCallback.api(sourceFile.file, _))
+    //   mainClasses.foreach(ctx.sbtCallback.mainClass(sourceFile.file, _))
   }
 }
 

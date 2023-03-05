@@ -327,12 +327,12 @@ class GenBCodePipeline(val int: DottyBackendInterface, val primitives: DottyPrim
           if (ctx.compilerCallback != null)
             ctx.compilerCallback.onClassGenerated(sourceFile, convertAbstractFile(clsFile), className)
           if (ctx.sbtCallback != null) {
-            if (isLocal)
-              ctx.sbtCallback.generatedLocalClass(sourceFile.jfile.orElse(null), clsFile.file)
-            else {
-              ctx.sbtCallback.generatedNonLocalClass(sourceFile.jfile.orElse(null), clsFile.file,
-                className, fullClassName)
-            }
+            // if (isLocal)
+            //   ctx.sbtCallback.generatedLocalClass(sourceFile.jfile.orElse(null), clsFile.file)
+            // else {
+            //   ctx.sbtCallback.generatedNonLocalClass(sourceFile.jfile.orElse(null), clsFile.file,
+            //     className, fullClassName)
+            // }
           }
         }
       }

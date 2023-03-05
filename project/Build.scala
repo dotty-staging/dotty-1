@@ -548,7 +548,7 @@ object Build {
       // get libraries onboard
       libraryDependencies ++= Seq(
         "org.scala-lang.modules" % "scala-asm" % "9.4.0-scala-1", // used by the backend
-        Dependencies.oldCompilerInterface, // we stick to the old version to avoid deprecation warnings
+        Dependencies.compilerInterface,
         "org.jline" % "jline-reader" % "3.19.0",   // used by the REPL
         "org.jline" % "jline-terminal" % "3.19.0",
         "org.jline" % "jline-terminal-jna" % "3.19.0", // needed for Windows
@@ -1048,9 +1048,6 @@ object Build {
       // Referring to the other project using a string avoids an infinite loop
       // when sbt reads the settings.
       Test / test := (LocalProject("scala3-sbt-bridge-tests") / Test / test).value,
-
-      // The `newCompilerInterface` is backward compatible with the `oldCompilerInterface`
-      libraryDependencies += Dependencies.newCompilerInterface % Provided
     )
 
   // We use a separate project for the bridge tests since they can only be run
