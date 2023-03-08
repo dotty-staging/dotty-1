@@ -179,6 +179,7 @@ object Tokens extends TokensCommon {
   inline val EXPORT = 64;           enter(EXPORT, "export")
   inline val MACRO = 65;            enter(MACRO, "macro") // TODO: remove
   inline val END = 66;              enter(END, "end")
+  inline val ENACT = 67;            enter(ENACT, "enact") // TODO(kπ) this is a temporart hack, until parsing is figured out
 
   /** special symbols */
   inline val NEWLINE = 78;          enter(NEWLINE, "end of statement", "new line")
@@ -206,7 +207,7 @@ object Tokens extends TokensCommon {
   /** XML mode */
   inline val XMLSTART = 99;         enter(XMLSTART, "$XMLSTART$<") // TODO: deprecate
 
-  final val alphaKeywords: TokenSet = tokenRange(IF, END)
+  final val alphaKeywords: TokenSet = tokenRange(IF, ENACT)
   final val symbolicKeywords: TokenSet = tokenRange(USCORE, CTXARROW)
   final val keywords: TokenSet = alphaKeywords | symbolicKeywords
 
@@ -257,7 +258,7 @@ object Tokens extends TokensCommon {
   final val canStartStatTokens2: TokenSet = canStartExprTokens2 | mustStartStatTokens | BitSet(
     AT, CASE, END) // END is included since it might be tested before being converted back to IDENTIFIER
   final val canStartStatTokens3: TokenSet = canStartExprTokens3 | mustStartStatTokens | BitSet(
-    AT, CASE, END)
+    AT, CASE, END, ENACT)
 
   final val canEndStatTokens: TokenSet = atomicExprTokens | BitSet(TYPE, GIVEN, RPAREN, RBRACE, RBRACKET, OUTDENT)
 

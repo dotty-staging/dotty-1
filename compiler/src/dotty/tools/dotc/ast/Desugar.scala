@@ -1830,6 +1830,7 @@ object desugar {
       case ForDo(enums, body) =>
         makeFor(nme.foreach, nme.foreach, enums, body) orElse tree
       case ForYield(enums, body) =>
+        enums.foreach(println)
         makeFor(nme.map, nme.flatMap, enums, body) orElse tree
       case PatDef(mods, pats, tpt, rhs) =>
         val pats1 = if (tpt.isEmpty) pats else pats map (Typed(_, tpt))
