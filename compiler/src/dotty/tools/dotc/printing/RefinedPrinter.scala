@@ -346,7 +346,7 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
     // Dotty deviation: called with an untpd.Tree, so cannot be a untpd.Tree[T] (seems to be a Scala2 problem to allow this)
     // More deviations marked below as // DD
     def enumText(tree: untpd.Tree) = tree match { // DD
-      case _: untpd.GenFrom | _: untpd.GenAlias => toText(tree)
+      case _: untpd.GenFrom | _: untpd.GenAlias | _: untpd.GenExpr => toText(tree)
       case _ => keywordStr("if ") ~ toText(tree)
     }
 
@@ -702,6 +702,8 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
       case GenFrom(pat, expr, checkMode) =>
         (Str("case ") provided checkMode == untpd.GenCheckMode.FilterAlways) ~
         toText(pat) ~ " <- " ~ toText(expr)
+      case GenExpr(expr) =>
+        toText(expr)
       case GenAlias(pat, expr) =>
         toText(pat) ~ " = " ~ toText(expr)
       case ContextBounds(bounds, cxBounds) =>

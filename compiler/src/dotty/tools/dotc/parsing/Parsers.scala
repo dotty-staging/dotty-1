@@ -2669,7 +2669,10 @@ object Parsers {
       else Nil
 
     def patternsUntilGenerator(): List[Tree] =
-      if (in.token == CASE) generator() :: Nil
+      if in.token == CASE then generator() :: Nil
+      else if in.token == ENACT then
+        in.nextToken()
+        GenExpr(subExpr()) :: Nil
       else {
         val pat = pattern1()
         if in.token == EQUALS then
@@ -2693,24 +2696,17 @@ object Parsers {
         else generatorRest(pat, casePat = false)
       }
 
-    // TODO(kπ) it should be like this vvv
-    /** Enumerator  ::=  [‘case’] Pattern `<-' Expr
-     *                |  Guard {Guard} //TODO(kπ) guard should be converted from an `if` expression without an else
-     *                |  [Pattern1 (`='|`<-`)] Expr
-     */
-
-
      /** Enumerator  ::=  ‘case’ Pattern `<-' Expr
-     *                |  Guard {Guard} //TODO(kπ) guard should be converted from an `if` expression without an else
-     *                |  'enact' Expr
-     *                |  Pattern1 (`='|`<-`) Expr
+     *                |  Guard {Guard} // if expr is correct, then this will be a special case of expr (except for same line cases)
+     *                |  'enact' Expr // a hack for expr
+     *                |  Pattern1 (`='|`<-`) Expr // should be [Pattern1 (`='|`<-`)] Expr
      */
     def newEnumerator(): Tree =
       if in.token == IF then guard()
       else if in.token == CASE then generator()
       else if in.token == ENACT then
         in.nextToken()
-        subExpr()
+        GenExpr(subExpr())
       else {
         val pat = pattern1()
         if (in.token == EQUALS) atSpan(startOffset(pat), in.skipToken()) { GenAlias(pat, subExpr()) }

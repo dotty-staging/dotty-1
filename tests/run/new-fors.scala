@@ -1,11 +1,11 @@
 import scala.language.experimental.newFors
 
-// def for1 =
-//   for {
-//     a = 1
-//     b <- List(a, 2)
-//     c <- List(3, 4)
-//   } yield (b, c)
+def for1 =
+  for {
+    a = 1
+    b <- List(a, 2)
+    c <- List(3, 4)
+  } yield (b, c)
 
 def for2 =
   for {
@@ -16,7 +16,15 @@ def for2 =
     d <- List(5, 6)
   } yield (b, c, d)
 
+def for3 =
+  for {
+    a = 1
+    enact List(a, 2)
+    a <- List('a')
+  } yield a
+
 object Test extends App {
-  // println(for1)
+  println(for1)
   println(for2)
+  println(for3)
 }

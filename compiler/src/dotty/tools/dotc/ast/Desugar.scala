@@ -1520,14 +1520,22 @@ object desugar {
   /** Main desugaring method */
   def apply(tree: Tree, pt: Type = NoType)(using Context): Tree = {
 
-    /** Create tree for for-comprehension `<for (enums) do body>` or
-     *   `<for (enums) yield body>` where mapName and flatMapName are chosen
-     *  corresponding to whether this is a for-do or a for-yield.
+    /** Create tree for for-comprehension `<for (enums) do body>`,
+     *  `<for (enums) yield body>` or `<for (enums)>` where mapName
+     *  and flatMapName are chosen corresponding to whether this is
+     *  a for-do or a for-yield. (for without a body is a for-yield)
+     *  
+     *  Enums can be of four types:
+     *  - Guard -- `if cond`
+     *  - Generator Blinding -- `ident <- expr`
+     *  - Alias Binding -- `ident = expr`
+     *  - Generator Expression -- `expr`
+     * 
      *  The creation performs the following rewrite rules:
      *
      *  1.
      *
-     *    for (P <- G) E   ==>   G.foreach (P => E)
+     *    for (P <- G) do E   ==>   G.foreach (P => E)
      *
      *     Here and in the following (P => E) is interpreted as the function (P => E)
      *     if P is a variable pattern and as the partial function { case P => E } otherwise.
@@ -1544,13 +1552,13 @@ object desugar {
      *
      *  4.
      *
-     *    for (P <- G; E; ...) ...
+     *    for (P <- G; if E; ...) ...
      *      =>
      *    for (P <- G.filter (P => E); ...) ...
      *
      *  5. For any N:
      *
-     *    for (P_1 <- G; P_2 = E_2; val P_N = E_N; ...)
+     *    for (P_1 <- G; P_2 = E_2; P_N = E_N; ...)
      *      ==>
      *    for (TupleN(P_1, P_2, ... P_N) <-
      *      for (x_1 @ P_1 <- G) yield {
@@ -1682,8 +1690,12 @@ object desugar {
       }
 
       enums match {
+        case (gen: GenExpr) :: rest =>
+          makeFor(mapName, flatMapName, GenFrom(Ident(nme.WILDCARD), gen.expr, GenCheckMode.Ignore) :: rest, body)
         case (gen: GenFrom) :: Nil =>
           Apply(rhsSelect(gen, mapName), makeLambda(gen, body))
+        case (gen: GenFrom) :: GenExpr(expr) :: rest =>
+          makeFor(mapName, flatMapName, gen :: GenFrom(Ident(nme.WILDCARD), expr, GenCheckMode.Ignore) :: rest, body)
         case (gen: GenFrom) :: (rest @ (GenFrom(_, _, _) :: _)) =>
           val cont = makeFor(mapName, flatMapName, rest, body)
           Apply(rhsSelect(gen, flatMapName), makeLambda(gen, cont))
@@ -1830,7 +1842,6 @@ object desugar {
       case ForDo(enums, body) =>
         makeFor(nme.foreach, nme.foreach, enums, body) orElse tree
       case ForYield(enums, body) =>
-        enums.foreach(println)
         makeFor(nme.map, nme.flatMap, enums, body) orElse tree
       case PatDef(mods, pats, tpt, rhs) =>
         val pats1 = if (tpt.isEmpty) pats else pats map (Typed(_, tpt))
