@@ -1533,12 +1533,18 @@ object desugar {
      * 
      *  The creation performs the following rewrite rules:
      *
-     *  1.
+     *  0.
      *
      *      for (P <- G) do E   ==>   G.foreach (P => E)
      *
      *    Here and in the following (P => E) is interpreted as the function (P => E)
      *    if P is a variable pattern and as the partial function { case P => E } otherwise.
+     *
+     *  1.
+     *
+     *     for (E) yield B  ==> E
+     *
+     *   if B is Empty, error otherwise
      *
      *  2.
      *
@@ -1560,19 +1566,39 @@ object desugar {
      *
      *    for (P <- G; if E; ...) ...
      *      =>
-     *    for (P <- G.filter (P => E); ...) ...
+     *    for (P <- G.withFilter (P => E); ...) ...
      *
      *  5. For any N:
      *
-     *      for (P_1 <- G; P_2 = E_2; P_N = E_N; ...)
+     *      for (P <- G; P_1 = E_1; ... P_N = E_N; if E; ...)
      *        ==>
-     *      for (TupleN(P_1, P_2, ... P_N) <-
-     *        for (x_1 @ P_1 <- G) yield {
-     *          val x_2 @ P_2 = E_2
+     *      for (TupleN(P, P_1, ... P_N) <-
+     *        for (x @ P <- G) yield {
+     *          val x_1 @ P_1 = E_2
      *          ...
-     *          val x_N & P_N = E_N
-     *          TupleN(x_1, ..., x_N)
-     *        } ...)
+     *          val x_N @ P_N = E_N
+     *          TupleN(x, x_1, ..., x_N)
+     *        }; if E; ...)
+     *
+     *  6. For any N:
+     *
+     *      for (P <- G; P_1 = E_1; ... P_N = E_N; ...)
+     *        ==>
+     *      G.flatMap (P => for (P_1 = E_1; ... P_N = E_N; ...))
+     *
+     *  7.
+     *
+     *      for (P_1 = E_1; ... P_N = E_N; ...)
+     *        ==>
+     *      {
+     *        val x_2 @ P_2 = E_2
+     *        ...
+     *        val x_N @ P_N = E_N
+     *        for (...)
+     *      }
+     * 
+     *      if the aliases are not followed by a guard, otherwise an error.
+     *      
      *
      *    If any of the P_i are variable patterns, the corresponding `x_i @ P_i` is not generated
      *    and the variable constituting P_i is used instead of x_i
@@ -1702,16 +1728,21 @@ object desugar {
           case _ => false
 
       enums match {
-        case (gen: GenExpr) :: rest =>
-          makeFor(mapName, flatMapName, GenFrom(Ident(nme.WILDCARD), gen.expr, GenCheckMode.Ignore) :: rest, body)
-        case (gen: GenFrom) :: GenExpr(expr) :: rest =>
-          makeFor(mapName, flatMapName, gen :: GenFrom(Ident(nme.WILDCARD), expr, GenCheckMode.Ignore) :: rest, body)
+        case (gen: GenExpr) :: Nil if body == EmptyTree =>
+          gen.expr
         case (gen: GenFrom) :: Nil =>
           if gen.checkMode != GenCheckMode.Filtered // results of withFilter have the wrong type
             && deepEquals(gen.pat, body)
           then gen.expr  // avoid a redundant map with identity
           else Apply(rhsSelect(gen, mapName), makeLambda(gen, body))
-        case (gen: GenFrom) :: (rest @ (GenFrom(_, _, _) :: _)) =>
+        case (gen: GenExpr) :: rest =>
+          makeFor(mapName, flatMapName, GenFrom(Ident(nme.WILDCARD), gen.expr, GenCheckMode.Ignore) :: rest, body)
+        case (gen: GenFrom) :: GenGuard(test) :: rest =>
+          val filtered = Apply(rhsSelect(gen, nme.withFilter), makeLambda(gen, test))
+          val genFrom = GenFrom(gen.pat, filtered, GenCheckMode.Filtered)
+          makeFor(mapName, flatMapName, genFrom :: rest, body)
+        case (gen: GenFrom) :: rest
+        if !rest.dropWhile(_.isInstanceOf[GenAlias]).headOption.exists(_.isInstanceOf[GenGuard]) =>
           val cont = makeFor(mapName, flatMapName, rest, body)
           Apply(rhsSelect(gen, flatMapName), makeLambda(gen, cont))
         case (gen: GenFrom) :: (rest @ GenAlias(_, _) :: _) =>
@@ -1730,10 +1761,6 @@ object desugar {
           val allpats = gen.pat :: pats
           val vfrom1 = GenFrom(makeTuple(allpats), rhs1, GenCheckMode.Ignore)
           makeFor(mapName, flatMapName, vfrom1 :: rest1, body)
-        case (gen: GenFrom) :: test :: rest =>
-          val filtered = Apply(rhsSelect(gen, nme.withFilter), makeLambda(gen, test))
-          val genFrom = GenFrom(gen.pat, filtered, GenCheckMode.Filtered)
-          makeFor(mapName, flatMapName, genFrom :: rest, body)
         case GenAlias(_, _) :: _ =>
           val (valeqs, rest) = enums.span(_.isInstanceOf[GenAlias])
           val pats = valeqs.map { case GenAlias(pat, _) => pat }

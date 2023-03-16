@@ -23,8 +23,15 @@ def for3 =
     a <- List('a')
   } yield a
 
+def for4 =
+  for {
+    a = 1
+    enact List(a, 2)
+  } yield a
+
 object Test extends App {
   println(for1)
   println(for2)
   println(for3)
+  println(for4)
 }

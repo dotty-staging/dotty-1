@@ -115,6 +115,7 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
   case class ForDo(enums: List[Tree], body: Tree)(implicit @constructorOnly src: SourceFile) extends TermTree
   case class GenFrom(pat: Tree, expr: Tree, checkMode: GenCheckMode)(implicit @constructorOnly src: SourceFile) extends Tree
   case class GenExpr(expr: Tree)(implicit @constructorOnly src: SourceFile) extends Tree
+  case class GenGuard(expr: Tree)(implicit @constructorOnly src: SourceFile) extends Tree
   case class GenAlias(pat: Tree, expr: Tree)(implicit @constructorOnly src: SourceFile) extends Tree
   case class ContextBounds(bounds: TypeBoundsTree, cxBounds: List[Tree])(implicit @constructorOnly src: SourceFile) extends TypTree
   case class PatDef(mods: Modifiers, pats: List[Tree], tpt: Tree, rhs: Tree)(implicit @constructorOnly src: SourceFile) extends DefTree
@@ -644,6 +645,10 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
       case tree: GenExpr if (expr eq tree.expr) => tree
       case _ => finalize(tree, untpd.GenExpr(expr)(tree.source))
     }
+    def GenGuard(tree: Tree)(expr: Tree)(using Context): Tree = tree match {
+      case tree: GenGuard if (expr eq tree.expr) => tree
+      case _ => finalize(tree, untpd.GenGuard(expr)(tree.source))
+    }
     def GenAlias(tree: Tree)(pat: Tree, expr: Tree)(using Context): Tree = tree match {
       case tree: GenAlias if (pat eq tree.pat) && (expr eq tree.expr) => tree
       case _ => finalize(tree, untpd.GenAlias(pat, expr)(tree.source))
@@ -725,6 +730,8 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
         cpy.GenFrom(tree)(transform(pat), transform(expr), checkMode)
       case GenExpr(expr) =>
         cpy.GenExpr(tree)(transform(expr))
+      case GenGuard(expr) =>
+        cpy.GenGuard(tree)(transform(expr))
       case GenAlias(pat, expr) =>
         cpy.GenAlias(tree)(transform(pat), transform(expr))
       case ContextBounds(bounds, cxBounds) =>
@@ -787,6 +794,8 @@ object untpd extends Trees.Instance[Untyped] with UntypedTreeInfo {
       case GenFrom(pat, expr, _) =>
         this(this(x, pat), expr)
       case GenExpr(expr) =>
+        this(x, expr)
+      case GenGuard(expr) =>
         this(x, expr)
       case GenAlias(pat, expr) =>
         this(this(x, pat), expr)

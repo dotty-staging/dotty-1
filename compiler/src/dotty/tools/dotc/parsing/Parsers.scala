@@ -2631,7 +2631,7 @@ object Parsers {
     /** Guard ::= if PostfixExpr
      */
     def guard(): Tree =
-      if (in.token == IF) { in.nextToken(); postfixExpr(Location.InGuard) }
+      if (in.token == IF) { in.nextToken(); GenGuard(postfixExpr(Location.InGuard)) }
       else EmptyTree
 
     def enumerators(): List[Tree] =
