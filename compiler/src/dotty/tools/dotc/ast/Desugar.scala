@@ -1533,20 +1533,20 @@ object desugar {
      * 
      *  The creation performs the following rewrite rules:
      *
-     *  0.
+     *  1.
      *
      *      for (P <- G) do E   ==>   G.foreach (P => E)
      *
      *    Here and in the following (P => E) is interpreted as the function (P => E)
      *    if P is a variable pattern and as the partial function { case P => E } otherwise.
      *
-     *  1.
+     *  2.
      *
      *     for (E) yield B  ==> E
      *
      *   if B is Empty, error otherwise
      *
-     *  2.
+     *  3.
      *
      *      for (P <- G) yield P  ==>  G
      *
@@ -1556,19 +1556,19 @@ object desugar {
      *
      *    otherwise
      *
-     *  3.
+     *  4.
      *
      *      for (P_1 <- G_1; P_2 <- G_2; ...) ...
      *        ==>
      *      G_1.flatMap (P_1 => for (P_2 <- G_2; ...) ...)
      *
-     *  4.
+     *  5.
      *
      *    for (P <- G; if E; ...) ...
      *      =>
      *    for (P <- G.withFilter (P => E); ...) ...
      *
-     *  5. For any N:
+     *  6. For any N:
      *
      *      for (P <- G; P_1 = E_1; ... P_N = E_N; if E; ...)
      *        ==>
@@ -1580,13 +1580,13 @@ object desugar {
      *          TupleN(x, x_1, ..., x_N)
      *        }; if E; ...)
      *
-     *  6. For any N:
+     *  7. For any N:
      *
      *      for (P <- G; P_1 = E_1; ... P_N = E_N; ...)
      *        ==>
      *      G.flatMap (P => for (P_1 = E_1; ... P_N = E_N; ...))
      *
-     *  7.
+     *  8.
      *
      *      for (P_1 = E_1; ... P_N = E_N; ...)
      *        ==>

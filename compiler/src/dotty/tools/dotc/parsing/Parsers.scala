@@ -2670,7 +2670,7 @@ object Parsers {
 
     def patternsUntilGenerator(): List[Tree] =
       if in.token == CASE then generator() :: Nil
-      else if in.token == ENACT then
+      else if in.token == EXEC then
         in.nextToken()
         GenExpr(subExpr()) :: Nil
       else {
@@ -2698,13 +2698,13 @@ object Parsers {
 
      /** Enumerator  ::=  ‘case’ Pattern `<-' Expr
      *                |  Guard {Guard} // if expr is correct, then this will be a special case of expr (except for same line cases)
-     *                |  'enact' Expr // a hack for expr
+     *                |  'exec' Expr // a hack for expr
      *                |  Pattern1 (`='|`<-`) Expr // should be [Pattern1 (`='|`<-`)] Expr
      */
     def newEnumerator(): Tree =
       if in.token == IF then guard()
       else if in.token == CASE then generator()
-      else if in.token == ENACT then
+      else if in.token == EXEC then
         in.nextToken()
         GenExpr(subExpr())
       else {
