@@ -29,9 +29,24 @@ def for4 =
     exec List(a, 2)
   } yield a
 
+def for5 =
+  for {
+    a = 1
+    b <- List(1, 2)
+    exec List(a, b)
+  }
+
+def for6 =
+  for
+    a = 1
+    b <- List(1, 2)
+    exec List(a, b)
+
 object Test extends App {
   println(for1)
   println(for2)
   println(for3)
   println(for4)
+  println(for5)
+  println(for6)
 }

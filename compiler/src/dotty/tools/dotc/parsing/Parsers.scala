@@ -2776,8 +2776,7 @@ object Parsers {
             }
             in.observeIndented()
             res
-          }
-          else {
+          } else {
             wrappedEnums = false
 
             if (in.token == INDENT)
@@ -2807,8 +2806,11 @@ object Parsers {
           ForDo(enums, subExpr())
         }
         else {
-          if (!wrappedEnums) syntaxErrorOrIncomplete(YieldOrDoExpectedInForComprehension())
-          ForDo(enums, expr())
+          if in.featureEnabled(Feature.newFors) then
+            ForYield(enums, EmptyTree)
+          else
+            if (!wrappedEnums) syntaxErrorOrIncomplete(YieldOrDoExpectedInForComprehension())
+            ForDo(enums, expr())
         }
       }
 
