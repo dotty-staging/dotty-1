@@ -1233,6 +1233,8 @@ class TreeUnpickler(reader: TastyReader,
           ByNameTypeTree(if knowsPureFuns then arg else arg.adaptByNameArgUnderPureFuns)
         case NAMEDARG =>
           NamedArg(readName(), readTree())
+        case EXPLICITtpt =>
+          readTpt()
         case _ =>
           readPathTree()
       }
@@ -1454,10 +1456,7 @@ class TreeUnpickler(reader: TastyReader,
               val alias = if currentAddr == end then EmptyTree else readTpt()
               createNullableTypeBoundsTree(lo, hi, alias)
             case HOLE =>
-              val idx = readNat()
-              val tpe = readType()
-              val args = until(end)(readTree())
-              Hole(true, idx, args, EmptyTree, tpe)
+              readHole(end, isTerm = true)
             case _ =>
               readPathTree()
           }
@@ -1488,10 +1487,7 @@ class TreeUnpickler(reader: TastyReader,
         case HOLE =>
           readByte()
           val end = readEnd()
-          val idx = readNat()
-          val tpe = readType()
-          val args = until(end)(readTree())
-          Hole(false, idx, args, EmptyTree, tpe)
+          readHole(end, isTerm = false)
         case _ =>
           if (isTypeTreeTag(nextByte)) readTree()
           else {
@@ -1523,6 +1519,12 @@ class TreeUnpickler(reader: TastyReader,
       val guard = ifBefore(end)(readTree(), EmptyTree)
       setSpan(start, CaseDef(pat, guard, rhs))
     }
+
+    def readHole(end: Addr, isTerm: Boolean)(using Context): Tree =
+      val idx = readNat()
+      val tpe = readType()
+      val args = until(end)(readTree())
+      Hole(isTerm, idx, args, EmptyTree, tpe)
 
     def readLater[T <: AnyRef](end: Addr, op: TreeReader => Context ?=> T)(using Context): Trees.Lazy[T] =
       readLaterWithOwner(end, op)(ctx.owner)

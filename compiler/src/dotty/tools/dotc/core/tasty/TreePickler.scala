@@ -690,7 +690,10 @@ class TreePickler(pickler: TastyPickler) {
           withLength {
             writeNat(idx)
             pickleType(tree.tpe, richTypes = true)
-            args.foreach(pickleTree)
+            args.foreach { arg =>
+              if arg.isType then writeByte(EXPLICITtpt)
+              pickleTree(arg)
+            }
           }
       }
       catch {
