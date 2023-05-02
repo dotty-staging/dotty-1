@@ -724,6 +724,12 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
       case Splice(expr) =>
         val spliceTypeText = (keywordStr("[") ~ toTextGlobal(tree.typeOpt) ~ keywordStr("]")).provided(printDebug && tree.typeOpt.exists)
         keywordStr("$") ~ spliceTypeText ~ keywordStr("{") ~ toTextGlobal(expr) ~ keywordStr("}")
+      case SplicePattern(pattern, args) =>
+        val spliceTypeText = (keywordStr("[") ~ toTextGlobal(tree.typeOpt) ~ keywordStr("]")).provided(printDebug && tree.typeOpt.exists)
+        val open = Str(keywordStr("{")).provided(args.isEmpty)
+        val close = Str(keywordStr("}")).provided(args.isEmpty)
+        val argsText = ("(" ~ toTextGlobal(args, ", ") ~ ")").provided(args.nonEmpty)
+        keywordStr("$") ~ spliceTypeText ~ open ~ inPattern(toText(pattern)) ~  close ~ argsText
       case Hole(isTermHole, idx, args, content, tpt) =>
         val (prefix, postfix) = if isTermHole then ("{{{", "}}}") else ("[[[", "]]]")
         val argsText = toTextGlobal(args, ", ")
