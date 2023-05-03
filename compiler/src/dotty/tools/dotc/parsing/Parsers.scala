@@ -1529,11 +1529,9 @@ object Parsers {
             if imods.is(Given) && params.isEmpty then
               syntaxError(em"context function types require at least one parameter", paramSpan)
             FunctionWithMods(params, resultType, imods, erasedArgs.toList)
-          else if !ctx.settings.YkindProjector.isDefault then
+          else
             val (newParams :+ newResultType, tparams) = replaceKindProjectorPlaceholders(params :+ resultType): @unchecked
             lambdaAbstract(tparams, Function(newParams, newResultType))
-          else
-            Function(params, resultType)
         }
 
       var isValParamList = false
@@ -1654,9 +1652,10 @@ object Parsers {
         Ident(name)
       }
 
-      val uscores = ctx.settings.YkindProjector.value == "underscores"
+      val uscores = ctx.settings.YkindProjector.value != ""
+      val stars = !ctx.settings.YkindProjector.isDefault
       val newParams = params.mapConserve {
-        case param @ Ident(tpnme.raw.STAR | tpnme.raw.MINUS_STAR | tpnme.raw.PLUS_STAR) => addParam()
+        case param @ Ident(tpnme.raw.STAR | tpnme.raw.MINUS_STAR | tpnme.raw.PLUS_STAR) if stars => addParam()
         case param @ Ident(tpnme.USCOREkw | tpnme.raw.MINUS_USCORE | tpnme.raw.PLUS_USCORE) if uscores => addParam()
         case other => other
       }
@@ -1778,18 +1777,17 @@ object Parsers {
       if isSimpleLiteral then
         SingletonTypeTree(simpleLiteral())
       else if in.token == USCORE then
-        if ctx.settings.YkindProjector.value == "underscores" then
+        if ctx.settings.YkindProjector.value != "" then
           val start = in.skipToken()
           Ident(tpnme.USCOREkw).withSpan(Span(start, in.lastOffset, start))
         else
-          if sourceVersion.isAtLeast(future) then
-            deprecationWarning(em"`_` is deprecated for wildcard arguments of types: use `?` instead")
-            patch(source, Span(in.offset, in.offset + 1), "?")
+          deprecationWarning(em"`_` is deprecated for wildcard arguments of types: use `?` instead")
+          patch(source, Span(in.offset, in.offset + 1), "?")
           val start = in.skipToken()
           typeBounds().withSpan(Span(start, in.lastOffset, start))
       // Allow symbols -_ and +_ through for compatibility with code written using kind-projector in Scala 3 underscore mode.
       // While these signify variant type parameters in Scala 2 + kind-projector, we ignore their variance markers since variance is inferred.
-      else if (isIdent(nme.MINUS) || isIdent(nme.PLUS)) && in.lookahead.token == USCORE && ctx.settings.YkindProjector.value == "underscores" then
+      else if (isIdent(nme.MINUS) || isIdent(nme.PLUS)) && in.lookahead.token == USCORE && ctx.settings.YkindProjector.value != "" then
         val identName = in.name.toTypeName ++ nme.USCOREkw
         val start = in.skipToken()
         in.nextToken()
@@ -1841,52 +1839,43 @@ object Parsers {
         val applied = rejectWildcardType(t)
         val args = typeArgs(namedOK = false, wildOK = true)
 
-        if (!ctx.settings.YkindProjector.isDefault) {
-          def fail(): Tree = {
-            syntaxError(
-              em"λ requires a single argument of the form X => ... or (X, Y) => ...",
-              Span(startOffset(t), in.lastOffset)
-            )
-            AppliedTypeTree(applied, args)
-          }
-
-          applied match {
-            case Ident(tpnme.raw.LAMBDA) =>
-              args match {
-                case List(Function(params, body)) =>
-                  val typeDefs = params.collect {
-                    case param @ Ident(name) => makeKindProjectorTypeDef(name.toTypeName).withSpan(param.span)
-                  }
-                  if (typeDefs.length != params.length) fail()
-                  else LambdaTypeTree(typeDefs, body)
-                case _ =>
-                  fail()
-              }
-            case _ =>
-              val (newArgs, tparams) = replaceKindProjectorPlaceholders(args)
-
-              lambdaAbstract(tparams, AppliedTypeTree(applied, newArgs))
-          }
-
-        } else {
+        def fail(): Tree = {
+          syntaxError(
+            em"λ requires a single argument of the form X => ... or (X, Y) => ...",
+            Span(startOffset(t), in.lastOffset)
+          )
           AppliedTypeTree(applied, args)
+        }
+
+        applied match {
+          case Ident(tpnme.raw.LAMBDA) if !ctx.settings.YkindProjector.isDefault =>
+            args match {
+              case List(Function(params, body)) =>
+                val typeDefs = params.collect {
+                  case param @ Ident(name) => makeKindProjectorTypeDef(name.toTypeName).withSpan(param.span)
+                }
+                if (typeDefs.length != params.length) fail()
+                else LambdaTypeTree(typeDefs, body)
+              case _ =>
+                fail()
+            }
+          case _ =>
+            val (newArgs, tparams) = replaceKindProjectorPlaceholders(args)
+
+            lambdaAbstract(tparams, AppliedTypeTree(applied, newArgs))
         }
       })
       case _ =>
-        if (!ctx.settings.YkindProjector.isDefault) {
-          t match {
-            case Tuple(params) =>
-              val (newParams, tparams) = replaceKindProjectorPlaceholders(params)
+        t match {
+          case Tuple(params) =>
+            val (newParams, tparams) = replaceKindProjectorPlaceholders(params)
 
-              if (tparams.isEmpty) {
-                t
-              } else {
-                LambdaTypeTree(tparams, Tuple(newParams))
-              }
-            case _ => t
-          }
-        } else {
-          t
+            if (tparams.isEmpty) {
+              t
+            } else {
+              LambdaTypeTree(tparams, Tuple(newParams))
+            }
+          case _ => t
         }
     }
 
