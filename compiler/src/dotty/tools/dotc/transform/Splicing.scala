@@ -23,6 +23,7 @@ import dotty.tools.dotc.quoted._
 import dotty.tools.dotc.config.ScalaRelease.*
 import dotty.tools.dotc.staging.StagingLevel.*
 import dotty.tools.dotc.staging.QuoteTypeTags
+import dotty.tools.dotc.staging.QuoteTypeTags.*
 
 import scala.annotation.constructorOnly
 
@@ -180,7 +181,6 @@ class Splicing extends MacroTransform:
     private var refBindingMap = mutable.Map.empty[Symbol, (Tree, Symbol)]
     /** Reference to the `Quotes` instance of the current level 1 splice */
     private var quotes: Tree | Null = null // TODO: add to the context
-    private var healedTypes: QuoteTypeTags | Null = null // TODO: add to the context
 
     def transformSplice(tree: tpd.Tree, tpe: Type, holeIdx: Int)(using Context): tpd.Tree =
       assert(level == 0)
@@ -241,12 +241,11 @@ class Splicing extends MacroTransform:
 
     private def transformLevel0Quote(quote: Quote)(using Context): Tree =
       // transform and collect new healed types
-      val old = healedTypes
-      healedTypes = new QuoteTypeTags(quote.body.span)
-      val body1 = transform(quote.body)(using quoteContext)
-      val newHealedTypes = healedTypes.nn.getTypeTags
-      healedTypes = old
-      cpy.Quote(quote)(body1, quote.args ::: newHealedTypes.map(tpd.ref(_)))
+      inContextWithQuoteTypeTags {
+        val body1 = transform(quote.body)(using quoteContext)
+        val newHealedTypes = getTypeTags()
+        cpy.Quote(quote)(body1, quote.args ::: newHealedTypes.map(tpd.ref(_)))
+      }
 
     class ArgsClause(val args: List[Tree]):
       def isTerm: Boolean = args.isEmpty || args.head.isTerm
@@ -333,27 +332,26 @@ class Splicing extends MacroTransform:
       bindingSym
 
     private def capturedPartTypes(quote: Quote)(using Context): Tree =
-      val old = healedTypes
-      healedTypes = QuoteTypeTags(quote.body.span)
-      val capturePartTypes = new TypeMap {
-        def apply(tp: Type) = tp match {
-          case typeRef: TypeRef if containsCapturedType(typeRef) =>
-            val termRef = refBindingMap
-              .getOrElseUpdate(typeRef.symbol, (TypeTree(typeRef), newQuotedTypeClassBinding(typeRef)))._2.termRef
-            val tagRef = healedTypes.nn.getTagRef(termRef)
-            tagRef
-          case _ =>
-            mapOver(tp)
+      inContextWithQuoteTypeTags {
+        val capturePartTypes = new TypeMap {
+          def apply(tp: Type) = tp match {
+            case typeRef: TypeRef if containsCapturedType(typeRef) =>
+              val termRef = refBindingMap
+                .getOrElseUpdate(typeRef.symbol, (TypeTree(typeRef), newQuotedTypeClassBinding(typeRef)))._2.termRef
+              val tagRef = getTagRef(termRef)
+              tagRef
+            case _ =>
+              mapOver(tp)
+          }
         }
+        val captured = capturePartTypes(quote.body.tpe.widenTermRefExpr)
+        val newHealedTypes = getTypeTags()
+        cpy.Quote(quote)(TypeTree(captured), quote.args ::: newHealedTypes.map(tpd.ref(_)))
       }
-      val captured = capturePartTypes(quote.body.tpe.widenTermRefExpr)
-      val newHealedTypes = healedTypes.nn.getTypeTags
-      healedTypes = old
-      cpy.Quote(quote)(TypeTree(captured), quote.args ::: newHealedTypes.map(tpd.ref(_)))
 
     private def getTagRefFor(tree: Tree)(using Context): Tree =
       val capturedTypeSym = capturedType(tree)
-      TypeTree(healedTypes.nn.getTagRef(capturedTypeSym.termRef))
+      TypeTree(getTagRef(capturedTypeSym.termRef))
 
     private def withCurrentQuote[T](newQuotes: Tree)(body: => T)(using Context): T =
       if level == 0 then

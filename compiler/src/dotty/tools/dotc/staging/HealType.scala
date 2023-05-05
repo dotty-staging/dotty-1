@@ -47,7 +47,7 @@ class HealType(pos: SrcPos)(using Context) extends TypeMap {
         tp
       case prefix: TermRef if tp.symbol.isTypeSplice =>
         checkNotWildcardSplice(tp)
-        if level == 0 then tp else getQuoteTypeTags.getTagRef(prefix)
+        if level == 0 then tp else getTagRef(prefix)
       case _: NamedType | _: ThisType | NoPrefix =>
         if levelInconsistentRootOfPath(tp).exists then
           tryHeal(tp)
@@ -88,7 +88,7 @@ class HealType(pos: SrcPos)(using Context) extends TypeMap {
       case tp: TermRef =>
         ctx.typer.checkStable(tp, pos, "type witness")
         if levelOf(tp.symbol) > 0 then tp.select(tpnme.Underlying)
-        else getQuoteTypeTags.getTagRef(tp)
+        else getTagRef(tp)
       case _: SearchFailureType =>
         report.error(
           ctx.typer.missingArgMsg(tag, reqType, "")

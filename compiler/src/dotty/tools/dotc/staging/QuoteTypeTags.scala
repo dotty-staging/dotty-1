@@ -1,39 +1,24 @@
 package dotty.tools.dotc.staging
 
-import dotty.tools.dotc.ast.{tpd, untpd}
-import dotty.tools.dotc.core.Annotations._
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Decorators._
-import dotty.tools.dotc.core.Flags._
-import dotty.tools.dotc.core.NameKinds._
 import dotty.tools.dotc.core.StdNames._
-import dotty.tools.dotc.core.Symbols._
 import dotty.tools.dotc.core.Types._
 import dotty.tools.dotc.staging.StagingLevel.*
 import dotty.tools.dotc.util.Property
-import dotty.tools.dotc.util.Spans._
 
-object QuoteTypeTags {
+import scala.collection.mutable.LinkedHashSet
 
-  private val TaggedTypes = new Property.Key[QuoteTypeTags]
+object QuoteTypeTags:
 
-  def contextWithQuoteTypeTags(taggedTypes: QuoteTypeTags)(using Context) =
-    ctx.fresh.setProperty(TaggedTypes, taggedTypes)
+  private val TaggedTypes = new Property.Key[LinkedHashSet[TermRef]]
 
-  def getQuoteTypeTags(using Context): QuoteTypeTags =
-    ctx.property(TaggedTypes).get
-}
+  def inContextWithQuoteTypeTags[T](body: Context ?=> T)(using Context): T =
+    body(using ctx.fresh.setProperty(TaggedTypes, LinkedHashSet.empty))
 
-class QuoteTypeTags(span: Span)(using Context) {
-  import tpd.*
-
-  private val tags = collection.mutable.LinkedHashSet.empty[TermRef]
-
-  def getTagRef(spliced: TermRef): Type = {
-    tags += spliced
+  def getTagRef(spliced: TermRef)(using Context): Type =
+    ctx.property(TaggedTypes).get += spliced
     spliced.select(tpnme.Underlying)
-  }
 
-  def getTypeTags: List[TermRef] = tags.toList
-
-}
+  def getTypeTags()(using Context): List[TermRef] =
+    ctx.property(TaggedTypes).get.toList

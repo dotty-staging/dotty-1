@@ -117,12 +117,12 @@ class PickleQuotes extends MacroTransform {
       override def transform(tree: tpd.Tree)(using Context): tpd.Tree =
         tree match
           case tree @ Hole(isTerm, _, _, content, _) =>
-            if !content.isEmpty then
-              contents += content
-            val holeType =
-              if isTerm then getTermHoleType(tree.tpe) else getTypeHoleType(tree.tpe)
+            assert(isTerm)
+            assert(!content.isEmpty)
+            contents += content
+            val holeType = getTermHoleType(tree.tpe)
             val hole = cpy.Hole(tree)(content = EmptyTree, TypeTree(holeType))
-            if isTerm then Inlined(EmptyTree, Nil, hole).withSpan(tree.span) else hole
+            cpy.Inlined(tree)(EmptyTree, Nil, hole)
           case tree: DefTree =>
             val newAnnotations = tree.symbol.annotations.mapconserve { annot =>
               annot.derivedAnnotation(transform(annot.tree)(using ctx.withOwner(tree.symbol)))
@@ -140,25 +140,6 @@ class PickleQuotes extends MacroTransform {
                 derivedAnnotatedType(tp, underlying1, annot.derivedAnnotation(transform(annot.tree)))
               case _ => mapOver(tp)
         }
-      }
-
-      /** Remove references to local types that will not be defined in this quote */
-      private def getTypeHoleType(using Context) = new TypeMap() {
-        override def apply(tp: Type): Type = tp match
-          case tp: TypeRef if tp.typeSymbol.isTypeSplice =>
-            apply(tp.dealias)
-          case tp @ TypeRef(pre, _) if isLocalPath(pre) =>
-            val hiBound = tp.typeSymbol.info match
-              case info: ClassInfo => info.parents.reduce(_ & _)
-              case info => info.hiBound
-            apply(hiBound)
-          case tp =>
-            mapOver(tp)
-
-        private def isLocalPath(tp: Type): Boolean = tp match
-          case NoPrefix => true
-          case tp: TermRef if !tp.symbol.is(Package) => isLocalPath(tp.prefix)
-          case tp => false
       }
 
       /** Remove references to local types that will not be defined in this quote */
@@ -188,12 +169,10 @@ class PickleQuotes extends MacroTransform {
     (holeMaker.getContents(), quote1)
   end makeHoles
 
-
+  /** TODO */
   private def encodeTypeArgs(quote: tpd.Quote)(using Context): tpd.Quote =
     if quote.args.isEmpty then quote
     else
-      // println(quote.show)
-
       val tdefs = quote.args.zipWithIndex.map(mkTagSymbolAndAssignType)
       val typeMapping = quote.args.map(_.tpe).zip(tdefs.map(_.symbol.typeRef)).toMap
       val typeMap = new TypeMap {
@@ -209,9 +188,7 @@ class PickleQuotes extends MacroTransform {
               case None => tree
           case _ => tree
       val body1 = new TreeTypeMap(typeMap, treeMap).transform(quote.body)
-      val res = cpy.Quote(quote)(Block(tdefs, body1), quote.args)
-      // println(res.show)
-      res
+      cpy.Quote(quote)(Block(tdefs, body1), quote.args)
 
   private def mkTagSymbolAndAssignType(typeArg: Tree, idx: Int)(using Context): TypeDef = {
     val holeType = getTypeHoleType(typeArg.tpe.select(tpnme.Underlying))

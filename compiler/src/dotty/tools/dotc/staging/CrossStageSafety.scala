@@ -138,15 +138,16 @@ class CrossStageSafety extends TreeMapWithStages {
         super.transform(tree)
   end transform
 
-  private def transformQuoteBody(body: Tree, span: Span)(using Context): (List[TermRef], Tree) = {
-    val taggedTypes = new QuoteTypeTags(span)
-    val contextWithQuote =
-      if level == 0 then contextWithQuoteTypeTags(taggedTypes)(using quoteContext)
-      else quoteContext
-    val transformedBody = transform(body)(using contextWithQuote)
-    val tags = taggedTypes.getTypeTags
-    (tags, transformedBody)
-  }
+  private def transformQuoteBody(body: Tree, span: Span)(using Context): (List[TermRef], Tree) =
+    if level == 0 then
+      inContextWithQuoteTypeTags {
+        val transformedBody = transform(body)(using quoteContext)
+        val tags = getTypeTags()
+        (tags, transformedBody)
+      }
+    else
+      val transformedBody = transform(body)(using quoteContext)
+      (Nil, transformedBody)
 
   def transformTypeAnnotationSplices(tp: Type)(using Context) = new TypeMap {
     def apply(tp: Type): Type = tp match
