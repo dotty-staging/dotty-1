@@ -1986,7 +1986,7 @@ object desugar {
         trees foreach collect
       case Block(Nil, expr) =>
         collect(expr)
-      case Quote(body) =>
+      case Quote(body, Nil) =>
         new UntypedTreeTraverser {
           def traverse(tree: untpd.Tree)(using Context): Unit = tree match {
             case Splice(expr) => collect(expr)

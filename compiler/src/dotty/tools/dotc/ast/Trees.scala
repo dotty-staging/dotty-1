@@ -692,7 +692,7 @@ object Trees {
    *
    *  @param  body  The tree that was quoted
    */
-  case class Quote[+T <: Untyped] private[ast] (body: Tree[T])(implicit @constructorOnly src: SourceFile)
+  case class Quote[+T <: Untyped] private[ast] (body: Tree[T], args: List[Tree[T]])(implicit @constructorOnly src: SourceFile)
     extends TermTree[T] {
     type ThisTree[+T <: Untyped] = Quote[T]
 
@@ -1314,9 +1314,9 @@ object Trees {
         case tree: Inlined if (call eq tree.call) && (bindings eq tree.bindings) && (expansion eq tree.expansion) => tree
         case _ => finalize(tree, untpd.Inlined(call, bindings, expansion)(sourceFile(tree)))
       }
-      def Quote(tree: Tree)(body: Tree)(using Context): Quote = tree match {
-        case tree: Quote if (body eq tree.body) => tree
-        case _ => finalize(tree, untpd.Quote(body)(sourceFile(tree)))
+      def Quote(tree: Tree)(body: Tree, args: List[Tree])(using Context): Quote = tree match {
+        case tree: Quote if (body eq tree.body) && (args eq tree.args) => tree
+        case _ => finalize(tree, untpd.Quote(body, args)(sourceFile(tree)))
       }
       def Splice(tree: Tree)(expr: Tree)(using Context): Splice = tree match {
         case tree: Splice if (expr eq tree.expr) => tree
@@ -1559,8 +1559,8 @@ object Trees {
             case Thicket(trees) =>
               val trees1 = transform(trees)
               if (trees1 eq trees) tree else Thicket(trees1)
-            case tree @ Quote(body) =>
-              cpy.Quote(tree)(transform(body)(using quoteContext))
+            case tree @ Quote(body, args) =>
+              cpy.Quote(tree)(transform(body)(using quoteContext), transform(args))
             case tree @ Splice(expr) =>
               cpy.Splice(tree)(transform(expr)(using spliceContext))
             case tree @ Hole(_, _, args, content, tpt) =>
@@ -1704,8 +1704,8 @@ object Trees {
               this(this(x, arg), annot)
             case Thicket(ts) =>
               this(x, ts)
-            case Quote(body) =>
-              this(x, body)(using quoteContext)
+            case Quote(body, args) =>
+              this(this(x, body)(using quoteContext), args)
             case Splice(expr) =>
               this(x, expr)(using spliceContext)
             case Hole(_, _, args, content, tpt) =>

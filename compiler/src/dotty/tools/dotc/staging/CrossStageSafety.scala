@@ -56,11 +56,11 @@ class CrossStageSafety extends TreeMapWithStages {
       case tree: Quote =>
         if (ctx.property(InAnnotation).isDefined)
           report.error("Cannot have a quote in an annotation", tree.srcPos)
-        val body1 = transformQuoteBody(tree.body, tree.span)
+        val (tags, body1) = transformQuoteBody(tree.body, tree.span)
         val stripAnnotationsDeep: TypeMap = new TypeMap:
           def apply(tp: Type): Type = mapOver(tp.stripAnnots)
         val bodyType1 = healType(tree.srcPos)(stripAnnotationsDeep(tree.bodyType))
-        cpy.Quote(tree)(body1).withBodyType(bodyType1)
+        cpy.Quote(tree)(body1, tags.map(tpd.ref(_))).withBodyType(bodyType1)
 
       case CancelledSplice(tree) =>
         transform(tree) // Optimization: `${ 'x }` --> `x`
@@ -79,7 +79,8 @@ class CrossStageSafety extends TreeMapWithStages {
             // Optimization: `quoted.Type.of[x.Underlying](quotes)`  -->  `x`
             ref(termRef).withSpan(tree.span)
           case _ =>
-            transformQuoteBody(body, tree.span) match
+            val (tags, transformedBody) = transformQuoteBody(body, tree.span)
+            transformedBody match
               case DirectTypeOf.Healed(termRef) =>
                 // Optimization: `quoted.Type.of[@SplicedType type T = x.Underlying; T](quotes)`  -->  `x`
                 ref(termRef).withSpan(tree.span)
@@ -88,7 +89,7 @@ class CrossStageSafety extends TreeMapWithStages {
                 // `quoted.Type.of[<body>](quotes)`  --> `quoted.Type.of[<body2>](quotes)`
                 val TypeApply(fun, _) = tree.fun: @unchecked
                 if level != 0 then cpy.Apply(tree)(cpy.TypeApply(tree.fun)(fun, transformedBody :: Nil), quotes :: Nil)
-                else tpd.Quote(transformedBody).select(nme.apply).appliedTo(quotes).withSpan(tree.span)
+                else tpd.Quote(transformedBody, tags.map(tpd.ref(_))).select(nme.apply).appliedTo(quotes).withSpan(tree.span)
 
       case _: DefDef if tree.symbol.isInlineMethod =>
         tree
@@ -137,15 +138,14 @@ class CrossStageSafety extends TreeMapWithStages {
         super.transform(tree)
   end transform
 
-  private def transformQuoteBody(body: Tree, span: Span)(using Context): Tree = {
+  private def transformQuoteBody(body: Tree, span: Span)(using Context): (List[TermRef], Tree) = {
     val taggedTypes = new QuoteTypeTags(span)
     val contextWithQuote =
       if level == 0 then contextWithQuoteTypeTags(taggedTypes)(using quoteContext)
       else quoteContext
     val transformedBody = transform(body)(using contextWithQuote)
-    taggedTypes.getTypeTags match
-      case Nil  => transformedBody
-      case tags => tpd.Block(tags, transformedBody).withSpan(body.span)
+    val tags = taggedTypes.getTypeTags
+    (tags, transformedBody)
   }
 
   def transformTypeAnnotationSplices(tp: Type)(using Context) = new TypeMap {
@@ -234,7 +234,7 @@ class CrossStageSafety extends TreeMapWithStages {
     def unapply(tree: Splice): Option[Tree] =
       def rec(tree: Tree): Option[Tree] = tree match
         case Block(Nil, expr) => rec(expr)
-        case Quote(inner) => Some(inner)
+        case Quote(inner, _) => Some(inner)
         case _ => None
       rec(tree.expr)
 }
