@@ -1543,9 +1543,13 @@ object desugar {
      *
      *  2.
      *
-     *     for (E) yield B  ==> E
+     *      for (E) yield B  ==> E
      *
-     *   if B is Empty, error otherwise
+     *   if B is Empty
+     *
+     *  3.
+     * 
+     *      for (E; ...) yield B  ==>  for(_ <- E; ...) yield B
      *
      *  3.
      *
@@ -1565,9 +1569,9 @@ object desugar {
      *
      *  5.
      *
-     *    for (P <- G; if E; ...) ...
-     *      =>
-     *    for (P <- G.withFilter (P => E); ...) ...
+     *      for (P <- G; if E; ...) ...
+     *        ==>
+     *      for (P <- G.withFilter (P => E); ...) ...
      *
      *  6. For any N:
      *

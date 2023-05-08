@@ -2745,7 +2745,7 @@ object Parsers {
         val forEnd = in.lastOffset
         val leading = in.token
         val enums =
-          if (leading == LBRACE || leading == LPAREN && followingIsEnclosedGenerators()) {
+          if leading == LBRACE || leading == LPAREN && followingIsEnclosedGenerators() then {
             in.nextToken()
             val res =
               if (leading == LBRACE || in.token == CASE)

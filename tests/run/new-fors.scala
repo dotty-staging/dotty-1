@@ -42,6 +42,11 @@ def for6 =
     b <- List(1, 2)
     exec List(a, b)
 
+def for7 =
+  for
+    a = 1
+    exec List(a, 2)
+
 object Test extends App {
   println(for1)
   println(for2)
@@ -49,4 +54,5 @@ object Test extends App {
   println(for4)
   println(for5)
   println(for6)
+  println(for7)
 }
