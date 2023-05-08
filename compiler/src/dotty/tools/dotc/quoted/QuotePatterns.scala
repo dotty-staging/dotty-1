@@ -39,7 +39,7 @@ object QuotePatterns:
       else
         val patternTypes = quotePattern.bindings.map { binding =>
           val sym = binding.symbol
-          val typeSym = newSymbol(ctx.owner, sym.name, EmptyFlags, sym.info, NoSymbol, binding.span)
+          val typeSym = newSymbol(ctx.owner, sym.name ++ "$given", EmptyFlags, sym.info, NoSymbol, binding.span)
           typeSym.addAnnotation(Annotation(New(ref(defn.QuotedRuntimePatterns_patternTypeAnnot.typeRef)).withSpan(binding.span)))
           TypeDef(typeSym.asType).withSpan(binding.span)
         }
@@ -62,17 +62,16 @@ object QuotePatterns:
     }
 
     val patterns = givenTypes ::: splicePatterns
+    val patternTypes = patterns.map(_.tpe.widenTermRefExpr)
 
     val splicePat =
       if patterns.isEmpty then ref(defn.EmptyTupleModule.termRef)
       else if patterns.size <= Definitions.MaxTupleArity then
-        UnApply(
-          ref(defn.TupleType(patterns.size).typeSymbol.companionModule).select(nme.unapply)
-            /*.appliedToTypes(...)*/, // TODO
-          Nil,
-          patterns,
-          defn.tupleType(patterns.map(_.tpe))
-        )
+        val tupleNUnapply =
+          ref(defn.TupleType(patterns.size).typeSymbol.companionModule)
+            .select(nme.unapply)
+            .appliedToTypes(patternTypes)
+        UnApply(tupleNUnapply, Nil, patterns, defn.tupleType(patternTypes))
       else ???
 
     val patType =

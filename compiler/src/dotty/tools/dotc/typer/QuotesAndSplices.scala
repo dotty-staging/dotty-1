@@ -460,6 +460,7 @@ trait QuotesAndSplices {
       }
     }
 
+
     val splicePat =
       if splices.isEmpty then ref(defn.EmptyTupleModule.termRef)
       else typed(untpd.Tuple(splices.map(x => untpd.TypedSplice(replaceBindingsInTree.transform(x)))).withSpan(quoted.span), patType)
@@ -475,25 +476,32 @@ trait QuotesAndSplices {
     val bindings1 = typeTypeVariables.map(tdef => {
       val sym = tdef.symbol
       val info = replaceBindings(sym.info)
-      val newSym = newPatternBoundSymbol(sym.name, info, sym.span, addToGadt = false)
+      val newSym = newPatternBoundSymbol(sym.name ++ "$new", info, sym.span, addToGadt = false)
       Bind(newSym, untpd.Ident(nme.WILDCARD).withType(info)).withSpan(quoted.span)
-
     })
-    println(i"\ntypeTypeVariables: $typeTypeVariables")
-    println(i"\nbindings1: $bindings1")
+    // println(i"\ntypeTypeVariables: $typeTypeVariables")
+    // println(i"\nbindings1: $bindings1")
 
 
     val proto = quoteClass.typeRef.appliedTo(replaceBindings(quoted2.tpe) & quotedPt)
     val quoted11 = new TreeTypeMap(
+      treeMap = _ match { // FIXME remove this hack (use generated type binding reference directly)
+        case tree @ Select(_: Bind, _) if tree.symbol == defn.QuotedType_splice =>
+          tpd.ref(tree.tpe.dealias.typeSymbol)
+        case tree => tree
+      },
       substFrom = typeTypeVariables.map(_.symbol),
       substTo = bindings1.map(_.symbol),
     ).transform(quoted1)
-    val newQuotePattern = QuotePattern(bindings1, quoted11, quotes, proto)
+
+    println(i"quoted11: $quoted11")
+
+    val newQuotePattern = QuotePattern(bindings1 ++ typeBindings.values, quoted11, quotes, proto)
     println(i"\nnewQuotePattern: $newQuotePattern")
+    // println(i"\nnewQuotePattern: $newQuotePattern")
 
     val encoded = dotty.tools.dotc.quoted.QuotePatterns.encode(newQuotePattern)
     println(i"\nencoded: $encoded")
-    println(i"\nencoded: ${encoded.tpe}")
 
     val original = UnApply(
       fun = unapplyFun.appliedToTypeTrees(typeBindingsTuple :: TypeTree(patType) :: Nil),
@@ -502,9 +510,8 @@ trait QuotesAndSplices {
       proto = quoteClass.typeRef.appliedTo(replaceBindings(quoted2.tpe) & quotedPt))
 
     println(i"\noriginal: $original")
-    println(i"\noriginal: ${original.tpe}")
-    original
-    // encoded
+    // original
+    encoded
   }
 }
 
