@@ -4,6 +4,7 @@ package sbt
 import scala.language.unsafeNulls
 
 import java.io.File
+import java.nio.file.Path
 import java.util.{Arrays, EnumSet}
 
 import dotty.tools.dotc.ast.tpd
@@ -111,17 +112,17 @@ class ExtractDependencies extends Phase {
    */
   def recordDependency(dep: ClassDependency)(using Context): Unit = {
     val fromClassName = classNameAsString(dep.from)
-    val sourceFile = ctx.compilationUnit.source.file.file
+    val sourceFile = ctx.compilationUnit.source.file.virtualFile
 
-    def binaryDependency(file: File, binaryClassName: String) =
+    def binaryDependency(file: Path, binaryClassName: String) =
       ctx.sbtCallback.binaryDependency(file, binaryClassName, fromClassName, sourceFile, dep.context)
 
     def processExternalDependency(depFile: AbstractFile, binaryClassName: String) = {
       depFile match {
         case ze: ZipArchive#Entry => // The dependency comes from a JAR
           ze.underlyingSource match
-            case Some(zip) if zip.file != null =>
-              binaryDependency(zip.file, binaryClassName)
+            case Some(zip) if zip.jpath != null =>
+              binaryDependency(zip.jpath, binaryClassName)
             case _ =>
         case pf: PlainFile => // The dependency comes from a class file
           // FIXME: pf.file is null for classfiles coming from the modulepath
@@ -130,8 +131,8 @@ class ExtractDependencies extends Phase {
           // java.io.File, this means that we cannot record dependencies coming
           // from the modulepath. For now this isn't a big deal since we only
           // support having the standard Java library on the modulepath.
-          if pf.file != null then
-            binaryDependency(pf.file, binaryClassName)
+          if pf.jpath != null then
+            binaryDependency(pf.jpath, binaryClassName)
         case _ =>
           internalError(s"Ignoring dependency $depFile of unknown class ${depFile.getClass}}", dep.from.srcPos)
       }

@@ -29,5 +29,5 @@ object Dependencies {
   )
 
   val newCompilerInterface = "org.scala-sbt" % "compiler-interface" % "1.8.0"
-  val oldCompilerInterface = "org.scala-sbt" % "compiler-interface" % "1.3.5"
+  // val oldCompilerInterface = "org.scala-sbt" % "compiler-interface" % "1.3.5"
 }
