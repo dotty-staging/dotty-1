@@ -62,6 +62,8 @@ object ScriptSourceFile {
 class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends interfaces.SourceFile {
   import SourceFile._
 
+  val tracer = Thread.currentThread().getStackTrace().mkString("\n*)  ", "\n*)  ", "")
+
   private var myContent: Array[Char] | Null = null
 
   /** The contents of the original source file. Note that this can be empty, for example when

@@ -91,7 +91,7 @@ public class CompilerBridgeDriver extends Driver {
           callback.problem(problem.category(), problem.position(), problem.message(), problem.severity(),
             true);
         }
-      } else {  
+      } else {
         delegate.printSummary();
       }
 

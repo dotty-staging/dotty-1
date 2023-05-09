@@ -15,6 +15,8 @@ import java.io.InputStream
  *  ''Note:  This library is considered experimental and should not be used unless you know what you are doing.''
  */
 object NoAbstractFile extends AbstractFile {
+
+  val tracer = "<root>"
   def absolute: AbstractFile = this
   def container: AbstractFile = this
   def create(): Unit = ???

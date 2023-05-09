@@ -85,6 +85,8 @@ object AbstractFile {
  */
 abstract class AbstractFile extends Iterable[AbstractFile] {
 
+  def tracer: String
+
   /** Returns the name of this abstract file. */
   def name: String
 
@@ -117,6 +119,8 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
 
   /** Returns the underlying Path if any and null otherwise. */
   def jpath: JPath
+
+  def underlying: xsbti.VirtualFile | Null = null
 
   /** An underlying source, if known.  Mostly, a zip/jar file. */
   def underlyingSource: Option[AbstractFile] = None

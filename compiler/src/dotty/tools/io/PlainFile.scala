@@ -27,6 +27,8 @@ class PlainFile(val givenPath: Path) extends AbstractFile {
 
   dotc.util.Stats.record("new PlainFile")
 
+  val tracer = Thread.currentThread().getStackTrace.mkString("\n>  ", "\n>  ", "")
+
   def jpath: JPath = givenPath.jpath
 
   override def underlyingSource  = {

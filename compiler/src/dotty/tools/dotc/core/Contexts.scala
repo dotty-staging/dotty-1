@@ -232,9 +232,20 @@ object Contexts {
     def nestingLevel: Int = effectiveScope.nestingLevel
 
     /** Sourcefile corresponding to given abstract file, memoized */
-    def getSource(file: AbstractFile, codec: => Codec = Codec(settings.encoding.value)) = {
+    def getSource(file: AbstractFile, codec: => Codec = Codec(settings.encoding.value)): SourceFile = {
       util.Stats.record("Context.getSource")
-      base.sources.getOrElseUpdate(file, SourceFile(file, codec))
+      if file.underlying != null then {
+        // replace whatever is here with the virtual file
+        val existing = base.sources.lookup(file)
+        if existing != null && existing.file.underlying != null then
+          existing
+        else
+          val sf = SourceFile(file, codec)
+          base.sources.update(file, sf)
+          sf
+      } else {
+        base.sources.getOrElseUpdate(file, SourceFile(file, codec))
+      }
     }
 
     /** SourceFile with given path name, memoized */

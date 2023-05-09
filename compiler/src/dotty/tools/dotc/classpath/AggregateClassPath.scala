@@ -149,14 +149,14 @@ case class AggregateClassPath(aggregates: Seq[ClassPath]) extends ClassPath {
   }
 }
 
-object AggregateClassPath {
-  def createAggregate(parts: ClassPath*): ClassPath = {
-    val elems = new ArrayBuffer[ClassPath]()
-    parts foreach {
-      case AggregateClassPath(ps) => elems ++= ps
-      case p => elems += p
-    }
-    if (elems.size == 1) elems.head
-    else AggregateClassPath(elems.toIndexedSeq)
-  }
-}
+// object AggregateClassPath {
+//   def createAggregate(parts: ClassPath*): ClassPath = {
+//     val elems = new ArrayBuffer[ClassPath]()
+//     parts foreach {
+//       case AggregateClassPath(ps) => elems ++= ps
+//       case p => elems += p
+//     }
+//     if (elems.size == 1) elems.head
+//     else AggregateClassPath(elems.toIndexedSeq)
+//   }
+// }
