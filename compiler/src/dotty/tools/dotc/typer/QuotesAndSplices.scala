@@ -172,6 +172,8 @@ trait QuotesAndSplices {
           report.warning(em"Ignored bound$typeSymInfo\n\nConsider defining bounds explicitly `'{ $typeSym$typeSymInfo; ... }`", tree.srcPos)
         ref(typeSym)
       case None =>
+        if ctx.mode.is(Mode.InPatternAlternative) then
+          report.error(IllegalVariableInPatternAlternative(tree.name), tree.srcPos)
         def spliceOwner(ctx: Context): Symbol =
           if (ctx.mode.is(Mode.QuotedPattern)) spliceOwner(ctx.outer) else ctx.owner
         val name = tree.name.toTypeName
