@@ -727,7 +727,7 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
       case tree @ QuotePattern(bindings, body, quotes) =>
         // TODO print quotes for debugging
         val bindingsText = bindings.map(binding => {
-          keywordStr("type ") ~ toText(binding.symbol.name) ~ toText(binding.symbol.info) ~ ";"
+          keywordStr("type ") ~ toText(binding.symbol.name) ~ toText(binding.symbol.info) ~ "; "
         }).reduceLeft(_ ~~ _).provided(bindings.nonEmpty)
         val open = if (body.isTerm) keywordStr("{") else keywordStr("[")
         val close = if (body.isTerm) keywordStr("}") else keywordStr("]")

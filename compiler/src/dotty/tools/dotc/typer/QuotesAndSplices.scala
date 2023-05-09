@@ -177,12 +177,18 @@ trait QuotesAndSplices {
         val name = tree.name.toTypeName
         val nameOfSyntheticGiven = PatMatGivenVarName.fresh(tree.name.toTermName)
         val expr = untpd.cpy.Ident(tree)(nameOfSyntheticGiven)
-        val typeSym = newSymbol(spliceOwner(ctx), name, EmptyFlags, typeSymInfo, NoSymbol, tree.span)
-        typeSym.addAnnotation(Annotation(New(ref(defn.QuotedRuntimePatterns_patternTypeAnnot.typeRef)).withSpan(tree.span)))
+        val typeSym = inContext(ctx.withOwner(spliceOwner(ctx))) {
+          newPatternBoundSymbol(tree.name, typeSymInfo, tree.span, addToGadt = false)
+        }
+        // typeSym.addAnnotation(Annotation(New(ref(defn.QuotedRuntimePatterns_patternTypeAnnot.typeRef)).withSpan(tree.span)))
         addQuotedPatternTypeVariable(typeSym)
-        val pat = typedPattern(expr, defn.QuotedTypeClass.typeRef.appliedTo(typeSym.typeRef))(
-            using spliceContext.retractMode(Mode.QuotedPattern).withOwner(spliceOwner(ctx)))
-        pat.select(tpnme.Underlying)
+        // val pat = typedPattern(expr, defn.QuotedTypeClass.typeRef.appliedTo(typeSym.typeRef))(
+        //     using spliceContext.retractMode(Mode.QuotedPattern).withOwner(spliceOwner(ctx)))
+        // val res = pat.select(tpnme.Underlying)
+        val newRes = Bind(typeSym, untpd.Ident(nme.WILDCARD).withType(typeSymInfo)).withSpan(tree.span)
+        // println(i"newRes: $newRes")
+        newRes
+
 
   private def checkSpliceOutsideQuote(tree: untpd.Tree)(using Context): Unit =
     if (level == 0 && !ctx.owner.ownersIterator.exists(_.isInlineMethod))
@@ -476,40 +482,49 @@ trait QuotesAndSplices {
     val bindings1 = typeTypeVariables.map(tdef => {
       val sym = tdef.symbol
       val info = replaceBindings(sym.info)
-      val newSym = newPatternBoundSymbol(sym.name ++ "$new", info, sym.span, addToGadt = false)
+      val newSym = newPatternBoundSymbol(sym.name, info, sym.span, addToGadt = false)
       Bind(newSym, untpd.Ident(nme.WILDCARD).withType(info)).withSpan(quoted.span)
     })
     // println(i"\ntypeTypeVariables: $typeTypeVariables")
     // println(i"\nbindings1: $bindings1")
 
+    val typeBindings2 = new TreeAccumulator[List[Bind]] {
+      override def apply(acc: List[Bind], tree: Tree)(using Context): List[Bind] = tree match {
+        case tree: Bind if tree.symbol.isType => tree :: acc
+        case _ => foldOver(acc, tree)
+      }
+    }.apply(Nil, quoted1)
 
-    val proto = quoteClass.typeRef.appliedTo(replaceBindings(quoted2.tpe) & quotedPt)
+
+    val quoteType = quoted2.tpe.subst(typeTypeVariables.map(_.symbol), bindings1.map(_.symbol.typeRef))
+    val proto = quoteClass.typeRef.appliedTo(quoteType & quotedPt)
     val quoted11 = new TreeTypeMap(
-      treeMap = _ match { // FIXME remove this hack (use generated type binding reference directly)
-        case tree @ Select(_: Bind, _) if tree.symbol == defn.QuotedType_splice =>
-          tpd.ref(tree.tpe.dealias.typeSymbol)
+      treeMap = _ match {
+        case tree: Bind if tree.symbol.isType => tpd.ref(tree.symbol)
         case tree => tree
       },
       substFrom = typeTypeVariables.map(_.symbol),
       substTo = bindings1.map(_.symbol),
     ).transform(quoted1)
 
-    println(i"quoted11: $quoted11")
+    // println(i"bindings1: ${bindings1}")
+    // println(i"typeBindings.values: ${typeBindings.values.toList}")
+    // println(i"typeBindings2: ${typeBindings2.toList}")
+    // println(i"proto: $proto")
 
-    val newQuotePattern = QuotePattern(bindings1 ++ typeBindings.values, quoted11, quotes, proto)
-    println(i"\nnewQuotePattern: $newQuotePattern")
+    val newQuotePattern = QuotePattern(bindings1 ++ typeBindings2, quoted11, quotes, proto)
     // println(i"\nnewQuotePattern: $newQuotePattern")
 
     val encoded = dotty.tools.dotc.quoted.QuotePatterns.encode(newQuotePattern)
-    println(i"\nencoded: $encoded")
+    // println(i"\nencoded: $encoded")
 
-    val original = UnApply(
-      fun = unapplyFun.appliedToTypeTrees(typeBindingsTuple :: TypeTree(patType) :: Nil),
-      implicits = quotedPattern :: Nil,
-      patterns = splicePat :: Nil,
-      proto = quoteClass.typeRef.appliedTo(replaceBindings(quoted2.tpe) & quotedPt))
+    // val original = UnApply(
+    //   fun = unapplyFun.appliedToTypeTrees(typeBindingsTuple :: TypeTree(patType) :: Nil),
+    //   implicits = quotedPattern :: Nil,
+    //   patterns = splicePat :: Nil,
+    //   proto = quoteClass.typeRef.appliedTo(replaceBindings(quoted2.tpe) & quotedPt))
 
-    println(i"\noriginal: $original")
+    // println(i"\noriginal: $original")
     // original
     encoded
   }

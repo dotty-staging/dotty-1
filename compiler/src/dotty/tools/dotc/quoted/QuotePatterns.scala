@@ -39,7 +39,7 @@ object QuotePatterns:
       else
         val patternTypes = quotePattern.bindings.map { binding =>
           val sym = binding.symbol
-          val typeSym = newSymbol(ctx.owner, sym.name ++ "$given", EmptyFlags, sym.info, NoSymbol, binding.span)
+          val typeSym = newSymbol(ctx.owner, sym.name ++ "$inPattern", EmptyFlags, sym.info, NoSymbol, binding.span)
           typeSym.addAnnotation(Annotation(New(ref(defn.QuotedRuntimePatterns_patternTypeAnnot.typeRef)).withSpan(binding.span)))
           TypeDef(typeSym.asType).withSpan(binding.span)
         }
@@ -68,7 +68,7 @@ object QuotePatterns:
       if patterns.isEmpty then ref(defn.EmptyTupleModule.termRef)
       else if patterns.size <= Definitions.MaxTupleArity then
         val tupleNUnapply =
-          ref(defn.TupleType(patterns.size).typeSymbol.companionModule)
+          ref(defn.TupleType(patterns.size).nn.typeSymbol.companionModule)
             .select(nme.unapply)
             .appliedToTypes(patternTypes)
         UnApply(tupleNUnapply, Nil, patterns, defn.tupleType(patternTypes))
