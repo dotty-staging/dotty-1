@@ -177,9 +177,7 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
 
   def compile(files: List[AbstractFile]): Unit =
     try
-      val original = files.map(runContext.getSource(_))
-      files.zip(original).foreach((f, o) => assert(f eq o.file, s"source files are not the same as the original ones! [$f, ${o.file}]"))
-      compileSources(original)
+      compileSources(files.map(runContext.getSource(_)))
     catch case NonFatal(ex) if !this.enrichedErrorMessage =>
       val files1 = if units.isEmpty then files else units.map(_.source.file)
       report.echo(this.enrichErrorMessage(s"exception occurred while compiling ${files1.map(_.path)}"))

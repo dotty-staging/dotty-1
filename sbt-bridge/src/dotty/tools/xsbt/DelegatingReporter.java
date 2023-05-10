@@ -15,12 +15,16 @@ import dotty.tools.dotc.util.SourcePosition;
 import xsbti.Position;
 import xsbti.Severity;
 
+import java.util.function.*;
+
 final public class DelegatingReporter extends AbstractReporter {
   private xsbti.Reporter delegate;
+  private final Function<SourceFile, String> lookup;
 
-  public DelegatingReporter(xsbti.Reporter delegate) {
+  public DelegatingReporter(xsbti.Reporter delegate, Function<SourceFile, String> lookup) {
     super();
     this.delegate = delegate;
+    this.lookup = lookup;
   }
 
   public void dropDelegate() {
@@ -63,9 +67,9 @@ final public class DelegatingReporter extends AbstractReporter {
     return severity;
   }
 
-  private static Position positionOf(SourcePosition pos) {
-    if (pos.exists()){
-      return new PositionBridge(pos, pos.source());
+  private Position positionOf(SourcePosition pos) {
+    if (pos.exists()) {
+      return new PositionBridge(pos, lookup.apply(pos.source()));
     } else {
       return PositionBridge.noPosition;
     }

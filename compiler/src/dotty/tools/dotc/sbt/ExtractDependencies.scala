@@ -112,7 +112,7 @@ class ExtractDependencies extends Phase {
    */
   def recordDependency(dep: ClassDependency)(using Context): Unit = {
     val fromClassName = classNameAsString(dep.from)
-    val sourceFile = ctx.compilationUnit.source.virtualFile
+    val sourceFile = ctx.compilationUnit.source.file.zincVirtualFile
 
     def binaryDependency(file: Path, binaryClassName: String) =
       ctx.sbtCallback.binaryDependency(file, binaryClassName, fromClassName, sourceFile, dep.context)

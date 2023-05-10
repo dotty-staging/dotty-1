@@ -1,6 +1,6 @@
 package dotty.tools.dotc.sbt
 
-import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.core.Contexts.{Context, ctx}
 import dotty.tools.dotc.core.Symbols.Symbol
 import dotty.tools.dotc.core.NameOps.stripModuleClassSuffix
 import dotty.tools.dotc.core.Names.Name
@@ -10,16 +10,16 @@ inline val TermNameHash = 1987 // 300th prime
 inline val TypeNameHash = 1993 // 301st prime
 inline val InlineParamHash = 1997 // 302nd prime
 
-extension (sf: dotty.tools.dotc.util.SourceFile) def virtualFile: xsbti.VirtualFile =
-  val underlying = sf.file.underlying
-  if underlying == null then
-    sys.error(s"no underlying file for $sf [${sf.file.getClass}]\n${sf.tracer}")
-  else underlying
-extension (file: io.AbstractFile) def virtualFile: xsbti.VirtualFile =
-  val underlying = file.underlying
-  if underlying == null then
-    sys.error(s"no underlying file for $file [${file.getClass}]\n${file.tracer}")
-  else underlying
+  // val underlying = sf.file.underlying
+  // if underlying == null then
+  //   sys.error(s"no underlying file for $sf [${sf.file.getClass}]\n${sf.tracer}")
+  // else underlying
+extension (file: io.AbstractFile) def zincVirtualFile(using Context): xsbti.VirtualFile =
+  ctx.zincInitialFiles.get(file.absolutePath).nn
+  // val underlying = file.underlying
+  // if underlying == null then
+  //   sys.error(s"no underlying file for $file [${file.getClass}]\n${file.tracer}")
+  // else underlying
       // file match
       // case file: io.PlainFile =>
       //   new xsbti.VirtualFile with xsbti.PathBasedFile {

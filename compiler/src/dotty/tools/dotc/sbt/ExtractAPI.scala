@@ -66,7 +66,7 @@ class ExtractAPI extends Phase {
   override def run(using Context): Unit = {
     val unit = ctx.compilationUnit
     val sourceFile = unit.source.file
-    val vf = unit.source.file.virtualFile
+    val vf = unit.source.file.zincVirtualFile
     if (ctx.sbtCallback != null)
       ctx.sbtCallback.startSource(vf)
 
