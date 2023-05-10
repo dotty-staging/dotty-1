@@ -24,6 +24,33 @@ import scala.collection.mutable
 object QuotePatterns:
   import tpd._
 
+  /** TODO */
+  def checkPattern(quotePattern: QuotePattern)(using Context): Unit = new tpd.TreeTraverser {
+    def traverse(tree: Tree)(using Context): Unit = tree match {
+      case _: SplicePattern =>
+      case tdef: TypeDef if tdef.symbol.isClass =>
+        val kind = if tdef.symbol.is(Module) then "objects" else "classes"
+        report.error(em"Implementation restriction: cannot match $kind", tree.srcPos)
+      case tree: NamedDefTree =>
+        if tree.name.is(NameKinds.WildcardParamName) then
+          report.warning(
+            "Use of `_` for lambda in quoted pattern. Use explicit lambda instead or use `$_` to match any term.",
+            tree.srcPos)
+        if tree.name.isTermName && !tree.nameSpan.isSynthetic && tree.name != nme.ANON_FUN && tree.name.startsWith("$") then
+          report.error("Names cannot start with $ quote pattern", tree.namePos)
+        traverseChildren(tree)
+      case _: Match =>
+        report.error("Implementation restriction: cannot match `match` expressions", tree.srcPos)
+      case _: Try =>
+        report.error("Implementation restriction: cannot match `try` expressions", tree.srcPos)
+      case _: Return =>
+        report.error("Implementation restriction: cannot match `return` statements", tree.srcPos)
+      case _ =>
+        traverseChildren(tree)
+    }
+
+  }.traverse(quotePattern.body)
+
   def encode(quotePattern: QuotePattern)(using Context): Tree =
     val quoteClass = if (quotePattern.body.isTerm) defn.QuotedExprClass else defn.QuotedTypeClass
 
@@ -39,7 +66,7 @@ object QuotePatterns:
       else
         val patternTypes = quotePattern.bindings.map { binding =>
           val sym = binding.symbol
-          val typeSym = newSymbol(ctx.owner, sym.name ++ "$inPattern", EmptyFlags, sym.info, NoSymbol, binding.span)
+          val typeSym = newSymbol(ctx.owner, sym.name ++ "$inPattern" /* TODO remove $inPattern */, EmptyFlags, sym.info, NoSymbol, binding.span)
           typeSym.addAnnotation(Annotation(New(ref(defn.QuotedRuntimePatterns_patternTypeAnnot.typeRef)).withSpan(binding.span)))
           TypeDef(typeSym.asType).withSpan(binding.span)
         }
