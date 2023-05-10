@@ -51,7 +51,7 @@ trait QuotesAndSplices {
       report.error(em"Quotes require stable Quotes, but found non stable $quotes", quotes.srcPos)
 
     if ctx.mode.is(Mode.Pattern) then
-      typedQuotePattern(tree, pt, quotes).withSpan(tree.span)
+      typedQuotePattern0(tree, pt, quotes).withSpan(tree.span)
     else if tree.isTypeQuote then
       val msg = em"""Quoted types `'[..]` can only be used in patterns.
                     |
@@ -101,6 +101,8 @@ trait QuotesAndSplices {
         cpy.Splice(tree)(spliced)
       case tree => tree
   }
+
+  def typedQuotePattern(tree: untpd.QuotePattern, pt: Type)(using Context): Tree = ???
 
   def typedSplicePattern(tree: untpd.SplicePattern, pt: Type)(using Context): Tree = {
     record("typedSplicePattern")
@@ -287,7 +289,7 @@ trait QuotesAndSplices {
    *        ) => ...
    *  ```
    */
-  private def typedQuotePattern(tree: untpd.Quote, pt: Type, quotes: Tree)(using Context): Tree = {
+  private def typedQuotePattern0(tree: untpd.Quote, pt: Type, quotes: Tree)(using Context): Tree = {
     val quoted = tree.body
     if quoted.isTerm && !pt.derivesFrom(defn.QuotedExprClass) then
       report.error("Quote pattern can only match scrutinees of type scala.quoted.Expr", tree.srcPos)
@@ -359,7 +361,7 @@ trait QuotesAndSplices {
     // println(i"\nnewQuotePattern: $newQuotePattern")
     // println(i"\nencoded: $encoded")
 
-    encoded
+    newQuotePattern
   }
 }
 

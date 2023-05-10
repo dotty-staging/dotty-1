@@ -1595,7 +1595,7 @@ object Trees {
             case tree @ Splice(expr) =>
               cpy.Splice(tree)(transform(expr)(using spliceContext))
             case tree @ QuotePattern(bindings, body, quotes) =>
-              cpy.QuotePattern(tree)(transform(bindings), transform(body)(using spliceContext), transform(quotes))
+              cpy.QuotePattern(tree)(transform(bindings), transform(body)(using quoteContext), transform(quotes))
             case tree @ SplicePattern(body, args) =>
               cpy.SplicePattern(tree)(transform(body)(using spliceContext), transform(args))
             case tree @ Hole(_, _, args, content, tpt) =>
@@ -1744,7 +1744,7 @@ object Trees {
             case Splice(expr) =>
               this(x, expr)(using spliceContext)
             case QuotePattern(bindings, body, quotes) =>
-              this(this(this(x, bindings), body)(using spliceContext), quotes)
+              this(this(this(x, bindings), body)(using quoteContext), quotes)
             case SplicePattern(body, args) =>
               this(this(x, body)(using spliceContext), args)
             case Hole(_, _, args, content, tpt) =>
