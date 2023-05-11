@@ -56,7 +56,7 @@ class ExtractDependencies extends Phase {
 
   override def isRunnable(using Context): Boolean = {
     def forceRun = ctx.settings.YdumpSbtInc.value || ctx.settings.YforceSbtPhases.value
-    super.isRunnable && (ctx.sbtCallback != null || forceRun)
+    super.isRunnable && (ctx.sbtCallback != null && ctx.sbtCallback.enabled() || forceRun)
   }
 
   // Check no needed. Does not transform trees
@@ -91,7 +91,7 @@ class ExtractDependencies extends Phase {
       } finally pw.close()
     }
 
-    if (ctx.sbtCallback != null) {
+    if (ctx.sbtCallback != null && ctx.sbtCallback.enabled()) {
       collector.usedNames.foreach {
         case (clazz, usedNames) =>
           val className = classNameAsString(clazz)

@@ -107,21 +107,19 @@ class CodeGen(val int: DottyBackendInterface, val primitives: DottyPrimitives)( 
 
   // Creates a callback that will be evaluated in PostProcessor after creating a file
   private def onFileCreated(cls: ClassNode, claszSymbol: Symbol, sourceFile: dotty.tools.dotc.util.SourceFile): AbstractFile => Unit = clsFile => {
-    val (fullClassName, isLocal) = atPhase(sbtExtractDependenciesPhase) {
-      (ExtractDependencies.classNameAsString(claszSymbol), claszSymbol.isLocal)
+    val isLocal = atPhase(sbtExtractDependenciesPhase) {
+      claszSymbol.isLocal
     }
 
     val className = cls.name.replace('/', '.')
     if (ctx.compilerCallback != null)
       ctx.compilerCallback.onClassGenerated(sourceFile, convertAbstractFile(clsFile), className)
 
-    if (ctx.sbtCallback != null) {
+    if (isLocal && ctx.sbtCallback != null) {
       import dotty.tools.dotc.sbt.zincVirtualFile
       val jSourceFile = sourceFile.file.zincVirtualFile
 
-      val cb = ctx.sbtCallback
-      if (isLocal) cb.generatedLocalClass(jSourceFile, clsFile.jpath)
-      else cb.generatedNonLocalClass(jSourceFile, clsFile.jpath, className, fullClassName)
+      ctx.sbtCallback.generatedLocalClass(jSourceFile, clsFile.jpath)
     }
   }
 

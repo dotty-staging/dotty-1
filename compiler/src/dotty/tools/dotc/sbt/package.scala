@@ -14,8 +14,11 @@ inline val InlineParamHash = 1997 // 302nd prime
   // if underlying == null then
   //   sys.error(s"no underlying file for $sf [${sf.file.getClass}]\n${sf.tracer}")
   // else underlying
-extension (file: io.AbstractFile) def zincVirtualFile(using Context): xsbti.VirtualFile =
-  ctx.zincInitialFiles.get(file.absolutePath).nn
+extension (file: io.AbstractFile)
+  def zincVirtualFile(using Context): xsbti.VirtualFile =
+    ctx.zincInitialFiles.get(file.absolutePath).nn
+  def zincVirtualFileOpt(using Context): Option[xsbti.VirtualFile] =
+    Option(ctx.zincInitialFiles.getOrDefault(file.absolutePath, null).asInstanceOf[xsbti.VirtualFile])
   // val underlying = file.underlying
   // if underlying == null then
   //   sys.error(s"no underlying file for $file [${file.getClass}]\n${file.tracer}")

@@ -19,6 +19,7 @@ import NameOps._
 import inlines.Inlines
 import transform.ValueClasses
 import transform.SymUtils._
+import util.Property
 import dotty.tools.io.File
 import java.io.PrintWriter
 
@@ -26,6 +27,8 @@ import java.io.PrintWriter
 import scala.collection.mutable
 import scala.util.hashing.MurmurHash3
 import scala.util.chaining.*
+import dotty.tools.io.JarArchive
+import dotty.tools.io.PlainDirectory
 
 /** This phase sends a representation of the API of classes to sbt via callbacks.
  *
@@ -50,7 +53,7 @@ class ExtractAPI extends Phase {
 
   override def isRunnable(using Context): Boolean = {
     def forceRun = ctx.settings.YdumpSbtInc.value || ctx.settings.YforceSbtPhases.value
-    super.isRunnable && (ctx.sbtCallback != null || forceRun)
+    super.isRunnable && (ctx.sbtCallback != null && ctx.sbtCallback.enabled() || forceRun)
   }
 
   // Check no needed. Does not transform trees
@@ -63,16 +66,56 @@ class ExtractAPI extends Phase {
   // definitions, and `PostTyper` does not change definitions).
   override def runsAfter: Set[String] = Set(transform.PostTyper.name)
 
+  private val NonLocalClassSymbolsInCurrentUnits: Property.Key[mutable.HashSet[Symbol]] = Property.Key()
+
+  override def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] =
+    val nonLocalClassSymbols = new mutable.HashSet[Symbol]
+    val ctx0 = ctx.withProperty(NonLocalClassSymbolsInCurrentUnits, Some(nonLocalClassSymbols))
+    val units0 = super.runOn(units)(using ctx0)
+    if ctx.sbtCallback != null && ctx.sbtCallback.enabled() then
+      val cb = ctx.sbtCallback
+
+      for cls <- nonLocalClassSymbols if !cls.isLocal && cls.source.exists do
+        val sourceFile = cls.source
+        val sourceVF0 = sourceFile.file.zincVirtualFileOpt
+        for sourceVF <- sourceVF0 do
+
+          val fullClassName = atPhase(sbtExtractDependenciesPhase) {
+            ExtractDependencies.classNameAsString(cls)
+          }
+          val binaryClassName = cls.binaryClassName
+          val pathToClassFile = s"${binaryClassName.replace('.', java.io.File.separatorChar)}.class"
+
+          val classFile = {
+            ctx.settings.outputDir.value match {
+              case jar: JarArchive =>
+                new java.io.File(s"$jar!$pathToClassFile")
+              case outputDir =>
+                new java.io.File(outputDir.file, pathToClassFile)
+            }
+          }
+
+          cb.generatedNonLocalClass(sourceVF, classFile.toPath(), binaryClassName, fullClassName)
+        end for
+      end for
+
+      cb.apiPhaseCompleted()
+      cb.dependencyPhaseCompleted()
+    end if
+    units0
+  end runOn
+
   override def run(using Context): Unit = {
     val unit = ctx.compilationUnit
     val sourceFile = unit.source.file
     val vf = unit.source.file.zincVirtualFile
-    if (ctx.sbtCallback != null)
+    if (ctx.sbtCallback != null && ctx.sbtCallback.enabled())
       ctx.sbtCallback.startSource(vf)
 
     val apiTraverser = new ExtractAPICollector
     val classes = apiTraverser.apiSource(unit.tpdTree)
     val mainClasses = apiTraverser.mainClasses
+    val allNonLocalClassSymbols = apiTraverser.allNonLocalClassSymbols
 
     if (ctx.settings.YdumpSbtInc.value) {
       // Append to existing file that should have been created by ExtractDependencies
@@ -83,11 +126,12 @@ class ExtractAPI extends Phase {
       } finally pw.close()
     }
 
-    if ctx.sbtCallback != null &&
+    if ctx.sbtCallback != null && ctx.sbtCallback.enabled() &&
       !ctx.compilationUnit.suspendedAtInliningPhase // already registered before this unit was suspended
     then
       classes.foreach(ctx.sbtCallback.api(vf, _))
       mainClasses.foreach(ctx.sbtCallback.mainClass(vf, _))
+      ctx.property(NonLocalClassSymbolsInCurrentUnits).get ++= allNonLocalClassSymbols
   }
 }
 
@@ -166,6 +210,7 @@ private class ExtractAPICollector(using Context) extends ThunkHolder {
   private val inlineBodyCache = mutable.HashMap.empty[Symbol, Int]
 
   private val allNonLocalClassesInSrc = new mutable.HashSet[xsbti.api.ClassLike]
+  private val _allNonLocalClassSymbols = new mutable.HashSet[Symbol]
   private val _mainClasses = new mutable.HashSet[String]
 
   private object Constants {
@@ -222,6 +267,11 @@ private class ExtractAPICollector(using Context) extends ThunkHolder {
     _mainClasses.toSet
   }
 
+  def allNonLocalClassSymbols: Set[Symbol] = {
+    forceThunks()
+    _allNonLocalClassSymbols.toSet
+  }
+
   private def computeClass(sym: ClassSymbol): api.ClassLikeDef = {
     import xsbti.api.{DefinitionType => dt}
     val defType =
@@ -255,6 +305,7 @@ private class ExtractAPICollector(using Context) extends ThunkHolder {
       childrenOfSealedClass, topLevel, tparams)
 
     allNonLocalClassesInSrc += cl
+    _allNonLocalClassSymbols += sym
 
     if (sym.isStatic && !sym.is(Trait) && ctx.platform.hasMainMethod(sym)) {
        // If sym is an object, all main methods count, otherwise only @static ones count.
