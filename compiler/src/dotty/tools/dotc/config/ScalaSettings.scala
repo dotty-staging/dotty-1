@@ -396,5 +396,9 @@ private sealed trait YSettings:
   val YinstrumentDefs: Setting[Boolean] = BooleanSetting("-Yinstrument-defs", "Add instrumentation code that counts method calls; needs -Yinstrument to be set, too.")
 
   val YforceInlineWhileTyping: Setting[Boolean] = BooleanSetting("-Yforce-inline-while-typing", "Make non-transparent inline methods inline when typing. Emulates the old inlining behavior of 3.0.0-M3.")
+
+  // Pipeline compilation options
+  val YpickleJava: Setting[Boolean] = BooleanSetting("-Ypickle-java", "Pickler phase should compute pickles for .java defined symbols for use by build tools")
+  val YpickleWrite: Setting[String] = StringSetting("-Ypickle-write", "directory|jar", "destination for generated .sig files containing type signatures.", "")
 end YSettings
 
