@@ -30,6 +30,9 @@ import scala.util.chaining.*
 import dotty.tools.io.JarArchive
 import dotty.tools.io.PlainDirectory
 
+import dotty.tools.dotc.transform.Pickler
+import dotty.tools.dotc.core.StdNames.str
+
 /** This phase sends a representation of the API of classes to sbt via callbacks.
  *
  *  This is used by sbt for incremental recompilation.
@@ -69,41 +72,75 @@ class ExtractAPI extends Phase {
   private val NonLocalClassSymbolsInCurrentUnits: Property.Key[mutable.HashSet[Symbol]] = Property.Key()
 
   override def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] =
+    val sigWriter: Option[Pickler.EarlyFileWriter] = ctx.settings.YpickleWrite.value match
+      case dest if dest.size > 0 =>
+        import dotty.tools.io.*
+        val path = Directory(dest)
+        val isJar = path.extension == "jar"
+        if (!isJar && !path.isDirectory)
+          report.error(s"'$dest' does not exist or is not a directory or .jar file")
+          None
+        else
+          val output = if (isJar) JarArchive.create(path) else new PlainDirectory(path)
+          Some(Pickler.EarlyFileWriter(ClassfileWriterOps(output)))
+      case _ =>
+        None
     val nonLocalClassSymbols = new mutable.HashSet[Symbol]
-    val ctx0 = ctx.withProperty(NonLocalClassSymbolsInCurrentUnits, Some(nonLocalClassSymbols))
-    val units0 = super.runOn(units)(using ctx0)
-    if ctx.sbtCallback != null && ctx.sbtCallback.enabled() then
-      val cb = ctx.sbtCallback
+    val ctx0 = ctx
+      .withProperty(NonLocalClassSymbolsInCurrentUnits, Some(nonLocalClassSymbols))
+      .withProperty(Pickler.EarlyWriter, sigWriter)
+    inContext(ctx0) {
+      val units0 = super.runOn(units)
+      writeSigFiles(units0)
+      if ctx.sbtCallback != null && ctx.sbtCallback.enabled() then
+        val cb = ctx.sbtCallback
 
-      for cls <- nonLocalClassSymbols if !cls.isLocal && cls.source.exists do
-        val sourceFile = cls.source
-        val sourceVF0 = sourceFile.file.zincVirtualFileOpt
-        for sourceVF <- sourceVF0 do
+        for cls <- nonLocalClassSymbols if !cls.isLocal && cls.source.exists do
+          val sourceFile = cls.source
+          val sourceVF0 = sourceFile.file.zincVirtualFileOpt
+          for sourceVF <- sourceVF0 do
 
-          val fullClassName = atPhase(sbtExtractDependenciesPhase) {
-            ExtractDependencies.classNameAsString(cls)
-          }
-          val binaryClassName = cls.binaryClassName
-          val pathToClassFile = s"${binaryClassName.replace('.', java.io.File.separatorChar)}.class"
-
-          val classFile = {
-            ctx.settings.outputDir.value match {
-              case jar: JarArchive =>
-                new java.io.File(s"$jar!$pathToClassFile")
-              case outputDir =>
-                new java.io.File(outputDir.file, pathToClassFile)
+            val fullClassName = atPhase(sbtExtractDependenciesPhase) {
+              ExtractDependencies.classNameAsString(cls)
             }
-          }
+            val binaryClassName = cls.binaryClassName
+            val pathToClassFile = s"${binaryClassName.replace('.', java.io.File.separatorChar)}.class"
 
-          cb.generatedNonLocalClass(sourceVF, classFile.toPath(), binaryClassName, fullClassName)
+            val classFile = {
+              ctx.settings.outputDir.value match {
+                case jar: JarArchive =>
+                  new java.io.File(s"$jar!$pathToClassFile")
+                case outputDir =>
+                  new java.io.File(outputDir.file, pathToClassFile)
+              }
+            }
+
+            cb.generatedNonLocalClass(sourceVF, classFile.toPath(), binaryClassName, fullClassName)
+          end for
         end for
-      end for
 
-      cb.apiPhaseCompleted()
-      cb.dependencyPhaseCompleted()
-    end if
-    units0
+        cb.apiPhaseCompleted()
+        cb.dependencyPhaseCompleted()
+      end if
+      units0
+    }
   end runOn
+
+  private def writeSigFiles(units: List[CompilationUnit])(using Context): Unit = {
+    ctx.property(Pickler.EarlyWriter).foreach { writer =>
+      for
+        unit <- units
+        (cls, pickled) <- unit.pickled
+      do
+        val binaryName = cls.binaryClassName.replace('.', java.io.File.separatorChar).nn
+        val binaryClassName = if (cls.is(Module)) binaryName.stripSuffix(str.MODULE_SUFFIX).nn else binaryName
+        writer.writeTastySig(binaryClassName, pickled())
+
+      writer.close()
+      if (ctx.settings.verbose.value)
+        report.echo("[sig files written]")
+    }
+  }
 
   override def run(using Context): Unit = {
     val unit = ctx.compilationUnit
