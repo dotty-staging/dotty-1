@@ -704,6 +704,11 @@ object Trees {
     /** Is this a type quote `'[tpe]' */
     def isTypeQuote = body.isType
 
+    /** Returns scala.quoted.{Expr,Type} depending if this is a term or type quote */
+    def quoteKind(using Context): Type =
+      if isTypeQuote then defn.QuotedTypeClass.typeRef
+      else defn.QuotedExprClass.typeRef
+
     /** Type of the quoted expression as seen from outside the quote */
     def bodyType(using Context): Type =
       val quoteType = typeOpt // `Quotes ?=> Expr[T]` or `Quotes ?=> Type[T]`
