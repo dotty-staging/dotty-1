@@ -17,6 +17,12 @@ import collection.mutable
 import util.concurrent.{Executor, Future}
 import compiletime.uninitialized
 
+import StdNames.str
+
+import dotty.tools.io.ClassfileWriterOps
+import dotty.tools.dotc.util.Property
+import dotty.tools.dotc.transform.Pickler.EarlyFileWriter
+
 object Pickler {
   val name: String = "pickler"
   val description: String = "generates TASTy info"
@@ -26,6 +32,11 @@ object Pickler {
    *  only in backend.
    */
   inline val ParallelPickling = true
+
+  val EarlyWriter: Property.Key[EarlyFileWriter] = new Property.Key()
+
+  class EarlyFileWriter(writer: ClassfileWriterOps):
+    export writer.{writeTasty, close}
 }
 
 /** This phase pickles trees */
@@ -144,23 +155,76 @@ class Pickler extends Phase {
   }
 
   override def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] = {
-    val result =
-      if useExecutor then
-        executor.start()
-        try super.runOn(units)
-        finally executor.close()
-      else
-        super.runOn(units)
-    if ctx.settings.YtestPickler.value then
-      val ctx2 = ctx.fresh.setSetting(ctx.settings.YreadComments, true)
-      testUnpickler(
-        using ctx2
-            .setPeriod(Period(ctx.runId + 1, ctx.base.typerPhase.id))
-            .setReporter(new ThrowingReporter(ctx.reporter))
-            .addMode(Mode.ReadPositions)
-            .addMode(Mode.PrintShowExceptions))
-    result
+    val sigWriter: Option[EarlyFileWriter] = ctx.settings.YpickleWrite.value match
+      case dest if dest.size > 0 =>
+        import dotty.tools.io.*
+        val path = Directory(dest)
+        val isJar = path.extension == "jar"
+        if (!isJar && !path.isDirectory)
+          report.error(s"'$dest' does not exist or is not a directory or .jar file")
+          None
+        else
+          val output = if (isJar) JarArchive.create(path) else new PlainDirectory(path)
+          Some(EarlyFileWriter(ClassfileWriterOps(output)))
+      case _ =>
+        None
+
+    inContext(ctx.withProperty(Pickler.EarlyWriter, sigWriter)) {
+      val result =
+        if useExecutor then
+          executor.start()
+          try super.runOn(units)
+          finally executor.close()
+        else
+          super.runOn(units)
+      if ctx.settings.YtestPickler.value then
+        val ctx2 = ctx.fresh.setSetting(ctx.settings.YreadComments, true)
+        testUnpickler(
+          using ctx2
+              .setPeriod(Period(ctx.runId + 1, ctx.base.typerPhase.id))
+              .setReporter(new ThrowingReporter(ctx.reporter))
+              .addMode(Mode.ReadPositions)
+              .addMode(Mode.PrintShowExceptions))
+      // closeSigWriter()
+      writeSigFiles(units)
+      result
+    }
+
   }
+
+  private def writeSigFiles(units: List[CompilationUnit])(using Context): Unit = {
+    ctx.property(Pickler.EarlyWriter).foreach { writer =>
+      for
+        unit <- units
+      do
+        for (cls, pickled) <- unit.pickled do
+          val binaryName = cls.binaryClassName.replace('.', java.io.File.separatorChar).nn
+          val binaryClassName = if (cls.is(Module)) binaryName.stripSuffix(str.MODULE_SUFFIX).nn else binaryName
+          // val relativePath = binaryClassName + ".sig"
+          // val data = pickle.bytes.take(pickle.writeIndex)
+          writer.writeTasty(binaryClassName, pickled())
+
+      writer.close()
+      if (ctx.settings.verbose.value)
+        report.echo("[sig files written]")
+    }
+  }
+  // private def writeSigFile(sym: Symbol, tasty: Array[Byte])(using Context): Unit = {
+  //   ctx.property(Pickler.EarlyWriter).foreach { writer =>
+  //     val binaryName = sym.binaryClassName.replace('.', java.io.File.separatorChar)
+  //     val binaryClassName = if (sym.is(Module)) binaryName.stripSuffix(str.MODULE_SUFFIX) else binaryName
+  //     // val relativePath = binaryClassName + ".sig"
+  //     // val data = pickle.bytes.take(pickle.writeIndex)
+  //     writer.writeTasty(binaryClassName, tasty)
+  //   }
+  // }
+  // private def closeSigWriter()(using Context): Unit = {
+  //   ctx.property(Pickler.EarlyWriter).foreach { writer =>
+  //     writer.close()
+  //     if (ctx.settings.verbose.value)
+  //       report.echo("[sig files written]")
+  //   }
+  // }
 
   private def testUnpickler(using Context): Unit = {
     pickling.println(i"testing unpickler at run ${ctx.runId}")
