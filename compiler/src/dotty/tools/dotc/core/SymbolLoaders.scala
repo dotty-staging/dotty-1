@@ -187,7 +187,7 @@ object SymbolLoaders {
   /** Initialize toplevel class and module symbols in `owner` from class path representation `classRep`
    */
   def initializeFromClassPath(owner: Symbol, classRep: ClassRepresentation)(using Context): Unit =
-    ((classRep.binary, classRep.source): @unchecked) match {
+    ((classRep.binaryOrTasty, classRep.source): @unchecked) match {
       case (Some(bin), Some(src)) if needCompile(bin, src) && !binaryOnly(owner, nameOf(classRep)) =>
         if (ctx.settings.verbose.value) report.inform("[symloader] picked up newer source file for " + src.path)
         enterToplevelsFromSource(owner, nameOf(classRep), src)
@@ -418,6 +418,29 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
         case _ =>
       }
   }
+
+  private def mayLoadTreesFromTasty(using Context): Boolean =
+    ctx.settings.YretainTrees.value || ctx.settings.fromTasty.value
+}
+
+class TastySigLoader(val tastyFile: AbstractFile) extends SymbolLoader {
+
+  override def sourceFileOrNull: AbstractFile | Null = tastyFile
+
+  def description(using Context): String = "tasty file " + tastyFile.toString
+
+  override def doComplete(root: SymDenotation)(using Context): Unit =
+    load(root)
+
+  def load(root: SymDenotation)(using Context): Unit =
+    val (classRoot, moduleRoot) = rootDenots(root.asClass)
+    val bytes = tastyFile.toByteArray
+    val unpickler = new tasty.DottyUnpickler(bytes)
+    unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
+    if mayLoadTreesFromTasty then
+      classRoot.classSymbol.rootTreeOrProvider = unpickler
+      moduleRoot.classSymbol.rootTreeOrProvider = unpickler
+  end load
 
   private def mayLoadTreesFromTasty(using Context): Boolean =
     ctx.settings.YretainTrees.value || ctx.settings.fromTasty.value

@@ -48,11 +48,11 @@ trait PackageEntry {
   def name: String
 }
 
-private[dotty] case class ClassFileEntryImpl(file: AbstractFile) extends ClassFileEntry {
+private[dotty] case class ClassFileOrSigEntryImpl(file: AbstractFile) extends ClassFileEntry {
   final def fileName: String = file.name
   def name: String = FileUtils.stripClassExtension(file.name) // class name
 
-  def binary: Option[AbstractFile] = Some(file)
+  def binaryOrTasty: Option[AbstractFile] = Some(file)
   def source: Option[AbstractFile] = None
 }
 
@@ -60,7 +60,7 @@ private[dotty] case class SourceFileEntryImpl(file: AbstractFile) extends Source
   final def fileName: String = file.name
   def name: String = FileUtils.stripSourceExtension(file.name)
 
-  def binary: Option[AbstractFile] = None
+  def binaryOrTasty: Option[AbstractFile] = None
   def source: Option[AbstractFile] = Some(file)
 }
 
@@ -68,7 +68,7 @@ private[dotty] case class ClassAndSourceFilesEntry(classFile: AbstractFile, srcF
   final def fileName: String = classFile.name
   def name: String = FileUtils.stripClassExtension(classFile.name)
 
-  def binary: Option[AbstractFile] = Some(classFile)
+  def binaryOrTasty: Option[AbstractFile] = Some(classFile)
   def source: Option[AbstractFile] = Some(srcFile)
 }
 

@@ -39,9 +39,9 @@ sealed trait ZipAndJarFileLookupFactory {
  * Manages creation of classpath for class files placed in zip and jar files.
  * It should be the only way of creating them as it provides caching.
  */
-object ZipAndJarClassPathFactory extends ZipAndJarFileLookupFactory {
+object ZipAndJarClassPathFactory extends ZipAndJarClassPathFactoryWithManifest {
   private case class ZipArchiveClassPath(zipFile: File, override val release: Option[String])
-    extends ZipArchiveFileLookup[ClassFileEntryImpl]
+    extends ZipArchiveFileLookup[ClassFileOrSigEntryImpl]
     with NoSourcePaths {
 
     override def findClassFile(className: String): Option[AbstractFile] = {
@@ -57,9 +57,16 @@ object ZipAndJarClassPathFactory extends ZipAndJarFileLookupFactory {
 
     override private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = files(inPackage)
 
-    override protected def createFileEntry(file: FileZipArchive#Entry): ClassFileEntryImpl = ClassFileEntryImpl(file)
-    override protected def isRequiredFileType(file: AbstractFile): Boolean = file.isClass
+    override protected def createFileEntry(file: FileZipArchive#Entry): ClassFileOrSigEntryImpl = ClassFileOrSigEntryImpl(file)
+    override protected def isRequiredFileType(file: AbstractFile): Boolean = file.isClass || file.isTastySig
+
   }
+
+  override def createZipArchiveClassPath(zipFile: AbstractFile, release: Option[String]): ClassPath =
+    ZipArchiveClassPath(zipFile.file, release)
+}
+
+trait ZipAndJarClassPathFactoryWithManifest extends ZipAndJarFileLookupFactory {
 
   /**
    * This type of classpath is closely related to the support for JSR-223.
@@ -128,10 +135,10 @@ object ZipAndJarClassPathFactory extends ZipAndJarFileLookupFactory {
         subpackages.map(packageFile => PackageEntryImpl(inPackage.entryName(packageFile.name)))
     }
 
-    override private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = cachedPackages.get(inPackage.dottedString) match {
+    /*override*/ private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = cachedPackages.get(inPackage.dottedString) match {
       case None => Seq.empty
       case Some(PackageFileInfo(pkg, _)) =>
-        (for (file <- pkg if file.isClass) yield ClassFileEntryImpl(file)).toSeq
+        (for (file <- pkg if file.isClass) yield ClassFileOrSigEntryImpl(file)).toSeq
     }
 
     override private[dotty] def hasPackage(pkg: PackageName) = cachedPackages.contains(pkg.dottedString)
@@ -143,9 +150,11 @@ object ZipAndJarClassPathFactory extends ZipAndJarFileLookupFactory {
     case class PackageInfo(packageName: String, subpackages: List[AbstractFile])
   }
 
+  def createZipArchiveClassPath(zipFile: AbstractFile, release: Option[String]): ClassPath
+
   override protected def createForZipFile(zipFile: AbstractFile, release: Option[String]): ClassPath =
     if (zipFile.file == null) createWithoutUnderlyingFile(zipFile)
-    else ZipArchiveClassPath(zipFile.file, release)
+    else createZipArchiveClassPath(zipFile, release)
 
   private def createWithoutUnderlyingFile(zipFile: AbstractFile) = zipFile match {
     case manifestRes: ManifestResources =>

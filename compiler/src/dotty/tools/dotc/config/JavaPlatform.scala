@@ -9,6 +9,8 @@ import Symbols._, Types._, Contexts._, StdNames._
 import Flags._
 import transform.ExplicitOuter, transform.SymUtils._
 
+import dotty.tools.dotc.classpath.FileUtils.*
+
 class JavaPlatform extends Platform {
 
   private var currentClassPath: Option[ClassPath] = None
@@ -65,5 +67,6 @@ class JavaPlatform extends Platform {
     true
 
   def newClassLoader(bin: AbstractFile)(using Context): SymbolLoader =
-    new ClassfileLoader(bin)
+    if bin.isTastySig then new TastySigLoader(bin)
+    else new ClassfileLoader(bin)
 }

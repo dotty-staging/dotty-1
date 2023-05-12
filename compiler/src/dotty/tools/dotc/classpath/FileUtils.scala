@@ -18,7 +18,9 @@ object FileUtils {
     def isPackage: Boolean = file.isDirectory && mayBeValidPackage(file.name)
 
     def isClass: Boolean = !file.isDirectory && file.hasExtension("class") && !file.name.endsWith("$class.class")
-      // FIXME: drop last condition when we stop being compatible with Scala 2.11
+    // FIXME: drop last condition when we stop being compatible with Scala 2.11
+
+    def isTastySig: Boolean = !file.isDirectory && file.hasExtension("tastys")
 
     def isScalaOrJavaSource: Boolean = !file.isDirectory && (file.hasExtension("scala") || file.hasExtension("java"))
 
@@ -37,12 +39,13 @@ object FileUtils {
 
     def isClass: Boolean = file.isFile && file.getName.endsWith(".class") && !file.getName.endsWith("$class.class")
       // FIXME: drop last condition when we stop being compatible with Scala 2.11
+
+    def isTastySig: Boolean = file.isFile && file.getName.endsWith(".tastys")
   }
 
   private val SUFFIX_CLASS = ".class"
   private val SUFFIX_SCALA = ".scala"
   private val SUFFIX_JAVA = ".java"
-  private val SUFFIX_SIG = ".sig"
 
   def stripSourceExtension(fileName: String): String =
     if (endsScala(fileName)) stripClassExtension(fileName)
@@ -54,9 +57,6 @@ object FileUtils {
   def dirPathInJar(forPackage: String): String = forPackage.replace('.', '/')
 
   inline private def ends (filename:String, suffix:String) = filename.endsWith(suffix) && filename.length > suffix.length
-
-  def endsClass(fileName: String): Boolean =
-    ends (fileName, SUFFIX_CLASS) || fileName.endsWith(SUFFIX_SIG)
 
   def endsScalaOrJava(fileName: String): Boolean =
     endsScala(fileName) || endsJava(fileName)

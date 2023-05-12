@@ -115,8 +115,8 @@ class ClassfileWriterOps(outputDir: AbstractFile)(using @constructorOnly ictx: C
       null
   }
 
-  def writeTasty(className: InternalName, bytes: Array[Byte]): Unit =
-    writeToJarOrFile(className, bytes, ".tasty")
+  def writeTastySig(className: InternalName, bytes: Array[Byte]): Unit =
+    writeToJarOrFile(className, bytes, ".tastys") // extra 's' to differentiate from tasty - simple way to avoid opening too many files
 
   private def writeToJarOrFile(className: InternalName, bytes: Array[Byte], suffix: String): AbstractFile | Null = {
     if jarWriter == null then

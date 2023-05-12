@@ -11,6 +11,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.ArraySeq
 import dotc.util
 
+import FileUtils.*
+
 import dotty.tools.io.{ AbstractFile, ClassPath, ClassRepresentation, EfficientClassPath }
 
 /**
@@ -120,10 +122,10 @@ case class AggregateClassPath(aggregates: Seq[ClassPath]) extends ClassPath {
         val index = indices(name)
         val existing = mergedEntries(index)
 
-        if (existing.binary.isEmpty && entry.binary.isDefined)
-          mergedEntries(index) = ClassAndSourceFilesEntry(entry.binary.get, existing.source.get)
+        if (existing.binaryOrTasty.isEmpty && entry.binaryOrTasty.isDefined)
+          mergedEntries(index) = ClassAndSourceFilesEntry(entry.binaryOrTasty.get, existing.source.get)
         if (existing.source.isEmpty && entry.source.isDefined)
-          mergedEntries(index) = ClassAndSourceFilesEntry(existing.binary.get, entry.source.get)
+          mergedEntries(index) = ClassAndSourceFilesEntry(existing.binaryOrTasty.get, entry.source.get)
       }
       else {
         indices(name) = count

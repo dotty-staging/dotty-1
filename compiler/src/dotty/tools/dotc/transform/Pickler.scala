@@ -36,7 +36,7 @@ object Pickler {
   val EarlyWriter: Property.Key[EarlyFileWriter] = new Property.Key()
 
   class EarlyFileWriter(writer: ClassfileWriterOps):
-    export writer.{writeTasty, close}
+    export writer.{writeTastySig, close}
 }
 
 /** This phase pickles trees */
@@ -200,31 +200,13 @@ class Pickler extends Phase {
         for (cls, pickled) <- unit.pickled do
           val binaryName = cls.binaryClassName.replace('.', java.io.File.separatorChar).nn
           val binaryClassName = if (cls.is(Module)) binaryName.stripSuffix(str.MODULE_SUFFIX).nn else binaryName
-          // val relativePath = binaryClassName + ".sig"
-          // val data = pickle.bytes.take(pickle.writeIndex)
-          writer.writeTasty(binaryClassName, pickled())
+          writer.writeTastySig(binaryClassName, pickled())
 
       writer.close()
       if (ctx.settings.verbose.value)
         report.echo("[sig files written]")
     }
   }
-  // private def writeSigFile(sym: Symbol, tasty: Array[Byte])(using Context): Unit = {
-  //   ctx.property(Pickler.EarlyWriter).foreach { writer =>
-  //     val binaryName = sym.binaryClassName.replace('.', java.io.File.separatorChar)
-  //     val binaryClassName = if (sym.is(Module)) binaryName.stripSuffix(str.MODULE_SUFFIX) else binaryName
-  //     // val relativePath = binaryClassName + ".sig"
-  //     // val data = pickle.bytes.take(pickle.writeIndex)
-  //     writer.writeTasty(binaryClassName, tasty)
-  //   }
-  // }
-  // private def closeSigWriter()(using Context): Unit = {
-  //   ctx.property(Pickler.EarlyWriter).foreach { writer =>
-  //     writer.close()
-  //     if (ctx.settings.verbose.value)
-  //       report.echo("[sig files written]")
-  //   }
-  // }
 
   private def testUnpickler(using Context): Unit = {
     pickling.println(i"testing unpickler at run ${ctx.runId}")
