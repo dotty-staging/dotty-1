@@ -131,6 +131,7 @@ class ExtractAPI extends Phase {
       for
         unit <- units
         (cls, pickled) <- unit.pickled
+        if cls.isDefinedInCurrentRun
       do
         val binaryName = cls.binaryClassName.replace('.', java.io.File.separatorChar).nn
         val binaryClassName = if (cls.is(Module)) binaryName.stripSuffix(str.MODULE_SUFFIX).nn else binaryName
