@@ -62,9 +62,25 @@ object ScriptSourceFile {
 class SourceFile(val file: AbstractFile, computeContent: => Array[Char]) extends interfaces.SourceFile {
   import SourceFile._
 
-  val tracer = Thread.currentThread().getStackTrace().mkString("\n*)  ", "\n*)  ", "")
-
   private var myContent: Array[Char] | Null = null
+
+  private var _underlying: xsbti.VirtualFile | Null = null
+  def underlyingZincFile(using dotty.tools.dotc.core.Contexts.Context): xsbti.VirtualFile =
+    val local = _underlying
+    if local == null then
+      val maybeUnderlying = file.underlying
+      val underlying0 =
+        if maybeUnderlying == null then
+          val fromLookup = ctx.zincInitialFiles.get(file.absolutePath)
+          if fromLookup != null then
+            fromLookup
+          else
+            sys.error(s"no underlying file for ${file.absolutePath}, possible paths = ${ctx.zincInitialFiles.keySet}")
+        else maybeUnderlying
+      _underlying = underlying0
+      underlying0
+    else
+      local
 
   /** The contents of the original source file. Note that this can be empty, for example when
    * the source is read from Tasty. */

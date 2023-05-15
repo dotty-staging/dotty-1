@@ -4,7 +4,7 @@ import dotty.tools.dotc.core.Contexts.{Context, ctx}
 import dotty.tools.dotc.core.Symbols.Symbol
 import dotty.tools.dotc.core.NameOps.stripModuleClassSuffix
 import dotty.tools.dotc.core.Names.Name
-import dotty.tools.io
+import dotty.tools.dotc.util.SourceFile
 
 inline val TermNameHash = 1987 // 300th prime
 inline val TypeNameHash = 1993 // 301st prime
@@ -14,7 +14,7 @@ inline val InlineParamHash = 1997 // 302nd prime
   // if underlying == null then
   //   sys.error(s"no underlying file for $sf [${sf.file.getClass}]\n${sf.tracer}")
   // else underlying
-extension (file: io.AbstractFile)
+extension (file: SourceFile)
   def zincVirtualFile(using Context): xsbti.VirtualFile =
     // ctx.zincInitialFiles.get(file.absolutePath).nn
     file.underlyingZincFile

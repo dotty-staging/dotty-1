@@ -37,7 +37,7 @@ object APIUtils {
   def registerDummyClass(classSym: ClassSymbol)(using Context): Unit = {
     if (ctx.sbtCallback != null) {
       val classLike = emptyClassLike(classSym)
-      ctx.sbtCallback.api(ctx.compilationUnit.source.file.zincVirtualFile, classLike)
+      ctx.sbtCallback.api(ctx.compilationUnit.source.zincVirtualFile, classLike)
     }
   }
 

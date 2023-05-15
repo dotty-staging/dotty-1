@@ -18,7 +18,6 @@ import java.io.{InputStream, OutputStream}
 class VirtualDirectory(val name: String, maybeContainer: Option[VirtualDirectory] = None)
 extends AbstractFile {
 
-  val tracer = "<dir>"
   def path: String =
     maybeContainer match {
       case None => name

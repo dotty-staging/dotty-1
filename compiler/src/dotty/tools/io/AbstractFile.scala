@@ -87,8 +87,6 @@ object AbstractFile {
  */
 abstract class AbstractFile extends Iterable[AbstractFile] {
 
-  def tracer: String
-
   /** Returns the name of this abstract file. */
   def name: String
 
@@ -123,17 +121,6 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
   def jpath: JPath
 
   def underlying: xsbti.VirtualFile | Null = null
-
-  private var _underlying: xsbti.VirtualFile | Null = null
-  def underlyingZincFile(using dotty.tools.dotc.core.Contexts.Context): xsbti.VirtualFile =
-    val local = _underlying
-    if local == null then
-      val maybeUnderlying = underlying
-      val underlying0 = if maybeUnderlying == null then ctx.zincInitialFiles.get(absolutePath).nn else maybeUnderlying
-      _underlying = underlying0
-      underlying0
-    else
-      local
 
   /** An underlying source, if known.  Mostly, a zip/jar file. */
   def underlyingSource: Option[AbstractFile] = None

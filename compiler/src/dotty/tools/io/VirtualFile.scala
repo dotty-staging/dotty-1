@@ -18,8 +18,6 @@ import java.io.{ ByteArrayInputStream, ByteArrayOutputStream, InputStream, Outpu
  */
 class VirtualFile(val name: String, override val path: String) extends AbstractFile {
 
-  val tracer = Thread.currentThread().getStackTrace.mkString("\n  ", "\n  ", "")
-
   /**
    * Initializes this instance with the specified name and an
    * identical path.

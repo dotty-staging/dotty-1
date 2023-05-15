@@ -176,8 +176,7 @@ class Run(comp: Compiler, ictx: Context) extends ImplicitRunInfo with Constraint
   private var myEnrichedErrorMessage = false
 
   def compile(files: List[AbstractFile]): Unit =
-    try
-      compileSources(files.map(runContext.getSource(_)))
+    try compileSources(files.map(runContext.getSource(_)))
     catch case NonFatal(ex) if !this.enrichedErrorMessage =>
       val files1 = if units.isEmpty then files else units.map(_.source.file)
       report.echo(this.enrichErrorMessage(s"exception occurred while compiling ${files1.map(_.path)}"))

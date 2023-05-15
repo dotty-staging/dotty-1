@@ -57,9 +57,6 @@ import ZipArchive._
 abstract class ZipArchive(override val jpath: JPath, release: Option[String]) extends AbstractFile with Equals {
   self =>
 
-
-  val tracer = Thread.currentThread().getStackTrace.mkString("\n")
-
   override def underlyingSource: Option[ZipArchive] = Some(this)
   def isDirectory: Boolean = true
   def lookupName(name: String, directory: Boolean): AbstractFile = unsupported()

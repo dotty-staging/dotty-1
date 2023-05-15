@@ -67,7 +67,7 @@ class ExtractAPI extends Phase {
   // after `PostTyper` (unlike `ExtractDependencies`, the simplication to trees
   // done by `PostTyper` do not affect this phase because it only cares about
   // definitions, and `PostTyper` does not change definitions).
-  override def runsAfter: Set[String] = Set(transform.PostTyper.name)
+  override def runsAfter: Set[String] = Set(transform.Pickler.name)
 
   private val NonLocalClassSymbolsInCurrentUnits: Property.Key[mutable.HashSet[Symbol]] = Property.Key()
 
@@ -98,7 +98,7 @@ class ExtractAPI extends Phase {
         for cls <- nonLocalClassSymbols if !cls.isLocal do
           val sourceFile = cls.source
           if sourceFile.exists && cls.isDefinedInCurrentRun then
-            val sourceVF0 = sourceFile.file.zincVirtualFile // TODO: in zinc this is optional? why
+            val sourceVF0 = sourceFile.zincVirtualFile // TODO: in zinc this is optional? why
 
             val fullClassName = atPhase(sbtExtractDependenciesPhase) {
               ExtractDependencies.classNameAsString(cls)
@@ -145,10 +145,10 @@ class ExtractAPI extends Phase {
 
   override def run(using Context): Unit = {
     val unit = ctx.compilationUnit
-    val sourceFile = unit.source.file
-    val vf = unit.source.file.zincVirtualFile
-    if (ctx.sbtCallback != null && ctx.sbtCallback.enabled())
-      ctx.sbtCallback.startSource(vf)
+    val source = unit.source
+    val sourceFile = source.file
+    if ctx.sbtCallback != null && ctx.sbtCallback.enabled() then
+      ctx.sbtCallback.startSource(source.zincVirtualFile)
 
     val apiTraverser = new ExtractAPICollector
     val classes = apiTraverser.apiSource(unit.tpdTree)
@@ -167,6 +167,7 @@ class ExtractAPI extends Phase {
     if ctx.sbtCallback != null && ctx.sbtCallback.enabled() &&
       !ctx.compilationUnit.suspendedAtInliningPhase // already registered before this unit was suspended
     then
+      val vf = source.zincVirtualFile
       classes.foreach(ctx.sbtCallback.api(vf, _))
       mainClasses.foreach(ctx.sbtCallback.mainClass(vf, _))
       ctx.property(NonLocalClassSymbolsInCurrentUnits).get ++= allNonLocalClassSymbols

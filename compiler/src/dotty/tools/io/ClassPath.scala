@@ -201,7 +201,7 @@ trait ClassRepresentation {
   def fileName: String
   def name: String
   // def binary: Option[AbstractFile]
-  def binaryOrTasty: Option[AbstractFile]
+  def binary: Option[AbstractFile]
   def source: Option[AbstractFile]
 
   /** returns the length of `name` by stripping the extension of `fileName`

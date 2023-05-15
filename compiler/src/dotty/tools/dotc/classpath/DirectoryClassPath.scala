@@ -188,7 +188,7 @@ final class JrtClassPath(fs: java.nio.file.FileSystem) extends ClassPath with No
     else
       packageToModuleBases.getOrElse(inPackage.dottedString, Nil).flatMap(x =>
         Files.list(x.resolve(inPackage.dirPathTrailingSlash)).iterator().asScala.filter(_.getFileName.toString.endsWith(".class"))).map(x =>
-        ClassFileOrSigEntryImpl(x.toPlainFile)).toVector
+        ClassFileEntryImpl(x.toPlainFile)).toVector
 
   override private[dotty] def list(inPackage: PackageName): ClassPathEntries =
     if (inPackage.isRoot) ClassPathEntries(packages(inPackage), Nil)
@@ -251,7 +251,7 @@ final class CtSymClassPath(ctSym: java.nio.file.Path, release: Int) extends Clas
     else {
       val sigFiles = packageIndex.getOrElse(inPackage.dottedString, Nil).iterator.flatMap(p =>
         Files.list(p).iterator.asScala.filter(_.getFileName.toString.endsWith(".sig")))
-      sigFiles.map(f => ClassFileOrSigEntryImpl(f.toPlainFile)).toVector
+      sigFiles.map(f => ClassFileEntryImpl(f.toPlainFile)).toVector
     }
   }
 
@@ -273,20 +273,19 @@ final class CtSymClassPath(ctSym: java.nio.file.Path, release: Int) extends Clas
   }
 }
 
-case class DirectoryClassPath(dir: JFile) extends JFileDirectoryLookup[ClassFileOrSigEntryImpl] with NoSourcePaths {
-  override def findClass(className: String): Option[ClassRepresentation] = findClassFile(className) map ClassFileOrSigEntryImpl.apply
+case class DirectoryClassPath(dir: JFile) extends JFileDirectoryLookup[ClassFileEntryImpl] with NoSourcePaths {
+  override def findClass(className: String): Option[ClassRepresentation] = findClassFile(className) map ClassFileEntryImpl.apply
 
   def findClassFile(className: String): Option[AbstractFile] = {
     val relativePath = FileUtils.dirPath(className)
     val classFile = new JFile(dir, relativePath + ".class")
     if (classFile.exists) {
       Some(classFile.toPath.toPlainFile)
-    } else {
-      None
     }
+    else None
   }
 
-  protected def createFileEntry(file: AbstractFile): ClassFileOrSigEntryImpl = ClassFileOrSigEntryImpl(file)
+  protected def createFileEntry(file: AbstractFile): ClassFileEntryImpl = ClassFileEntryImpl(file)
   protected def isMatchingFile(f: JFile): Boolean = f.isClass || f.isTastySig
 
   private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = files(inPackage)

@@ -16,7 +16,6 @@ import java.io.InputStream
  */
 object NoAbstractFile extends AbstractFile {
 
-  val tracer = "<root>"
   def absolute: AbstractFile = this
   def container: AbstractFile = this
   def create(): Unit = ???

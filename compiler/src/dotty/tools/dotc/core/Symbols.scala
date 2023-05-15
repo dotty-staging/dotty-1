@@ -269,10 +269,10 @@ object Symbols {
       lastDenot.topLevelClass.associatedFile
 
     /** The class file from which this class was generated, null if not applicable. */
-    final def binaryFile(using Context): AbstractFile | Null = {
-      val file = associatedFile
-      if (file != null && file.extension == "class") file else null
-    }
+    // final def binaryFile(using Context): AbstractFile | Null = {
+    //   val file = associatedFile
+    //   if (file != null && file.extension == "class") file else null
+    // }
 
     /** A trap to avoid calling x.symbol on something that is already a symbol.
      *  This would be expanded to `toDenot(x).symbol` which is guaraneteed to be

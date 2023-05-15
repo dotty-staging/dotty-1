@@ -117,7 +117,7 @@ class CodeGen(val int: DottyBackendInterface, val primitives: DottyPrimitives)( 
 
     if (isLocal && ctx.sbtCallback != null) {
       import dotty.tools.dotc.sbt.zincVirtualFile
-      val jSourceFile = sourceFile.file.zincVirtualFile
+      val jSourceFile = sourceFile.zincVirtualFile
 
       ctx.sbtCallback.generatedLocalClass(jSourceFile, clsFile.jpath)
     }
