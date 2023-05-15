@@ -168,7 +168,7 @@ class RefinedPrinter(_ctx: Context) extends PlainPrinter(_ctx) {
       ~ " " ~ argText(args.last)
     }
 
-  private def toTextMethodAsFunction(info: Type, isPure: Boolean, refs: Text = Str("")): Text = info match
+  protected def toTextMethodAsFunction(info: Type, isPure: Boolean, refs: Text = Str("")): Text = info match
     case info: MethodType =>
       val capturesRoot = refs == rootSetText
       changePrec(GlobalPrec) {
