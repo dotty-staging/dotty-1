@@ -71,6 +71,36 @@ class ExtractAPI extends Phase {
 
   private val NonLocalClassSymbolsInCurrentUnits: Property.Key[mutable.HashSet[Symbol]] = Property.Key()
 
+  // private def fullName(
+  //     symbol: Symbol,
+  //     separator: Char,
+  //     suffix: CharSequence,
+  //     includePackageObjectClassNames: Boolean
+  // )(using Context): String = {
+  //   var b: java.lang.StringBuffer = null
+  //   def loop(size: Int, sym: Symbol): Unit = {
+  //     val symName = sym.name.toTermName.asSimpleName
+  //     // Use of encoded to produce correct paths for names that have symbols
+  //     val encodedName = symName.encode
+  //     val nSize = encodedName.length - (if (symName.endsWith(" ")) 1 else 0)
+  //     if (sym.isRoot || sym == NoSymbol || sym.owner.isEffectiveRoot) {
+  //       val capacity = size + nSize
+  //       b = new java.lang.StringBuffer(capacity)
+  //       b.append(chrs, encodedName.start, nSize)
+  //     } else {
+  //       val next = if (sym.owner.isPackageObject) sym.owner else sym.effectiveOwner.enclosingClass
+  //       loop(size + nSize + 1, next)
+  //       // Addition to normal `fullName` to produce correct names for nested non-local classes
+  //       if (sym.isNestedClass) b.append(nme.MODULE_SUFFIX_STRING) else b.append(separator)
+  //       b.append(chrs, encodedName.start, nSize)
+  //     }
+  //     ()
+  //   }
+  //   loop(suffix.length(), symbol)
+  //   b.append(suffix)
+  //   b.toString
+  // }
+
   override def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] =
     val sigWriter: Option[Pickler.EarlyFileWriter] = ctx.settings.YpickleWrite.value match
       case dest if dest.size > 0 =>
@@ -95,6 +125,21 @@ class ExtractAPI extends Phase {
       if ctx.sbtCallback != null && ctx.sbtCallback.enabled() then
         val cb = ctx.sbtCallback
 
+        def registerProductNames(sourceVF0: xsbti.VirtualFile, fullClassName: String, binaryClassName: String) =
+          val pathToClassFile = s"${binaryClassName.replace('.', java.io.File.separatorChar)}.class"
+
+          val classFile = {
+            ctx.settings.outputDir.value match {
+              case jar: JarArchive =>
+                new java.io.File(s"$jar!$pathToClassFile")
+              case outputDir =>
+                new java.io.File(outputDir.file, pathToClassFile)
+            }
+          }
+
+          cb.generatedNonLocalClass(sourceVF0, classFile.toPath(), binaryClassName, fullClassName)
+        end registerProductNames
+
         for cls <- nonLocalClassSymbols if !cls.isLocal do
           val sourceFile = cls.source
           if sourceFile.exists && cls.isDefinedInCurrentRun then
@@ -104,19 +149,16 @@ class ExtractAPI extends Phase {
               ExtractDependencies.classNameAsString(cls)
             }
             val binaryClassName = cls.binaryClassName
-            val pathToClassFile = s"${binaryClassName.replace('.', java.io.File.separatorChar)}.class"
+            registerProductNames(sourceVF0, fullClassName, binaryClassName)
 
-            val classFile = {
-              ctx.settings.outputDir.value match {
-                case jar: JarArchive =>
-                  new java.io.File(s"$jar!$pathToClassFile")
-                case outputDir =>
-                  new java.io.File(outputDir.file, pathToClassFile)
-              }
-            }
+            // Register the names of top-level module symbols that emit two class files
+            val isTopLevelUniqueModule =
+              cls.owner.is(PackageClass) && cls.is(ModuleClass) && cls.companionClass == NoSymbol
+            if isTopLevelUniqueModule || cls.isPackageObject then
+              registerProductNames(sourceVF0, fullClassName.stripSuffix(str.MODULE_SUFFIX), binaryClassName.stripSuffix(str.MODULE_SUFFIX))
 
-            cb.generatedNonLocalClass(sourceVF0, classFile.toPath(), binaryClassName, fullClassName)
           end if
+
         end for
 
         cb.apiPhaseCompleted()
