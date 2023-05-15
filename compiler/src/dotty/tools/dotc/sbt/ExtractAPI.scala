@@ -95,10 +95,10 @@ class ExtractAPI extends Phase {
       if ctx.sbtCallback != null && ctx.sbtCallback.enabled() then
         val cb = ctx.sbtCallback
 
-        for cls <- nonLocalClassSymbols if !cls.isLocal && cls.source.exists do
+        for cls <- nonLocalClassSymbols if !cls.isLocal do
           val sourceFile = cls.source
-          val sourceVF0 = sourceFile.file.zincVirtualFileOpt
-          for sourceVF <- sourceVF0 do
+          if sourceFile.exists && cls.isDefinedInCurrentRun then
+            val sourceVF0 = sourceFile.file.zincVirtualFile // TODO: in zinc this is optional? why
 
             val fullClassName = atPhase(sbtExtractDependenciesPhase) {
               ExtractDependencies.classNameAsString(cls)
@@ -115,8 +115,8 @@ class ExtractAPI extends Phase {
               }
             }
 
-            cb.generatedNonLocalClass(sourceVF, classFile.toPath(), binaryClassName, fullClassName)
-          end for
+            cb.generatedNonLocalClass(sourceVF0, classFile.toPath(), binaryClassName, fullClassName)
+          end if
         end for
 
         cb.apiPhaseCompleted()
@@ -305,9 +305,9 @@ private class ExtractAPICollector(using Context) extends ThunkHolder {
     _mainClasses.toSet
   }
 
-  def allNonLocalClassSymbols: Set[Symbol] = {
+  def allNonLocalClassSymbols: collection.Set[Symbol] = {
     forceThunks()
-    _allNonLocalClassSymbols.toSet
+    _allNonLocalClassSymbols
   }
 
   private def computeClass(sym: ClassSymbol): api.ClassLikeDef = {

@@ -117,7 +117,7 @@ public class CompilerBridgeDriver extends Driver {
 
   private static AbstractFile asDottyFile(VirtualFile virtualFile) {
     if (virtualFile instanceof PathBasedFile)
-      return new dotty.tools.io.PlainFile(new dotty.tools.io.Path(((PathBasedFile) virtualFile).toPath()));
+      return new ZincPlainFile(((PathBasedFile) virtualFile));
 
     try {
       return new ZincVirtualFile(virtualFile);

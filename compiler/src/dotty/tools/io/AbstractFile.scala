@@ -14,6 +14,8 @@ import java.io.{
 import java.net.URL
 import java.nio.file.{FileAlreadyExistsException, Files, Paths}
 
+import dotty.tools.dotc.core.Contexts.{Context, ctx}
+
 /**
  * An abstraction over files for use in the reflection/compiler libraries.
  *
@@ -121,6 +123,17 @@ abstract class AbstractFile extends Iterable[AbstractFile] {
   def jpath: JPath
 
   def underlying: xsbti.VirtualFile | Null = null
+
+  private var _underlying: xsbti.VirtualFile | Null = null
+  def underlyingZincFile(using dotty.tools.dotc.core.Contexts.Context): xsbti.VirtualFile =
+    val local = _underlying
+    if local == null then
+      val maybeUnderlying = underlying
+      val underlying0 = if maybeUnderlying == null then ctx.zincInitialFiles.get(absolutePath).nn else maybeUnderlying
+      _underlying = underlying0
+      underlying0
+    else
+      local
 
   /** An underlying source, if known.  Mostly, a zip/jar file. */
   def underlyingSource: Option[AbstractFile] = None
