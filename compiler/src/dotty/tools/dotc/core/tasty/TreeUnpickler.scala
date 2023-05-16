@@ -55,7 +55,8 @@ import scala.annotation.internal.sharable
 class TreeUnpickler(reader: TastyReader,
                     nameAtRef: NameTable,
                     posUnpicklerOpt: Option[PositionUnpickler],
-                    commentUnpicklerOpt: Option[CommentUnpickler]) {
+                    commentUnpicklerOpt: Option[CommentUnpickler],
+                    baseFlags: FlagSet) {
   import TreeUnpickler._
   import tpd._
 
@@ -667,7 +668,7 @@ class TreeUnpickler(reader: TastyReader,
      *  boundary symbol.
      */
     def readModifiers(end: Addr)(using Context): (FlagSet, List[Symbol => Annotation], Symbol) = {
-      var flags: FlagSet = EmptyFlags
+      var flags: FlagSet = baseFlags
       var annotFns: List[Symbol => Annotation] = Nil
       var privateWithin: Symbol = NoSymbol
       while (currentAddr.index != end.index) {

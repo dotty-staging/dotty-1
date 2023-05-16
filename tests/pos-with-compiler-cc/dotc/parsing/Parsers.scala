@@ -148,9 +148,6 @@ object Parsers {
      */
     def syntaxError(msg: Message, span: Span): Unit =
       report.error(msg, source.atSpan(span))
-
-    def unimplementedExpr(using Context): Select =
-      Select(scalaDot(nme.Predef), nme.???)
   }
 
   trait OutlineParserCommon extends ParserCommon {

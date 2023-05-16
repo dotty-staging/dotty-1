@@ -51,6 +51,9 @@ class Pickler extends Phase {
   override def isRunnable(using Context): Boolean =
     super.isRunnable && !ctx.settings.fromTasty.value
 
+  // will only run on java sources if `-Ypickle-java` is set
+  override def skipIfJava(using Context): Boolean = false
+
   private def output(name: String, msg: String) = {
     val s = new PrintStream(name)
     s.print(msg)

@@ -25,7 +25,9 @@ class Parser extends Phase {
   def parse(using Context) = monitor("parser") {
     val unit = ctx.compilationUnit
     unit.untpdTree =
-      if (unit.isJava) new JavaParsers.JavaParser(unit.source).parse()
+      if (unit.isJava)
+        val tree = new JavaParsers.JavaParser(unit.source).parse()
+        tree
       else {
         val p = new Parsers.Parser(unit.source)
         //  p.in.debugTokenStream = true

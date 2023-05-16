@@ -402,7 +402,7 @@ object Flags {
   val (Scala2SpecialFlags @ _, Scala2SuperAccessor @ _, Scala2Existential @ _) = newFlags(55, "<existential>")
 
   /** Children were queried on this class */
-  val (_, _, ChildrenQueried @ _) = newFlags(56, "<children-queried>")
+  val (ChildrenQueried @ _, _, _) = newFlags(56, "<children-queried>")
 
   /** A module variable (Scala 2.x only)
    *  (re-used as a flag for private parameter accessors in Recheck)

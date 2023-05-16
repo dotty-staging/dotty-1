@@ -209,6 +209,7 @@ object Phases {
     private var myTyperPhase: Phase = _
     private var myPostTyperPhase: Phase = _
     private var mySbtExtractDependenciesPhase: Phase = _
+    private var mySbtExtractApiPhase: Phase = _
     private var myPicklerPhase: Phase = _
     private var myInliningPhase: Phase = _
     private var mySplicingPhase: Phase = _
@@ -233,6 +234,7 @@ object Phases {
     final def typerPhase: Phase = myTyperPhase
     final def postTyperPhase: Phase = myPostTyperPhase
     final def sbtExtractDependenciesPhase: Phase = mySbtExtractDependenciesPhase
+    final def sbtExtractApiPhase: Phase = mySbtExtractApiPhase
     final def picklerPhase: Phase = myPicklerPhase
     final def inliningPhase: Phase = myInliningPhase
     final def splicingPhase: Phase = mySplicingPhase
@@ -260,6 +262,7 @@ object Phases {
       myTyperPhase = phaseOfClass(classOf[TyperPhase])
       myPostTyperPhase = phaseOfClass(classOf[PostTyper])
       mySbtExtractDependenciesPhase = phaseOfClass(classOf[sbt.ExtractDependencies])
+      mySbtExtractApiPhase = phaseOfClass(classOf[sbt.ExtractAPI])
       myPicklerPhase = phaseOfClass(classOf[Pickler])
       myInliningPhase = phaseOfClass(classOf[Inlining])
       mySplicingPhase = phaseOfClass(classOf[Splicing])
@@ -317,16 +320,24 @@ object Phases {
     /** @pre `isRunnable` returns true */
     def run(using Context): Unit
 
+    def skipIfJava(using Context): Boolean = true
+
     /** @pre `isRunnable` returns true */
     def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] =
-      units.map { unit =>
+      def processUnit(unit: CompilationUnit)(using Context) =
         val unitCtx = ctx.fresh.setPhase(this.start).setCompilationUnit(unit).withRootImports
         try run(using unitCtx)
         catch case ex: Throwable if !ctx.run.enrichedErrorMessage =>
           println(ctx.run.enrichErrorMessage(s"unhandled exception while running $phaseName on $unit"))
           throw ex
         unitCtx.compilationUnit
-      }
+
+      if ctx.settings.YpickleJava.value && ctx.phase <= sbtExtractApiPhase && skipIfJava then
+        units.map { unit =>
+          if unit.isJava then unit
+          else processUnit(unit)
+        }
+      else units.map(processUnit)
 
     /** Convert a compilation unit's tree to a string; can be overridden */
     def show(tree: untpd.Tree)(using Context): String =
@@ -447,6 +458,7 @@ object Phases {
   def typerPhase(using Context): Phase                  = ctx.base.typerPhase
   def postTyperPhase(using Context): Phase              = ctx.base.postTyperPhase
   def sbtExtractDependenciesPhase(using Context): Phase = ctx.base.sbtExtractDependenciesPhase
+  def sbtExtractApiPhase(using Context): Phase          = ctx.base.sbtExtractDependenciesPhase
   def picklerPhase(using Context): Phase                = ctx.base.picklerPhase
   def inliningPhase(using Context): Phase               = ctx.base.inliningPhase
   def splicingPhase(using Context): Phase               = ctx.base.splicingPhase

@@ -20,7 +20,13 @@ object FileUtils {
     def isClass: Boolean = !file.isDirectory && file.hasExtension("class") && !file.name.endsWith("$class.class")
     // FIXME: drop last condition when we stop being compatible with Scala 2.11
 
-    def isTastySig: Boolean = !file.isDirectory && file.hasExtension("tastys")
+    def isTastySig: Boolean = !file.isDirectory && file.extension.endsWith("sigtasty") && {
+      // extension is `sigtasty` or `jsigtasty`
+      file.extension.length == 8
+      || file.extension.length == 9 && file.extension(0) == 'j'
+    }
+
+    def isTastyJavaSig: Boolean = !file.isDirectory && file.hasExtension("jsigtasty")
 
     def isScalaOrJavaSource: Boolean = !file.isDirectory && (file.hasExtension("scala") || file.hasExtension("java"))
 
@@ -40,7 +46,15 @@ object FileUtils {
     def isClass: Boolean = file.isFile && file.getName.endsWith(".class") && !file.getName.endsWith("$class.class")
       // FIXME: drop last condition when we stop being compatible with Scala 2.11
 
-    def isTastySig: Boolean = file.isFile && file.getName.endsWith(".tastys")
+    def isTastySig: Boolean = file.isFile && {
+      // extension is `.sigtasty` or `.jsigtasty`
+      val name = file.getName
+      name.endsWith("sigtasty") && {
+        val extensionIdx = name.length - 9
+        name.length > 8 && name(extensionIdx) == '.'
+        || name.length > 9 && name(extensionIdx) == 'j' && name(extensionIdx - 1) == '.'
+      }
+    }
   }
 
   private val SUFFIX_CLASS = ".class"

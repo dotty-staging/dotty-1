@@ -7,6 +7,7 @@ import java.nio.channels.ClosedByInterruptException
 
 import scala.util.control.NonFatal
 
+import dotty.tools.dotc.classpath.FileUtils.isTastyJavaSig
 import dotty.tools.io.{ ClassPath, ClassRepresentation, AbstractFile }
 import dotty.tools.backend.jvm.DottyBackendInterface.symExtensions
 
@@ -435,7 +436,8 @@ class TastySigLoader(val tastyFile: AbstractFile) extends SymbolLoader {
   def load(root: SymDenotation)(using Context): Unit =
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
     val bytes = tastyFile.toByteArray
-    val unpickler = new tasty.DottyUnpickler(bytes)
+    val baseFlags = if tastyFile.isTastyJavaSig then Flags.JavaDefined else Flags.EmptyFlags
+    val unpickler = new tasty.DottyUnpickler(bytes, baseFlags)
     unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
     if mayLoadTreesFromTasty then
       classRoot.classSymbol.rootTreeOrProvider = unpickler

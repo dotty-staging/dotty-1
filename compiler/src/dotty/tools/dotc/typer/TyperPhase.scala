@@ -60,7 +60,7 @@ class TyperPhase(addRootImports: Boolean = true) extends Phase {
   }
 
   protected def discardAfterTyper(unit: CompilationUnit)(using Context): Boolean =
-    unit.isJava || unit.suspended
+    (unit.isJava && !ctx.settings.YpickleJava.value) || unit.suspended
 
   override def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] =
     val unitContexts =

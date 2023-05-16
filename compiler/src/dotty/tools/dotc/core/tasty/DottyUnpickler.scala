@@ -7,6 +7,7 @@ import scala.language.unsafeNulls
 
 import Contexts._, SymDenotations._,  Decorators._
 import dotty.tools.dotc.ast.tpd
+import Flags.{FlagSet, EmptyFlags}
 import TastyUnpickler._
 import classfile.ClassfileParser
 import Names.SimpleName
@@ -20,10 +21,10 @@ object DottyUnpickler {
   /** Exception thrown if classfile is corrupted */
   class BadSignature(msg: String) extends RuntimeException(msg)
 
-  class TreeSectionUnpickler(posUnpickler: Option[PositionUnpickler], commentUnpickler: Option[CommentUnpickler])
+  class TreeSectionUnpickler(posUnpickler: Option[PositionUnpickler], commentUnpickler: Option[CommentUnpickler], baseFlags: FlagSet)
   extends SectionUnpickler[TreeUnpickler](ASTsSection) {
     def unpickle(reader: TastyReader, nameAtRef: NameTable): TreeUnpickler =
-      new TreeUnpickler(reader, nameAtRef, posUnpickler, commentUnpickler)
+      new TreeUnpickler(reader, nameAtRef, posUnpickler, commentUnpickler, baseFlags)
   }
 
   class PositionsSectionUnpickler extends SectionUnpickler[PositionUnpickler](PositionsSection) {
@@ -41,7 +42,7 @@ object DottyUnpickler {
  *  @param bytes         the bytearray containing the Tasty file from which we unpickle
  *  @param mode          the tasty file contains package (TopLevel), an expression (Term) or a type (TypeTree)
  */
-class DottyUnpickler(bytes: Array[Byte], mode: UnpickleMode = UnpickleMode.TopLevel) extends ClassfileParser.Embedded with tpd.TreeProvider {
+class DottyUnpickler(bytes: Array[Byte], baseFlags: FlagSet = EmptyFlags, mode: UnpickleMode = UnpickleMode.TopLevel) extends ClassfileParser.Embedded with tpd.TreeProvider {
   import tpd._
   import DottyUnpickler._
 
@@ -57,7 +58,7 @@ class DottyUnpickler(bytes: Array[Byte], mode: UnpickleMode = UnpickleMode.TopLe
     treeUnpickler.enter(roots)
 
   protected def treeSectionUnpickler(posUnpicklerOpt: Option[PositionUnpickler], commentUnpicklerOpt: Option[CommentUnpickler]): TreeSectionUnpickler =
-    new TreeSectionUnpickler(posUnpicklerOpt, commentUnpicklerOpt)
+    new TreeSectionUnpickler(posUnpicklerOpt, commentUnpicklerOpt, baseFlags)
 
   protected def computeRootTrees(using Context): List[Tree] = treeUnpickler.unpickle(mode)
 

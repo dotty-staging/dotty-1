@@ -38,6 +38,9 @@ object Parsers {
 
   import ast.untpd._
 
+  def unimplementedExpr(using Context): Select =
+    Select(scalaDot(nme.Predef), nme.???)
+
   case class OpInfo(operand: Tree, operator: Ident, offset: Offset)
 
   enum Location(val inParens: Boolean, val inPattern: Boolean, val inArgs: Boolean):
@@ -148,9 +151,6 @@ object Parsers {
      */
     def syntaxError(msg: Message, span: Span): Unit =
       report.error(msg, source.atSpan(span))
-
-    def unimplementedExpr(using Context): Select =
-      Select(scalaDot(nme.Predef), nme.???)
   }
 
   trait OutlineParserCommon extends ParserCommon {

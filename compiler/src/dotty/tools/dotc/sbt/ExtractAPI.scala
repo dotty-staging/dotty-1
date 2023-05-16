@@ -59,6 +59,9 @@ class ExtractAPI extends Phase {
     super.isRunnable && (ctx.sbtCallback != null && ctx.sbtCallback.enabled() || forceRun)
   }
 
+  // will only run on java sources if `-Ypickle-java` is set
+  override def skipIfJava(using Context): Boolean = false
+
   // Check no needed. Does not transform trees
   override def isCheckable: Boolean = false
 
@@ -70,36 +73,6 @@ class ExtractAPI extends Phase {
   override def runsAfter: Set[String] = Set(transform.Pickler.name)
 
   private val NonLocalClassSymbolsInCurrentUnits: Property.Key[mutable.HashSet[Symbol]] = Property.Key()
-
-  // private def fullName(
-  //     symbol: Symbol,
-  //     separator: Char,
-  //     suffix: CharSequence,
-  //     includePackageObjectClassNames: Boolean
-  // )(using Context): String = {
-  //   var b: java.lang.StringBuffer = null
-  //   def loop(size: Int, sym: Symbol): Unit = {
-  //     val symName = sym.name.toTermName.asSimpleName
-  //     // Use of encoded to produce correct paths for names that have symbols
-  //     val encodedName = symName.encode
-  //     val nSize = encodedName.length - (if (symName.endsWith(" ")) 1 else 0)
-  //     if (sym.isRoot || sym == NoSymbol || sym.owner.isEffectiveRoot) {
-  //       val capacity = size + nSize
-  //       b = new java.lang.StringBuffer(capacity)
-  //       b.append(chrs, encodedName.start, nSize)
-  //     } else {
-  //       val next = if (sym.owner.isPackageObject) sym.owner else sym.effectiveOwner.enclosingClass
-  //       loop(size + nSize + 1, next)
-  //       // Addition to normal `fullName` to produce correct names for nested non-local classes
-  //       if (sym.isNestedClass) b.append(nme.MODULE_SUFFIX_STRING) else b.append(separator)
-  //       b.append(chrs, encodedName.start, nSize)
-  //     }
-  //     ()
-  //   }
-  //   loop(suffix.length(), symbol)
-  //   b.append(suffix)
-  //   b.toString
-  // }
 
   override def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] =
     val sigWriter: Option[Pickler.EarlyFileWriter] = ctx.settings.YpickleWrite.value match
@@ -164,7 +137,7 @@ class ExtractAPI extends Phase {
         cb.apiPhaseCompleted()
         cb.dependencyPhaseCompleted()
       end if
-      units0
+      units0.filterNot(_.isJava) // remove java sources
     }
   end runOn
 
@@ -177,7 +150,7 @@ class ExtractAPI extends Phase {
       do
         val binaryName = cls.binaryClassName.replace('.', java.io.File.separatorChar).nn
         val binaryClassName = if (cls.is(Module)) binaryName.stripSuffix(str.MODULE_SUFFIX).nn else binaryName
-        writer.writeTastySig(binaryClassName, pickled())
+        writer.writeTastySig(binaryClassName, pickled(), cls.is(JavaDefined))
 
       writer.close()
       if (ctx.settings.verbose.value)
