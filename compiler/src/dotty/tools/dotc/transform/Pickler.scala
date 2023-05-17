@@ -35,8 +35,12 @@ object Pickler {
 
   val EarlyWriter: Property.Key[EarlyFileWriter] = new Property.Key()
 
-  class EarlyFileWriter(writer: ClassfileWriterOps):
-    export writer.{writeTastySig, close}
+  class EarlyFileWriter(writers: Seq[ClassfileWriterOps]):
+    def writeTastySig(className: String, bytes: Array[Byte], isJava: Boolean) =
+      writers.foreach(_.writeTastySig(className, bytes, isJava))
+
+    def close(): Unit =
+      writers.foreach(_.close())
 }
 
 /** This phase pickles trees */

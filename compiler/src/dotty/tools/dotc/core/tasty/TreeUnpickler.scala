@@ -1031,6 +1031,8 @@ class TreeUnpickler(reader: TastyReader,
       val parentReader = fork
       val parents = readParents(withArgs = false)(using parentCtx)
       val parentTypes = parents.map(_.tpe.dealias)
+      if cls.is(JavaDefined) && parentTypes.exists(_.derivesFrom(defn.JavaAnnotationAnnot)) then
+        cls.setFlag(JavaAnnotation)
       val self =
         if (nextByte == SELFDEF) {
           readByte()
@@ -1191,7 +1193,12 @@ class TreeUnpickler(reader: TastyReader,
 
       def completeSelect(name: Name, sig: Signature, target: Name): Select =
         val qual = readTree()
-        val denot = accessibleDenot(qual.tpe.widenIfUnstable, name, sig, target)
+        val denot0 = accessibleDenot(qual.tpe.widenIfUnstable, name, sig, target)
+        val denot =
+          if baseFlags.is(JavaDefined) && name == tpnme.Object && denot0.symbol == defn.ObjectClass then
+            defn.FromJavaObjectType.denot
+          else
+            denot0
         makeSelect(qual, name, denot)
 
       def readQualId(): (untpd.Ident, TypeRef) =

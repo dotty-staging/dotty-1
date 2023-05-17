@@ -22,6 +22,8 @@ object Settings:
   val VersionTag: ClassTag[ScalaVersion] = ClassTag(classOf[ScalaVersion])
   val OptionTag: ClassTag[Option[?]]     = ClassTag(classOf[Option[?]])
   val OutputTag: ClassTag[AbstractFile]  = ClassTag(classOf[AbstractFile])
+  val OutputsTag: ClassTag[IArray[String]] =
+    ClassTag(classOf[Array[String]]).asInstanceOf[ClassTag[IArray[String]]]
 
   class SettingsState(initialValues: Seq[Any]):
     private val values = ArrayBuffer(initialValues: _*)
@@ -76,6 +78,10 @@ object Settings:
 
     def isMultivalue: Boolean = summon[ClassTag[T]] == ListTag
 
+    def isMultiOutput: Boolean = summon[ClassTag[T]] == OutputsTag
+
+    def isMultiFlag: Boolean = summon[ClassTag[T]] == BooleanTag
+
     def legalChoices: String =
       choices match {
         case Some(xs) if xs.isEmpty => ""
@@ -89,13 +95,25 @@ object Settings:
       def update(value: Any, args: List[String]): ArgsSummary =
         var dangers = warnings
         val value1 =
-          if changed && isMultivalue then
+          if changed && isMultiFlag then
+            val value0  = value.asInstanceOf[Boolean]
+            val current = valueIn(sstate).asInstanceOf[Boolean]
+            if current != value0 then
+              dangers :+= s"Setting $name set to both true and false"
+            current
+          else if changed && isMultivalue then
             val value0  = value.asInstanceOf[List[String]]
             val current = valueIn(sstate).asInstanceOf[List[String]]
             value0.filter(current.contains).foreach(s => dangers :+= s"Setting $name set to $s redundantly")
             current ++ value0
+          else if changed && isMultiOutput then
+            val value0  = value.asInstanceOf[IArray[String]]
+            val current = valueIn(sstate).asInstanceOf[IArray[String]]
+            value0.filter(current.contains).foreach(s => dangers :+= s"Setting $name set to $s redundantly")
+            IArray.from[String](current ++ value0)
           else
-            if changed then dangers :+= s"Flag $name set repeatedly"
+            if changed then
+              dangers :+= s"Flag $name set repeatedly"
             value
         changed = true
         ArgsSummary(updateIn(sstate, value1), args, errors, dangers)
@@ -146,6 +164,9 @@ object Settings:
                 case Nil => update(strings, args)
                 case invalid => fail(s"invalid choice(s) for $name: ${invalid.mkString(",")}", args)
               case _ => update(strings, args)
+        case (OutputsTag, arg2 :: args2) =>
+          if (arg2 startsWith "-") missingArg
+          else update(IArray[String](arg2), args2)
         case (StringTag, _) if argRest.nonEmpty || choices.exists(_.contains("")) =>
           setString(argRest, args)
         case (StringTag, arg2 :: args2) =>
@@ -294,6 +315,9 @@ object Settings:
       publish(Setting(name, descr, default, choices = Some(choices)))
 
     def MultiStringSetting(name: String, helpArg: String, descr: String, default: List[String] = Nil, aliases: List[String] = Nil): Setting[List[String]] =
+      publish(Setting(name, descr, default, helpArg, aliases = aliases))
+
+    def OutputsSetting(name: String, helpArg: String, descr: String, default: IArray[String] = IArray.empty, aliases: List[String] = Nil): Setting[IArray[String]] =
       publish(Setting(name, descr, default, helpArg, aliases = aliases))
 
     def OutputSetting(name: String, helpArg: String, descr: String, default: AbstractFile): Setting[AbstractFile] =

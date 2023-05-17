@@ -165,6 +165,9 @@ object ExtractDependencies {
   def classNameAsString(sym: Symbol)(using Context): String =
     sym.fullName.stripModuleClassSuffix.toString
 
+  def apiClassNameAsString(sym: Symbol)(using Context): String =
+    sym.fullName.sourceModuleName.toString
+
   /** Report an internal error in incremental compilation. */
   def internalError(msg: => String, pos: SrcPos = NoSourcePosition)(using Context): Unit =
     report.error(em"Internal error in the incremental compiler while compiling ${ctx.compilationUnit.source}: $msg", pos)

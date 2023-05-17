@@ -76,16 +76,24 @@ class ExtractAPI extends Phase {
 
   override def runOn(units: List[CompilationUnit])(using Context): List[CompilationUnit] =
     val sigWriter: Option[Pickler.EarlyFileWriter] = ctx.settings.YpickleWrite.value match
-      case dest if dest.size > 0 =>
+      case dests if dests.size > 0 =>
         import dotty.tools.io.*
-        val path = Directory(dest)
-        val isJar = path.extension == "jar"
-        if (!isJar && !path.isDirectory)
-          report.error(s"'$dest' does not exist or is not a directory or .jar file")
+        val paths = dests.map { dest =>
+          val path = Directory(dest)
+          val isJar = path.extension == "jar"
+          if (!isJar && !path.isDirectory)
+            Left(s"'$dest' does not exist or is not a directory or .jar file")
+          else
+            val output = if (isJar) JarArchive.create(path) else new PlainDirectory(path)
+            Right(ClassfileWriterOps(output))
+        }
+        val (errors, writers) = paths.partitionMap(identity)
+        if errors.nonEmpty then
+          errors.foreach(report.error(_))
           None
         else
-          val output = if (isJar) JarArchive.create(path) else new PlainDirectory(path)
-          Some(Pickler.EarlyFileWriter(ClassfileWriterOps(output)))
+          Some(Pickler.EarlyFileWriter(writers))
+
       case _ =>
         None
     val nonLocalClassSymbols = new mutable.HashSet[Symbol]
@@ -119,7 +127,7 @@ class ExtractAPI extends Phase {
             val sourceVF0 = sourceFile.zincVirtualFile // TODO: in zinc this is optional? why
 
             val fullClassName = atPhase(sbtExtractDependenciesPhase) {
-              ExtractDependencies.classNameAsString(cls)
+              ExtractDependencies.apiClassNameAsString(cls)
             }
             val binaryClassName = cls.binaryClassName
             registerProductNames(sourceVF0, fullClassName, binaryClassName)
@@ -128,7 +136,7 @@ class ExtractAPI extends Phase {
             val isTopLevelUniqueModule =
               cls.owner.is(PackageClass) && cls.is(ModuleClass) && cls.companionClass == NoSymbol
             if isTopLevelUniqueModule || cls.isPackageObject then
-              registerProductNames(sourceVF0, fullClassName.stripSuffix(str.MODULE_SUFFIX), binaryClassName.stripSuffix(str.MODULE_SUFFIX))
+              registerProductNames(sourceVF0, fullClassName, binaryClassName.stripSuffix(str.MODULE_SUFFIX))
 
           end if
 
