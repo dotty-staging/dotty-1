@@ -66,6 +66,7 @@ val experimentalDefinitionInLibrary = Set(
   // Should be stabilized in 3.4.0
   "scala.quoted.Quotes.reflectModule.defnModule.FunctionClass",
   "scala.quoted.Quotes.reflectModule.FlagsModule.AbsOverride",
+  "scala.quoted.Quotes.reflectModule.TypeLambdaMethods.paramVariances",
   // Can be stabilized in 3.4.0 (unsure) or later
   "scala.quoted.Quotes.reflectModule.CompilationInfoModule.XmacroSettings",
   "scala.quoted.Quotes.reflectModule.FlagsModule.JavaAnnotation",
