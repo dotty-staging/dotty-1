@@ -2,7 +2,7 @@ package dotty.tools
 package dotc
 package core
 
-import java.io.{IOException, File}
+import java.io.{IOException, File, ByteArrayOutputStream}
 import java.nio.channels.ClosedByInterruptException
 
 import scala.util.control.NonFatal
@@ -195,7 +195,10 @@ object SymbolLoaders {
         if (ctx.settings.verbose.value) report.inform("[symloader] no class, picked up source file for " + src.path)
         enterToplevelsFromSource(owner, nameOf(classRep), src)
       case (Some(bin), _) =>
-        enterClassAndModule(owner, nameOf(classRep), ctx.platform.newClassLoader(bin))
+        val completer =
+          if bin.extension == "tasty" then ctx.platform.newTastyLoader(bin)
+          else ctx.platform.newClassLoader(bin)
+        enterClassAndModule(owner, nameOf(classRep), completer)
     }
 
   def needCompile(bin: AbstractFile, src: AbstractFile): Boolean =
@@ -417,6 +420,48 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
           moduleRoot.classSymbol.rootTreeOrProvider = unpickler
         case _ =>
       }
+  }
+
+  private def mayLoadTreesFromTasty(using Context): Boolean =
+    ctx.settings.YretainTrees.value || ctx.settings.fromTasty.value
+}
+
+class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
+
+  override def sourceFileOrNull: AbstractFile | Null = tastyFile
+
+  def description(using Context): String = "TASTy file " + tastyFile.toString
+
+  override def doComplete(root: SymDenotation)(using Context): Unit =
+    load(root)
+
+  def load(root: SymDenotation)(using Context): Unit = {
+    val tastyBytes: Array[Byte] = tastyFile match { // TODO: simplify when #3552 is fixed
+      case tastyFile: io.ZipArchive#Entry => // We are in a jar
+        val stream = tastyFile.input
+        try {
+          val tastyOutStream = new ByteArrayOutputStream()
+          val buffer = new Array[Byte](1024)
+          var read = stream.read(buffer, 0, buffer.length)
+          while (read != -1) {
+            tastyOutStream.write(buffer, 0, read)
+            read = stream.read(buffer, 0, buffer.length)
+          }
+          tastyOutStream.flush()
+          tastyOutStream.toByteArray.nn
+        } finally {
+          stream.close()
+        }
+      case _ =>
+        tastyFile.toByteArray
+    }
+    val unpickler = new tasty.DottyUnpickler(tastyBytes)
+    val (classRoot, moduleRoot) = rootDenots(root.asClass)
+    unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
+    if (mayLoadTreesFromTasty)
+      classRoot.classSymbol.rootTreeOrProvider = unpickler
+      moduleRoot.classSymbol.rootTreeOrProvider = unpickler
+    // TODO check TASTy UUID matches classfile
   }
 
   private def mayLoadTreesFromTasty(using Context): Boolean =

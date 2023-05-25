@@ -47,18 +47,20 @@ object ZipAndJarClassPathFactory extends ZipAndJarFileLookupFactory {
     override def findClassFile(className: String): Option[AbstractFile] = {
       val (pkg, simpleClassName) = PackageNameUtils.separatePkgAndClassNames(className)
       file(PackageName(pkg), simpleClassName + ".class").map(_.file)
+        .orElse(file(PackageName(pkg), simpleClassName + ".tasty").map(_.file))
     }
 
     // This method is performance sensitive as it is used by SBT's ExtractDependencies phase.
     override def findClass(className: String): Option[ClassRepresentation] = {
       val (pkg, simpleClassName) = PackageNameUtils.separatePkgAndClassNames(className)
       file(PackageName(pkg), simpleClassName + ".class")
+        .orElse(file(PackageName(pkg), simpleClassName + ".tasty"))
     }
 
     override private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = files(inPackage)
 
     override protected def createFileEntry(file: FileZipArchive#Entry): ClassFileEntryImpl = ClassFileEntryImpl(file)
-    override protected def isRequiredFileType(file: AbstractFile): Boolean = file.isClass
+    override protected def isRequiredFileType(file: AbstractFile): Boolean = file.isClass || file.isTasty
   }
 
   /**

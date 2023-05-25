@@ -20,6 +20,8 @@ object FileUtils {
     def isClass: Boolean = !file.isDirectory && file.hasExtension("class") && !file.name.endsWith("$class.class")
       // FIXME: drop last condition when we stop being compatible with Scala 2.11
 
+    def isTasty: Boolean = !file.isDirectory && file.hasExtension("tasty")
+
     def isScalaOrJavaSource: Boolean = !file.isDirectory && (file.hasExtension("scala") || file.hasExtension("java"))
 
     // TODO do we need to check also other files using ZipMagicNumber like in scala.tools.nsc.io.Jar.isJarOrZip?
@@ -35,12 +37,15 @@ object FileUtils {
   extension (file: JFile) {
     def isPackage: Boolean = file.isDirectory && mayBeValidPackage(file.getName)
 
-    def isClass: Boolean = file.isFile && file.getName.endsWith(".class") && !file.getName.endsWith("$class.class")
-      // FIXME: drop last condition when we stop being compatible with Scala 2.11
+    def isClass: Boolean = file.isFile && file.getName.endsWith(SUFFIX_CLASS) && !file.getName.endsWith("$class.class")
+    // FIXME: drop last condition when we stop being compatible with Scala 2.11
+
+    def isTasty: Boolean = file.isFile && file.getName.endsWith(SUFFIX_TASTY)
   }
 
   private val SUFFIX_CLASS = ".class"
   private val SUFFIX_SCALA = ".scala"
+  private val SUFFIX_TASTY = ".tasty"
   private val SUFFIX_JAVA = ".java"
   private val SUFFIX_SIG = ".sig"
 
