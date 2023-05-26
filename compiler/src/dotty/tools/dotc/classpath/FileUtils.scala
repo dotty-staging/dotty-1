@@ -21,6 +21,14 @@ object FileUtils {
       // FIXME: drop last condition when we stop being compatible with Scala 2.11
 
     def isTasty: Boolean = !file.isDirectory && file.hasExtension("tasty")
+      // FIXME: Tuple fails if loaded from TASTy.
+      // Reproduce with: scala3-bootstrapped/testCompilation tests/pos-macros/i7358.scala
+      // assertion failed: wrong source set for runtime.Tuples.cons(x$1, Tuple_this).asInstanceOf[*:[quoted.Type[H], Tuple]]:*:[quoted.Type[H], Tuple] # -1 of class dotty.tools.dotc.ast.Trees$Typed, set to library/src/scala/Tuple.scala but context had /Users/nicolasstucki/GitHub/dotty/library/../out/bootstrap/scala3-library-bootstrapped/scala-3.3.1-RC1-bin-SNAPSHOT-nonbootstrapped/scala3-library_3-3.3.1-RC1-bin-SNAPSHOT.jar(scala/Tuple.tasty)
+      //    final <method> <permanent>
+      //         at scala.runtime.Scala3RunTime$.assertFailed(Scala3RunTime.scala:8)
+      //         at dotty.tools.dotc.transform.YCheckPositions$$anon$1.traverse(YCheckPositions.scala:36)
+      //         at dotty.tools.dotc.transform.YCheckPositions$$anon$1.traverse(YCheckPositions.scala:51)
+      && !file.path.endsWith("scala/Tuple.tasty")
 
     def isScalaOrJavaSource: Boolean = !file.isDirectory && (file.hasExtension("scala") || file.hasExtension("java"))
 
