@@ -918,12 +918,6 @@ class ClassfileParser(
         Some(unpickler)
       }
 
-      def unpickleTASTY(bytes: Array[Byte]): Some[Embedded]  = {
-        val unpickler = new tasty.DottyUnpickler(bytes)
-        unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
-        Some(unpickler)
-      }
-
       def parseScalaSigBytes: Array[Byte] = {
         val tag = in.nextByte.toChar
         assert(tag == STRING_TAG, tag)
@@ -955,13 +949,17 @@ class ClassfileParser(
           if tastyFile == null then
             report.error(em"Could not find TASTY file $tastyFileName in $parent")
           else
-            val tastyBytes: Array[Byte] = TastyLoader.loadTastyBytes(tastyFile)
-            val reader = new TastyReader(bytes, 0, 16)
-            val expectedUUID = new UUID(reader.readUncompressedLong(), reader.readUncompressedLong())
-            val tastyUUID = new TastyHeaderUnpickler(tastyBytes).readHeader()
+            val tastyLoader = new TastyLoader(tastyFile)
+            val tastyBytes: Array[Byte] = tastyLoader.loadTastyBytes()
+            val unpickler = tastyLoader.unpickleTASTY(tastyBytes, classRoot, moduleRoot)
+            val expectedUUID =
+              val reader = new TastyReader(bytes, 0, 16)
+              new UUID(reader.readUncompressedLong(), reader.readUncompressedLong())
+            val tastyUUID =
+              new TastyHeaderUnpickler(tastyBytes).readHeader()
             if (expectedUUID != tastyUUID)
               report.warning(s"$classfile is out of sync with its TASTy file. Loaded TASTy file. Try cleaning the project to fix this issue", NoSourcePosition)
-            return unpickleTASTY(tastyBytes)
+            return Some(unpickler)
         }
         else
           // Before 3.0.0 we had a mode where we could embed the TASTY bytes in the classfile. This has not been supported in any stable release.
