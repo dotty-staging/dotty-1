@@ -947,49 +947,21 @@ class ClassfileParser(
         val attrLen = in.nextInt
         val bytes = in.nextBytes(attrLen)
         if (attrLen == 16) { // A tasty attribute with that has only a UUID (16 bytes) implies the existence of the .tasty file
-          val tastyBytes: Array[Byte] = classfile match { // TODO: simplify when #3552 is fixed
-            case classfile: io.ZipArchive#Entry => // We are in a jar
-              val path = classfile.parent.lookupName(
-                classfile.name.stripSuffix(".class") + ".tasty", directory = false
-              )
-              if (path != null) {
-                val stream = path.input
-                try {
-                  val tastyOutStream = new ByteArrayOutputStream()
-                  val buffer = new Array[Byte](1024)
-                  var read = stream.read(buffer, 0, buffer.length)
-                  while (read != -1) {
-                    tastyOutStream.write(buffer, 0, read)
-                    read = stream.read(buffer, 0, buffer.length)
-                  }
-                  tastyOutStream.flush()
-                  tastyOutStream.toByteArray
-                } finally {
-                  stream.close()
-                }
-              }
-              else {
-                report.error(em"Could not find $path in ${classfile.underlyingSource}")
-                Array.empty
-              }
-            case _ =>
-              val dir = classfile.container
-              val name = classfile.name.stripSuffix(".class") + ".tasty"
-              val tastyFileOrNull = dir.lookupName(name, false)
-              if (tastyFileOrNull == null) {
-                report.error(em"Could not find TASTY file $name under $dir")
-                Array.empty
-              } else
-                tastyFileOrNull.toByteArray
-          }
-          if (tastyBytes.nonEmpty) {
+          val parent = classfile match  // TODO: simplify when #3552 is fixed
+            case classfile: io.ZipArchive#Entry => classfile.parent
+            case _ => classfile.container
+          val tastyFileName = classfile.name.stripSuffix(".class") + ".tasty"
+          val tastyFile = parent.lookupName(tastyFileName, directory = false)
+          if tastyFile == null then
+            report.error(em"Could not find TASTY file $tastyFileName in $parent")
+          else
+            val tastyBytes: Array[Byte] = TastyLoader.loadTastyBytes(tastyFile)
             val reader = new TastyReader(bytes, 0, 16)
             val expectedUUID = new UUID(reader.readUncompressedLong(), reader.readUncompressedLong())
             val tastyUUID = new TastyHeaderUnpickler(tastyBytes).readHeader()
             if (expectedUUID != tastyUUID)
               report.warning(s"$classfile is out of sync with its TASTy file. Loaded TASTy file. Try cleaning the project to fix this issue", NoSourcePosition)
             return unpickleTASTY(tastyBytes)
-          }
         }
         else
           // Before 3.0.0 we had a mode where we could embed the TASTY bytes in the classfile. This has not been supported in any stable release.

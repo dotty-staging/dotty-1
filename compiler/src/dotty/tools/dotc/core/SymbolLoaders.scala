@@ -436,7 +436,23 @@ class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
     load(root)
 
   def load(root: SymDenotation)(using Context): Unit = {
-    val tastyBytes: Array[Byte] = tastyFile match { // TODO: simplify when #3552 is fixed
+    val tastyBytes: Array[Byte] = TastyLoader.loadTastyBytes(tastyFile)
+    val unpickler = new tasty.DottyUnpickler(tastyBytes)
+    val (classRoot, moduleRoot) = rootDenots(root.asClass)
+    unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
+    if (mayLoadTreesFromTasty)
+      classRoot.classSymbol.rootTreeOrProvider = unpickler
+      moduleRoot.classSymbol.rootTreeOrProvider = unpickler
+    // TODO check TASTy UUID matches classfile
+  }
+
+  private def mayLoadTreesFromTasty(using Context): Boolean =
+    ctx.settings.YretainTrees.value || ctx.settings.fromTasty.value
+}
+
+object TastyLoader {
+  def loadTastyBytes(tastyFile: AbstractFile): Array[Byte] =
+    tastyFile match { // TODO: simplify when #3552 is fixed
       case tastyFile: io.ZipArchive#Entry => // We are in a jar
         val stream = tastyFile.input
         try {
@@ -455,17 +471,6 @@ class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
       case _ =>
         tastyFile.toByteArray
     }
-    val unpickler = new tasty.DottyUnpickler(tastyBytes)
-    val (classRoot, moduleRoot) = rootDenots(root.asClass)
-    unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
-    if (mayLoadTreesFromTasty)
-      classRoot.classSymbol.rootTreeOrProvider = unpickler
-      moduleRoot.classSymbol.rootTreeOrProvider = unpickler
-    // TODO check TASTy UUID matches classfile
-  }
-
-  private def mayLoadTreesFromTasty(using Context): Boolean =
-    ctx.settings.YretainTrees.value || ctx.settings.fromTasty.value
 }
 
 class SourcefileLoader(val srcfile: AbstractFile) extends SymbolLoader {
