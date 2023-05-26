@@ -29,6 +29,7 @@ object FileUtils {
       //         at dotty.tools.dotc.transform.YCheckPositions$$anon$1.traverse(YCheckPositions.scala:36)
       //         at dotty.tools.dotc.transform.YCheckPositions$$anon$1.traverse(YCheckPositions.scala:51)
       && !file.path.endsWith("scala/Tuple.tasty")
+      && !file.path.endsWith("scala/util/boundary.tasty")
 
     def isScalaOrJavaSource: Boolean = !file.isDirectory && (file.hasExtension("scala") || file.hasExtension("java"))
 
