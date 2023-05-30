@@ -462,7 +462,7 @@ object Symbols {
       if !mySource.exists && !denot.is(Package) then
         // this allows sources to be added in annotations after `sourceOfClass` is first called
         val file = associatedFile
-        if file != null && file.extension != "class" then
+        if file != null && file.extension != "class" && file.extension != "tasty" then
           mySource = ctx.getSource(file)
         else
           mySource = defn.patchSource(this)

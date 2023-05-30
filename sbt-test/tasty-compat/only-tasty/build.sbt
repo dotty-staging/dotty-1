@@ -11,3 +11,6 @@ lazy val b = project.in(file("b"))
 
 lazy val c = project.in(file("c"))
   .dependsOn(a, b)
+  .settings(
+    scalacOptions += "-Ycheck:all",
+  )
