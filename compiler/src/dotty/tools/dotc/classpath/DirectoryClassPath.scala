@@ -282,7 +282,11 @@ case class DirectoryClassPath(dir: JFile) extends JFileDirectoryLookup[ClassFile
     if (classFile.exists) {
       Some(classFile.toPath.toPlainFile)
     }
-    else None
+    else {
+      val tastyFile = new JFile(dir, relativePath + ".tasty")
+      if tastyFile.exists then Some(tastyFile.toPath.toPlainFile)
+      else None
+    }
   }
 
   protected def createFileEntry(file: AbstractFile): ClassFileEntryImpl = ClassFileEntryImpl(file)
