@@ -62,8 +62,8 @@ class ReadTasty extends Phase {
       staticRef(className) match {
         case clsd: ClassDenotation =>
           clsd.infoOrCompleter match {
-            case info: SymbolLoader =>
-              info.complete(clsd) // sets cls.rootTreeOrProvider and cls.moduleClass.treeProvider as a side-effect
+            case info: (ClassfileLoader | TastyLoader) =>
+              info.doComplete(clsd) // sets cls.rootTreeOrProvider and cls.moduleClass.treeProvider as a side-effect
             case _ =>
           }
           def moduleClass = clsd.owner.info.member(className.moduleClassName).symbol
