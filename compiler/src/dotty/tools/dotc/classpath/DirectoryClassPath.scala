@@ -278,19 +278,19 @@ case class DirectoryClassPath(dir: JFile) extends JFileDirectoryLookup[ClassFile
 
   def findClassFile(className: String): Option[AbstractFile] = {
     val relativePath = FileUtils.dirPath(className)
-    val classFile = new JFile(dir, relativePath + ".class")
-    if (classFile.exists) {
-      Some(classFile.toPath.toPlainFile)
-    }
-    else {
-      val tastyFile = new JFile(dir, relativePath + ".tasty")
-      if tastyFile.exists then Some(tastyFile.toPath.toPlainFile)
+    val tastyFile = new JFile(dir, relativePath + ".tasty")
+    if tastyFile.exists then Some(tastyFile.toPath.toPlainFile)
+    else
+      val classFile = new JFile(dir, relativePath + ".class")
+      if classFile.exists then  Some(classFile.toPath.toPlainFile)
       else None
-    }
   }
 
   protected def createFileEntry(file: AbstractFile): ClassFileEntryImpl = ClassFileEntryImpl(file)
-  protected def isMatchingFile(f: JFile): Boolean = f.isClass || f.isTasty
+  protected def isMatchingFile(f: JFile): Boolean =
+    def isClassWithNoTasty =
+      f.isClass && !Files.exists(f.toPath.resolveSibling(f.getName.stripSuffix(".class").stripSuffix("$") + ".tasty"))
+    f.isTasty || isClassWithNoTasty
 
   private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = files(inPackage)
 }
