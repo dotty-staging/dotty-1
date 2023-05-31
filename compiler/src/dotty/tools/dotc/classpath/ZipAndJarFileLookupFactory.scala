@@ -12,7 +12,7 @@ import java.nio.file.Files
 import java.nio.file.attribute.{BasicFileAttributes, FileTime}
 
 import scala.annotation.tailrec
-import dotty.tools.io.{AbstractFile, ClassPath, ClassRepresentation, FileZipArchive, ManifestResources}
+import dotty.tools.io.{AbstractFile, ClassPath, ClassRepresentation, FileZipArchive, ManifestResources, ZipArchive}
 import dotty.tools.dotc.core.Contexts._
 import FileUtils._
 
@@ -46,21 +46,29 @@ object ZipAndJarClassPathFactory extends ZipAndJarFileLookupFactory {
 
     override def findClassFile(className: String): Option[AbstractFile] = {
       val (pkg, simpleClassName) = PackageNameUtils.separatePkgAndClassNames(className)
-      file(PackageName(pkg), simpleClassName + ".class").map(_.file)
-        .orElse(file(PackageName(pkg), simpleClassName + ".tasty").map(_.file))
+      file(PackageName(pkg), simpleClassName + ".tasty").map(_.file)
+        .orElse(file(PackageName(pkg), simpleClassName + ".class").map(_.file))
     }
 
     // This method is performance sensitive as it is used by SBT's ExtractDependencies phase.
     override def findClass(className: String): Option[ClassRepresentation] = {
       val (pkg, simpleClassName) = PackageNameUtils.separatePkgAndClassNames(className)
-      file(PackageName(pkg), simpleClassName + ".class")
-        .orElse(file(PackageName(pkg), simpleClassName + ".tasty"))
+      file(PackageName(pkg), simpleClassName + ".tasty")
+        .orElse(file(PackageName(pkg), simpleClassName + ".class"))
     }
 
     override private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = files(inPackage)
 
     override protected def createFileEntry(file: FileZipArchive#Entry): ClassFileEntryImpl = ClassFileEntryImpl(file)
-    override protected def isRequiredFileType(file: AbstractFile): Boolean = file.isClass || file.isTasty
+    override protected def isRequiredFileType(file: AbstractFile): Boolean =
+      def tastyFile: AbstractFile | Null =
+        val parent = file match  // TODO: simplify when #3552 is fixed
+          case classfile: ZipArchive#Entry => classfile.parent
+          case _ => file.container
+        val tastyFileName = file.name.stripSuffix(".class").stripSuffix("$") + ".tasty"
+        parent.lookupName(tastyFileName, directory = false)
+      def isClassWithNoTasty = file.isClass && tastyFile == null
+      file.isTasty || isClassWithNoTasty
   }
 
   /**
