@@ -951,7 +951,6 @@ class ClassfileParser(
           else
             val tastyLoader = new TastyLoader(tastyFile)
             val tastyBytes: Array[Byte] = tastyLoader.loadTastyBytes()
-            val unpickler = tastyLoader.unpickleTASTY(tastyBytes, classRoot, moduleRoot)
             val expectedUUID =
               val reader = new TastyReader(bytes, 0, 16)
               new UUID(reader.readUncompressedLong(), reader.readUncompressedLong())
@@ -959,7 +958,7 @@ class ClassfileParser(
               new TastyHeaderUnpickler(tastyBytes).readHeader()
             if (expectedUUID != tastyUUID)
               report.warning(s"$classfile is out of sync with its TASTy file. Loaded TASTy file. Try cleaning the project to fix this issue", NoSourcePosition)
-            return Some(unpickler)
+            return None
         }
         else
           // Before 3.0.0 we had a mode where we could embed the TASTY bytes in the classfile. This has not been supported in any stable release.
