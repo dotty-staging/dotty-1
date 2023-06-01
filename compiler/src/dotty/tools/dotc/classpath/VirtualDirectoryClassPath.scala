@@ -3,7 +3,7 @@ package dotty.tools.dotc.classpath
 import scala.language.unsafeNulls
 
 import dotty.tools.io.{ClassPath, ClassRepresentation}
-import dotty.tools.io.{AbstractFile, VirtualDirectory}
+import dotty.tools.io.{AbstractFile, VirtualDirectory, ZipArchive}
 import FileUtils._
 import java.net.{URI, URL}
 
@@ -41,12 +41,21 @@ case class VirtualDirectoryClassPath(dir: VirtualDirectory) extends ClassPath wi
   override def findClass(className: String): Option[ClassRepresentation] = findClassFile(className) map ClassFileEntryImpl.apply
 
   def findClassFile(className: String): Option[AbstractFile] = {
-    val relativePath = FileUtils.dirPath(className) + ".class"
-    Option(lookupPath(dir)(relativePath.split(java.io.File.separator).toIndexedSeq, directory = false))
+    val pathSeq = FileUtils.dirPath(className).split(java.io.File.separator).toVector
+    val parentSeq = pathSeq.init
+    val tastyPath = parentSeq :+ (pathSeq.last + ".tasty")
+    val classPath = parentSeq :+ (pathSeq.last + ".class")
+    Option(lookupPath(dir)(tastyPath, directory = false))
+      .orElse(Option(lookupPath(dir)(classPath, directory = false)))
   }
 
   private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = files(inPackage)
 
   protected def createFileEntry(file: AbstractFile): ClassFileEntryImpl = ClassFileEntryImpl(file)
-  protected def isMatchingFile(f: AbstractFile): Boolean = f.isClass
+  protected def isMatchingFile(f: AbstractFile): Boolean =
+    def tastyFile: AbstractFile | Null =
+      val tastyFileName = f.name.stripSuffix(".class").stripSuffix("$") + ".tasty"
+      f.container.lookupName(tastyFileName, directory = false)
+    def isClassWithNoTasty = f.isClass && tastyFile == null
+    f.isTasty || isClassWithNoTasty
 }
