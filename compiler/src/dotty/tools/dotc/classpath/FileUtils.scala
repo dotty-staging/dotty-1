@@ -32,6 +32,15 @@ object FileUtils {
      * and returning given default value in other case
      */
     def toURLs(default: => Seq[URL] = Seq.empty): Seq[URL] = if (file.file == null) default else Seq(file.toURL)
+
+    /** Returns the tasty file associated with this class file */
+    def classToTasty: Option[AbstractFile] =
+      assert(file.isClass, s"non-class: $file")
+      val parent = file match  // TODO: simplify when #3552 is fixed
+        case file: io.ZipArchive#Entry => file.parent
+        case _ => file.container
+      val tastyName = classNameToTasty(file.name)
+      Option(parent.lookupName(tastyName, directory = false))
   }
 
   extension (file: JFile) {
@@ -41,6 +50,14 @@ object FileUtils {
     // FIXME: drop last condition when we stop being compatible with Scala 2.11
 
     def isTasty: Boolean = file.isFile && file.getName.endsWith(SUFFIX_TASTY)
+
+    /** Returns the tasty file associated with this class file */
+    def classToTasty: Option[JFile] =
+      assert(file.isClass, s"non-class: $file")
+      val tastyName = classNameToTasty(file.getName.stripSuffix(".class"))
+      val tastyPath = file.toPath.resolveSibling(tastyName)
+      if java.nio.file.Files.exists(tastyPath) then Some(tastyPath.toFile) else None
+
   }
 
   private val SUFFIX_CLASS = ".class"
@@ -86,4 +103,12 @@ object FileUtils {
   def mkFileFilter(f: JFile => Boolean): FileFilter = new FileFilter {
     def accept(pathname: JFile): Boolean = f(pathname)
   }
+
+  private def classNameToTasty(fileName: String): String =
+    val className = fileName.stripSuffix(".class")
+    if className.endsWith("$")
+      && className != "Null$" // scala.runtime.Null$
+      && className != "Nothing$" // scala.runtime.Nothing$
+    then className.stripSuffix("$") + ".tasty"
+    else className + ".tasty"
 }

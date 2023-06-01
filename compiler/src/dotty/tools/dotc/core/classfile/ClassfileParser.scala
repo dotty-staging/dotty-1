@@ -23,6 +23,7 @@ import scala.annotation.switch
 import typer.Checking.checkNonCyclic
 import io.{AbstractFile, ZipArchive}
 import scala.util.control.NonFatal
+import dotty.tools.dotc.classpath.FileUtils.classToTasty
 
 object ClassfileParser {
   /** Marker trait for unpicklers that can be embedded in classfiles. */
@@ -941,23 +942,19 @@ class ClassfileParser(
         val attrLen = in.nextInt
         val bytes = in.nextBytes(attrLen)
         if (attrLen == 16) { // A tasty attribute with that has only a UUID (16 bytes) implies the existence of the .tasty file
-          val parent = classfile match  // TODO: simplify when #3552 is fixed
-            case classfile: io.ZipArchive#Entry => classfile.parent
-            case _ => classfile.container
-          val tastyFileName = classfile.name.stripSuffix(".class") + ".tasty"
-          val tastyFile = parent.lookupName(tastyFileName, directory = false)
-          if tastyFile == null then
-            report.error(em"Could not find TASTY file $tastyFileName in $parent")
-          else
-            val tastyLoader = new TastyLoader(tastyFile)
-            val tastyBytes: Array[Byte] = tastyLoader.loadTastyBytes()
-            val expectedUUID =
-              val reader = new TastyReader(bytes, 0, 16)
-              new UUID(reader.readUncompressedLong(), reader.readUncompressedLong())
-            val tastyUUID =
-              new TastyHeaderUnpickler(tastyBytes).readHeader()
-            if (expectedUUID != tastyUUID)
-              report.warning(s"$classfile is out of sync with its TASTy file. Loaded TASTy file. Try cleaning the project to fix this issue", NoSourcePosition)
+          classfile.classToTasty match
+            case None =>
+              report.error(em"Could not find TASTY for $classfile")
+            case Some(tastyFile) =>
+              val tastyLoader = new TastyLoader(tastyFile)
+              val tastyBytes: Array[Byte] = tastyLoader.loadTastyBytes()
+              val expectedUUID =
+                val reader = new TastyReader(bytes, 0, 16)
+                new UUID(reader.readUncompressedLong(), reader.readUncompressedLong())
+              val tastyUUID =
+                new TastyHeaderUnpickler(tastyBytes).readHeader()
+              if (expectedUUID != tastyUUID)
+                report.warning(s"$classfile is out of sync with its TASTy file. Loaded TASTy file. Try cleaning the project to fix this issue", NoSourcePosition)
             return None
         }
         else

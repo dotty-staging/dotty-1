@@ -61,14 +61,7 @@ object ZipAndJarClassPathFactory extends ZipAndJarFileLookupFactory {
 
     override protected def createFileEntry(file: FileZipArchive#Entry): ClassFileEntryImpl = ClassFileEntryImpl(file)
     override protected def isRequiredFileType(file: AbstractFile): Boolean =
-      def tastyFile: AbstractFile | Null =
-        val parent = file match  // TODO: simplify when #3552 is fixed
-          case classfile: ZipArchive#Entry => classfile.parent
-          case _ => file.container
-        val tastyFileName = file.name.stripSuffix(".class").stripSuffix("$") + ".tasty"
-        parent.lookupName(tastyFileName, directory = false)
-      def isClassWithNoTasty = file.isClass && tastyFile == null
-      file.isTasty || isClassWithNoTasty
+      file.isTasty || (file.isClass && file.classToTasty.isEmpty)
   }
 
   /**

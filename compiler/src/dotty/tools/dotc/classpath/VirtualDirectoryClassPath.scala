@@ -53,9 +53,5 @@ case class VirtualDirectoryClassPath(dir: VirtualDirectory) extends ClassPath wi
 
   protected def createFileEntry(file: AbstractFile): ClassFileEntryImpl = ClassFileEntryImpl(file)
   protected def isMatchingFile(f: AbstractFile): Boolean =
-    def tastyFile: AbstractFile | Null =
-      val tastyFileName = f.name.stripSuffix(".class").stripSuffix("$") + ".tasty"
-      f.container.lookupName(tastyFileName, directory = false)
-    def isClassWithNoTasty = f.isClass && tastyFile == null
-    f.isTasty || isClassWithNoTasty
+    f.isTasty || (f.isClass && f.classToTasty.isEmpty)
 }
