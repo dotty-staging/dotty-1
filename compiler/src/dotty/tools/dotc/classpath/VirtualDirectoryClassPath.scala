@@ -43,9 +43,10 @@ case class VirtualDirectoryClassPath(dir: VirtualDirectory) extends ClassPath wi
   def findClassFile(className: String): Option[AbstractFile] = {
     val pathSeq = FileUtils.dirPath(className).split(java.io.File.separator)
     val parentDir = lookupPath(dir)(pathSeq.init.toSeq, directory = true)
-    val name = pathSeq.last
-    Option(lookupPath(parentDir)(name + ".tasty" :: Nil, directory = false))
-      .orElse(Option(lookupPath(parentDir)(name + ".class" :: Nil, directory = false)))
+    if parentDir == null then return None
+    else
+      Option(lookupPath(parentDir)(pathSeq.last + ".tasty" :: Nil, directory = false))
+        .orElse(Option(lookupPath(parentDir)(pathSeq.last + ".class" :: Nil, directory = false)))
   }
 
   private[dotty] def classes(inPackage: PackageName): Seq[ClassFileEntry] = files(inPackage)
