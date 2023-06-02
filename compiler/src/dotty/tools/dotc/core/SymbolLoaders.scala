@@ -412,18 +412,8 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
   def load(root: SymDenotation)(using Context): Unit = {
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
     val classfileParser = new ClassfileParser(classfile, classRoot, moduleRoot)(ctx)
-    val result = classfileParser.run()
-    if (mayLoadTreesFromTasty)
-      result match {
-        case Some(unpickler: tasty.DottyUnpickler) =>
-          classRoot.classSymbol.rootTreeOrProvider = unpickler
-          moduleRoot.classSymbol.rootTreeOrProvider = unpickler
-        case _ =>
-      }
+    classfileParser.run()
   }
-
-  private def mayLoadTreesFromTasty(using Context): Boolean =
-    ctx.settings.YretainTrees.value || ctx.settings.fromTasty.value
 }
 
 class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
@@ -436,19 +426,15 @@ class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
     load(root)
 
   def load(root: SymDenotation)(using Context): Unit = {
-    val tastyBytes = tastyFile.toByteArray
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
-    unpickleTASTY(tastyBytes, classRoot, moduleRoot)
-    // TODO check TASTy UUID matches classfile
-  }
-
-  def unpickleTASTY(bytes: Array[Byte], classRoot: ClassDenotation, moduleRoot: ClassDenotation)(using Context): tasty.DottyUnpickler = {
-    val unpickler = new tasty.DottyUnpickler(bytes)
+    val unpickler =
+      val tastyBytes = tastyFile.toByteArray
+      new tasty.DottyUnpickler(tastyBytes)
     unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
     if (mayLoadTreesFromTasty)
       classRoot.classSymbol.rootTreeOrProvider = unpickler
       moduleRoot.classSymbol.rootTreeOrProvider = unpickler
-    unpickler
+    // TODO check TASTy UUID matches classfile
   }
 
   private def mayLoadTreesFromTasty(using Context): Boolean =
