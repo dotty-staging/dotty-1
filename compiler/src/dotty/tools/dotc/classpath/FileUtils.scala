@@ -104,11 +104,14 @@ object FileUtils {
     def accept(pathname: JFile): Boolean = f(pathname)
   }
 
+  /** Transforms a .class file name to a .tasty file name */
   private def classNameToTasty(fileName: String): String =
-    val className = fileName.stripSuffix(".class")
-    if className.endsWith("$")
-      && className != "Null$" // scala.runtime.Null$
-      && className != "Nothing$" // scala.runtime.Nothing$
-    then className.stripSuffix("$") + ".tasty"
-    else className + ".tasty"
+    val classOrModuleName = fileName.stripSuffix(".class")
+    val className =
+      if classOrModuleName.endsWith("$")
+        && classOrModuleName != "Null$" // scala.runtime.Null$
+        && classOrModuleName != "Nothing$" // scala.runtime.Nothing$
+      then classOrModuleName.stripSuffix("$")
+      else classOrModuleName
+    className + SUFFIX_TASTY
 }
