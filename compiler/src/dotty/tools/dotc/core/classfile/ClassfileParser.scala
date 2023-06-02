@@ -946,12 +946,11 @@ class ClassfileParser(
             case None =>
               report.error(em"Could not find TASTY for $classfile")
             case Some(tastyFile) =>
-              val tastyLoader = new TastyLoader(tastyFile)
-              val tastyBytes: Array[Byte] = tastyLoader.loadTastyBytes()
               val expectedUUID =
                 val reader = new TastyReader(bytes, 0, 16)
                 new UUID(reader.readUncompressedLong(), reader.readUncompressedLong())
               val tastyUUID =
+                val tastyBytes: Array[Byte] = tastyFile.toByteArray
                 new TastyHeaderUnpickler(tastyBytes).readHeader()
               if (expectedUUID != tastyUUID)
                 report.warning(s"$classfile is out of sync with its TASTy file. Loaded TASTy file. Try cleaning the project to fix this issue", NoSourcePosition)

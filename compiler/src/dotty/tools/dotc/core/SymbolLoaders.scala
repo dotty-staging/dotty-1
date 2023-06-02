@@ -436,32 +436,11 @@ class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
     load(root)
 
   def load(root: SymDenotation)(using Context): Unit = {
-    val tastyBytes = loadTastyBytes()
+    val tastyBytes = tastyFile.toByteArray
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
     unpickleTASTY(tastyBytes, classRoot, moduleRoot)
     // TODO check TASTy UUID matches classfile
   }
-
-  def loadTastyBytes(): Array[Byte] =
-    tastyFile match { // TODO: simplify when #3552 is fixed
-      case tastyFile: io.ZipArchive#Entry => // We are in a jar
-        val stream = tastyFile.input
-        try {
-          val tastyOutStream = new ByteArrayOutputStream()
-          val buffer = new Array[Byte](1024)
-          var read = stream.read(buffer, 0, buffer.length)
-          while (read != -1) {
-            tastyOutStream.write(buffer, 0, read)
-            read = stream.read(buffer, 0, buffer.length)
-          }
-          tastyOutStream.flush()
-          tastyOutStream.toByteArray.nn
-        } finally {
-          stream.close()
-        }
-      case _ =>
-        tastyFile.toByteArray
-    }
 
   def unpickleTASTY(bytes: Array[Byte], classRoot: ClassDenotation, moduleRoot: ClassDenotation)(using Context): tasty.DottyUnpickler = {
     val unpickler = new tasty.DottyUnpickler(bytes)
