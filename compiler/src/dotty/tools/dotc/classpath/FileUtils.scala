@@ -36,11 +36,8 @@ object FileUtils {
     /** Returns the tasty file associated with this class file */
     def classToTasty: Option[AbstractFile] =
       assert(file.isClass, s"non-class: $file")
-      val parent = file match  // TODO: simplify when #3552 is fixed
-        case file: io.ZipArchive#Entry => file.parent
-        case _ => file.container
       val tastyName = classNameToTasty(file.name)
-      Option(parent.lookupName(tastyName, directory = false))
+      Option(file.resolveSibling(tastyName))
   }
 
   extension (file: JFile) {
