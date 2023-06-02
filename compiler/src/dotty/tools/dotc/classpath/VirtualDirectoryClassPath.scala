@@ -3,7 +3,7 @@ package dotty.tools.dotc.classpath
 import scala.language.unsafeNulls
 
 import dotty.tools.io.{ClassPath, ClassRepresentation}
-import dotty.tools.io.{AbstractFile, VirtualDirectory, ZipArchive}
+import dotty.tools.io.{AbstractFile, VirtualDirectory}
 import FileUtils._
 import java.net.{URI, URL}
 

@@ -12,7 +12,7 @@ import SymDenotations._, unpickleScala2.Scala2Unpickler._, Constants._, Annotati
 import Phases._
 import ast.{ tpd, untpd }
 import ast.tpd._, util._
-import java.io.{ ByteArrayOutputStream, IOException }
+import java.io.IOException
 
 import java.lang.Integer.toHexString
 import java.util.UUID

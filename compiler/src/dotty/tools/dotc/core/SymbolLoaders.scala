@@ -2,11 +2,12 @@ package dotty.tools
 package dotc
 package core
 
-import java.io.{IOException, File, ByteArrayOutputStream}
+import java.io.{IOException, File}
 import java.nio.channels.ClosedByInterruptException
 
 import scala.util.control.NonFatal
 
+import dotty.tools.dotc.classpath.FileUtils.isTasty
 import dotty.tools.io.{ ClassPath, ClassRepresentation, AbstractFile }
 import dotty.tools.backend.jvm.DottyBackendInterface.symExtensions
 
@@ -192,11 +193,11 @@ object SymbolLoaders {
         if (ctx.settings.verbose.value) report.inform("[symloader] picked up newer source file for " + src.path)
         enterToplevelsFromSource(owner, nameOf(classRep), src)
       case (None, Some(src)) =>
-        if (ctx.settings.verbose.value) report.inform("[symloader] no class, picked up source file for " + src.path)
+        if (ctx.settings.verbose.value) report.inform("[symloader] no class or tasty, picked up source file for " + src.path)
         enterToplevelsFromSource(owner, nameOf(classRep), src)
       case (Some(bin), _) =>
         val completer =
-          if bin.extension == "tasty" then ctx.platform.newTastyLoader(bin)
+          if bin.isTasty then ctx.platform.newTastyLoader(bin)
           else ctx.platform.newClassLoader(bin)
         enterClassAndModule(owner, nameOf(classRep), completer)
     }

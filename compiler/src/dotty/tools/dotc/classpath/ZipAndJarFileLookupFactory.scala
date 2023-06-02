@@ -12,7 +12,7 @@ import java.nio.file.Files
 import java.nio.file.attribute.{BasicFileAttributes, FileTime}
 
 import scala.annotation.tailrec
-import dotty.tools.io.{AbstractFile, ClassPath, ClassRepresentation, FileZipArchive, ManifestResources, ZipArchive}
+import dotty.tools.io.{AbstractFile, ClassPath, ClassRepresentation, FileZipArchive, ManifestResources}
 import dotty.tools.dotc.core.Contexts._
 import FileUtils._
 
