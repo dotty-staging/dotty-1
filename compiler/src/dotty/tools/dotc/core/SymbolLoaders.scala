@@ -407,13 +407,9 @@ class ClassfileLoader(val classfile: AbstractFile) extends SymbolLoader {
   def description(using Context): String = "class file " + classfile.toString
 
   override def doComplete(root: SymDenotation)(using Context): Unit =
-    load(root)
-
-  def load(root: SymDenotation)(using Context): Unit = {
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
     val classfileParser = new ClassfileParser(classfile, classRoot, moduleRoot)(ctx)
     classfileParser.run()
-  }
 }
 
 class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
@@ -423,19 +419,15 @@ class TastyLoader(val tastyFile: AbstractFile) extends SymbolLoader {
   def description(using Context): String = "TASTy file " + tastyFile.toString
 
   override def doComplete(root: SymDenotation)(using Context): Unit =
-    load(root)
-
-  def load(root: SymDenotation)(using Context): Unit = {
     val (classRoot, moduleRoot) = rootDenots(root.asClass)
     val unpickler =
       val tastyBytes = tastyFile.toByteArray
       new tasty.DottyUnpickler(tastyBytes)
     unpickler.enter(roots = Set(classRoot, moduleRoot, moduleRoot.sourceModule))(using ctx.withSource(util.NoSource))
-    if (mayLoadTreesFromTasty)
+    if mayLoadTreesFromTasty then
       classRoot.classSymbol.rootTreeOrProvider = unpickler
       moduleRoot.classSymbol.rootTreeOrProvider = unpickler
     // TODO check TASTy UUID matches classfile
-  }
 
   private def mayLoadTreesFromTasty(using Context): Boolean =
     ctx.settings.YretainTrees.value || ctx.settings.fromTasty.value
