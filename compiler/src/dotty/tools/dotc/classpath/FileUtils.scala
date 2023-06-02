@@ -22,6 +22,8 @@ object FileUtils {
 
     def isTasty: Boolean = !file.isDirectory && file.hasExtension("tasty")
 
+    def isScalaBinary: Boolean = file.isClass || file.isTasty
+
     def isScalaOrJavaSource: Boolean = !file.isDirectory && (file.hasExtension("scala") || file.hasExtension("java"))
 
     // TODO do we need to check also other files using ZipMagicNumber like in scala.tools.nsc.io.Jar.isJarOrZip?

@@ -7,6 +7,7 @@ import java.io.File
 import java.util.{Arrays, EnumSet}
 
 import dotty.tools.dotc.ast.tpd
+import dotty.tools.dotc.classpath.FileUtils.{isTasty, isClass}
 import dotty.tools.dotc.core.Contexts._
 import dotty.tools.dotc.core.Decorators._
 import dotty.tools.dotc.core.Flags._
@@ -141,10 +142,10 @@ class ExtractDependencies extends Phase {
     if (depFile != null) {
       // Cannot ignore inheritance relationship coming from the same source (see sbt/zinc#417)
       def allowLocal = dep.context == DependencyByInheritance || dep.context == LocalDependencyByInheritance
-      if (depFile.extension == "class") {
+      if (depFile.isClass) {
         // Dependency is external -- source is undefined
         processExternalDependency(depFile, dep.to.binaryClassName)
-      } else if (depFile.extension == "tasty") {
+      } else if (depFile.isTasty) {
         val depClassFile = depFile.resolveSibling(dep.to.binaryClassName + ".class")
         if depClassFile != null then
           processExternalDependency(depClassFile, dep.to.binaryClassName)
