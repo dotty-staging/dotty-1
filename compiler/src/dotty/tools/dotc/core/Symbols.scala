@@ -150,7 +150,8 @@ object Symbols {
       * symbols defined by the user in a prior run of the REPL, that are still valid.
       */
     final def isDefinedInSource(using Context): Boolean =
-      span.exists && isValidInCurrentRun && associatedFileMatches(_.extension != "class")
+      span.exists && isValidInCurrentRun
+      && associatedFileMatches(file => file.extension != "class" && file.extension != "tasty")
 
     /** Is symbol valid in current run? */
     final def isValidInCurrentRun(using Context): Boolean =
@@ -284,7 +285,7 @@ object Symbols {
 
     final def source(using Context): SourceFile = {
       def valid(src: SourceFile): SourceFile =
-        if (src.exists && src.file.extension != "class") src
+        if (src.exists && src.file.extension != "class" && src.file.extension != "tasty") src
         else NoSource
 
       if (!denot.exists) NoSource
