@@ -937,6 +937,7 @@ object Build {
         Seq("-sourcepath", ((Compile/sourceManaged).value / "scala-library-src").toString)
       },
       Compile / doc / scalacOptions += "-Ydocument-synthetic-types",
+      Compile / scalacOptions += "-Youtput-only-tasty",
       scalacOptions += "-Yscala2-stdlib",
       scalacOptions -= "-Xfatal-warnings",
       ivyConfigurations += SourceDeps.hide,
@@ -982,7 +983,8 @@ object Build {
         val reference = (Compile/sourceManaged).value / "scala-library-src"
         files.filterNot(_.relativeTo(reference).exists(overwritenSources))
       },
-      (Test / managedClasspath) ~= {
+      Test / scalacOptions -= "-Youtput-only-tasty",
+      (Test / compile / managedClasspath) ~= {
         _.filterNot(file => file.data.getName == s"scala-library-${stdlibVersion(Bootstrapped)}.jar")
       },
       mimaCheckDirection := "both",
