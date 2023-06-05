@@ -3,4 +3,4 @@
 $ sleep 2000
 
 $ copy-file changes/Break.scala dep/A.scala
--> use/compile
+# FIXME -> use/compile

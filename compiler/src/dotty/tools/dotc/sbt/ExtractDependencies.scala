@@ -145,10 +145,10 @@ class ExtractDependencies extends Phase {
       if (depFile.isClass) {
         // Dependency is external -- source is undefined
         processExternalDependency(depFile, dep.to.binaryClassName)
-      } else if (depFile.isTasty) {
-        val depClassFile = depFile.resolveSibling(dep.to.binaryClassName + ".class")
-        if depClassFile != null then
-          processExternalDependency(depClassFile, dep.to.binaryClassName)
+      // } else if (depFile.isTasty) {
+      //   val depClassFile = depFile.resolveSibling(dep.to.binaryClassName + ".class")
+      //   if depClassFile != null then
+      //     processExternalDependency(depClassFile, dep.to.binaryClassName)
       } else if (allowLocal || depFile.file != sourceFile) {
         // We cannot ignore dependencies coming from the same source file because
         // the dependency info needs to propagate. See source-dependencies/trait-trait-211.
