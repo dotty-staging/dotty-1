@@ -65,6 +65,34 @@ import scala.annotation.constructorOnly
 object Objects:
 
   // ----------------------------- abstract domain -----------------------------
+/** Syntax for the data structure abstraction used in abstract domain:
+
+ *  ve ::= ObjectRef(class)
+ *  | OfClass(class, vs[outer], ctor, args, env)
+ *  | OfArray(object[owner], regions)
+ *  | Fun(..., env)
+ *  | Cold // abstract values in domain
+ *  vs ::= Set(ve) // set of abstract values
+ *
+ *  refMap = ( ObjectRef | OfClass ) -> ( valsMap, varsMap, outersMap ) // refMap stores field informations of an object or instance
+ *  valsMap = valsym -> vs                                              // maps immutable fields to their values
+ *  varsMap = valsym -> addr                                            // each mutable field has an abstract address
+ *  outersMap = class -> vs                                             // maps outer objects to their values
+ *
+ *  arrayMap = OfArray -> addr                                          // an array has one address that stores the join value of every element
+ *
+ *  heap = addr -M> vs
+ *
+ *  env = (valsMap, Option[env])                                        // stores local variables in the residing method, and possibly outer environments
+ *
+ *  addr ::= localVarAddr(regions, valsym, owner)
+ *  | fieldVarAddr(regions, valsym, owner)                              // independent of OfClass/ObjectRef
+ *  | arrayAddr(regions, owner)                                         // independent of array element type
+ *
+ *  regions ::= List(sourcePosition)
+ *
+ *  Note: -> refers to extensible maps whose entries cannot be modified; -M> refers to extensible whose entries can be modified
+ */
 
   sealed abstract class Value:
     def show(using Context): String
